@@ -286,10 +286,15 @@ earlier ones. Phases may be split into smaller steps as we go.
   marked "missing" instead, so edits aren't lost if a disk is unplugged. If
   the library folder itself is missing, a scan changes nothing.
 
-### Phase 3 — Play it
+### Phase 3 — Play it ✅ *done*
 - Stream audio from the server into a player on the page.
 - Persistent player bar that keeps playing while you browse (htmx).
 - **Try it:** play an episode, click to another page, it keeps playing.
+- Notes: a simple file page (`/files/<id>`) was added so there's somewhere
+  to browse to; Phase 5 grows it into the full episode page. htmx is kept
+  in the app (`app/static/htmx.min.js`, version 2.0.11), not loaded from
+  the internet. Formats a browser can't play (often WMA, sometimes AIFF)
+  show a message in the player bar.
 
 ### Phase 4 — Radio metadata
 - Database fields for series, episode number, station/network, host, cast,

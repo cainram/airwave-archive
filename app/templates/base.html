@@ -5,16 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Airwave Archive{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='player.js') }}" defer></script>
 </head>
-<body>
+{#
+  hx-boost: links and forms fetch just the middle of the next page (#content)
+  and swap it in, so the player bar below keeps playing.
+#}
+<body hx-boost="true" hx-target="#content" hx-swap="innerHTML show:window:top">
   <header class="topbar">
     <a class="brand" href="/">Airwave Archive</a>
   </header>
-  <main class="content">
+  <main id="content" class="content" hx-history-elt>
     {% block content %}{% endblock %}
   </main>
   <footer class="footer">
     Airwave Archive · free software under the GNU GPL v3
   </footer>
+
+  <div id="player" class="player" hidden>
+    <div class="player-info">
+      <a id="player-title" class="player-title" href="/"></a>
+      <span id="player-subtitle" class="muted small"></span>
+    </div>
+    <audio id="player-audio" controls preload="none"></audio>
+  </div>
 </body>
 </html>

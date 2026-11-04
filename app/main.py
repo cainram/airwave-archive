@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 2: remember the library in a database.
+"""Airwave Archive web app — Phase 3: play recordings in the browser.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -11,8 +11,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine, func, select
@@ -30,6 +30,14 @@ DATA_DIR = Path(os.environ.get("AIRWAVE_DATA", "data"))
 
 PAGE_SIZE = 200  # files shown per page
 
+# What kind of audio each file ending holds, so the browser knows how to play it.
+AUDIO_TYPES = {
+    ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".m4b": "audio/mp4",
+    ".aac": "audio/aac", ".flac": "audio/flac", ".ogg": "audio/ogg",
+    ".oga": "audio/ogg", ".opus": "audio/ogg", ".wav": "audio/wav",
+    ".wma": "audio/x-ms-wma", ".aiff": "audio/aiff", ".aif": "audio/aiff",
+}
+
 app = FastAPI(title="Airwave Archive")
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 
@@ -46,11 +54,42 @@ def time_ago(when: datetime | None) -> str:
     return "just now"
 
 
+# Plain names for tag codes. MP3 tags use short codes ("TIT2" = title);
+# FLAC, Ogg, M4A, and WMA use their own names.
+TAG_NAMES = {
+    "TIT2": "Title", "TPE1": "Artist", "TPE2": "Album artist", "TALB": "Album",
+    "TDRC": "Date", "TYER": "Year", "TCON": "Genre", "TRCK": "Track",
+    "TPOS": "Disc", "TCOM": "Composer", "TENC": "Encoded by", "TSSE": "Encoder",
+    "TCOP": "Copyright", "TPUB": "Publisher", "TLEN": "Length", "TIT1": "Grouping",
+    "TIT3": "Subtitle", "COMM": "Comment", "USLT": "Lyrics", "TXXX": "Custom",
+    "WXXX": "Web link", "WOAF": "Web link", "WOAR": "Web link", "WCOM": "Web link",
+    "\xa9nam": "Title", "\xa9ART": "Artist", "aART": "Album artist",
+    "\xa9alb": "Album", "\xa9day": "Date", "\xa9gen": "Genre", "trkn": "Track",
+    "\xa9cmt": "Comment", "\xa9too": "Encoder", "desc": "Description",
+    "title": "Title", "artist": "Artist", "album": "Album", "date": "Date",
+    "genre": "Genre", "tracknumber": "Track", "comment": "Comment",
+    "description": "Description", "encoder": "Encoder", "albumartist": "Album artist",
+    "Author": "Artist", "WM/AlbumTitle": "Album", "WM/Year": "Date",
+    "WM/Genre": "Genre", "WM/TrackNumber": "Track",
+}
+
+
+def tag_label(key: str) -> tuple[str, str]:
+    """'TIT2' -> ('Title', 'TIT2'); 'COMM:ID3v1 Comment:eng' -> ('Comment', 'ID3v1 Comment')."""
+    code, _, extra = key.partition(":")
+    name = TAG_NAMES.get(code) or TAG_NAMES.get(code.lower())
+    if name is None:
+        return key, ""
+    extra = extra.rsplit(":", 1)[0] if code == "COMM" else extra   # drop the language
+    return name, extra or (code if code != name else "")
+
+
 templates = Jinja2Templates(directory=APP_DIR / "templates")
 templates.env.filters["size"] = format_size
 templates.env.filters["duration"] = format_duration
 templates.env.filters["bitrate"] = format_bitrate
 templates.env.filters["ago"] = time_ago
+templates.env.filters["tag_label"] = tag_label
 templates.env.filters["fromjson"] = lambda text: json.loads(text) if text else []
 
 _engine: Engine | None = None
@@ -63,6 +102,26 @@ def get_engine() -> Engine:
     if _engine is None:
         _engine = make_engine(DATA_DIR / DB_FILENAME)
     return _engine
+
+
+def render(request: Request, template: str, context: dict, status_code: int = 200):
+    """Send a page. When htmx asks (a click inside the app), send only the
+    title and the middle of the page, so the player bar isn't replaced."""
+    from_htmx = ("HX-Request" in request.headers
+                 or "HX-History-Restore-Request" in request.headers)
+    context["layout"] = "_partial.html" if from_htmx else "base.html"
+    response = templates.TemplateResponse(request, template, context, status_code=status_code)
+    # Tell browsers the full and partial versions are different pages.
+    response.headers["Vary"] = "HX-Request, HX-History-Restore-Request"
+    return response
+
+
+def get_file(file_id: int) -> AudioFile:
+    with Session(get_engine()) as session:
+        row = session.get(AudioFile, file_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="No such file in the library")
+    return row
 
 
 def run_scan() -> ScanRun:
@@ -94,7 +153,7 @@ def library_page(request: Request, page: int = 1):
             .limit(PAGE_SIZE)
         ).all()
 
-    return templates.TemplateResponse(request, "library.html", {
+    return render(request, "library.html", {
         "files": files,
         "count": count,
         "total_bytes": total_bytes or 0,
@@ -110,10 +169,32 @@ def library_page(request: Request, page: int = 1):
 
 
 @app.post("/rescan")
-def rescan():
+def rescan(request: Request):
     run_scan()
+    if "HX-Request" in request.headers:
+        # Ask htmx to load the Library page into the middle of the screen.
+        return Response(headers={"HX-Location": '{"path": "/", "target": "#content"}'})
     # Send the browser back to the list ("303" means "go look at this page now").
     return RedirectResponse("/", status_code=303)
+
+
+@app.get("/files/{file_id}", response_class=HTMLResponse)
+def file_page(request: Request, file_id: int):
+    return render(request, "file.html", {"f": get_file(file_id)})
+
+
+@app.get("/audio/{file_id}")
+def audio(file_id: int):
+    """Stream one recording. The browser can ask for any part of the file
+    (a "range"), which is how jumping ahead works without downloading it all.
+    Only files the scanner recorded can be played, so nothing outside the
+    library is ever sent."""
+    row = get_file(file_id)
+    path = LIBRARY_DIR / row.folder / row.name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="File is missing; try a rescan")
+    media_type = AUDIO_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media_type)
 
 
 @app.get("/health")
