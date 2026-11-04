@@ -275,11 +275,16 @@ earlier ones. Phases may be split into smaller steps as we go.
   read-only.
 - **Try it:** start the app, open it in a browser, see your files listed.
 
-### Phase 2 — Remember what we found
+### Phase 2 — Remember what we found ✅ *done*
 - Store scan results in SQLite (with indexes and WAL mode from day one);
   re-scans pick up new, changed, and removed files without starting over.
 - Read existing tags (ID3 etc.) and show them.
 - **Try it:** add a file to the folder, re-scan, see it appear.
+- Notes: the database is `airwave.db` in the data folder. A re-scan only
+  opens files whose size or modified time changed. Files that disappear are
+  dropped from the database; once Phase 4 adds manual edits, they should be
+  marked "missing" instead, so edits aren't lost if a disk is unplugged. If
+  the library folder itself is missing, a scan changes nothing.
 
 ### Phase 3 — Play it
 - Stream audio from the server into a player on the page.

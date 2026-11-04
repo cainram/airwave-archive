@@ -1,15 +1,25 @@
-"""Find audio files in the library folder and read basic facts about them.
+"""Find audio files in the library folder, read facts and tags from them,
+and keep the database in step with what's on disk.
 
-This module only *reads* files. It never writes, moves, or renames anything.
+This module only *reads* library files. It never writes, moves, or renames
+anything in the library.
 """
 
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Iterator
 
 import mutagen
+from mutagen.id3 import ID3, Frame
+from sqlalchemy import Engine, delete, select
+from sqlalchemy.orm import Session
+
+from app.db import AudioFile, ScanRun, utcnow
 
 # File endings we treat as audio.
 AUDIO_EXTENSIONS = {
@@ -17,53 +27,137 @@ AUDIO_EXTENSIONS = {
     ".wav", ".wma", ".aiff", ".aif",
 }
 
+# Save to the database every this many new or changed files, so a long
+# first scan isn't lost if it's interrupted.
+BATCH_SIZE = 500
+
+# Very long tag values (rare) are cut to this many characters.
+MAX_TAG_LENGTH = 10_000
+
+COMMON_TAGS = ("title", "artist", "album", "date", "genre", "track", "comment")
+
+# Where each common tag lives in each tag format.
+ID3_FRAMES = {"TIT2": "title", "TPE1": "artist", "TALB": "album",
+              "TDRC": "date", "TCON": "genre", "TRCK": "track"}
+OTHER_KEYS = {
+    # MP4 / M4A
+    "\xa9nam": "title", "\xa9ART": "artist", "\xa9alb": "album", "\xa9day": "date",
+    "\xa9gen": "genre", "trkn": "track", "\xa9cmt": "comment",
+    # FLAC, Ogg, Opus (Vorbis comments)
+    "title": "title", "artist": "artist", "album": "album", "date": "date",
+    "genre": "genre", "tracknumber": "track", "comment": "comment",
+    "description": "comment",
+    # WMA
+    "Title": "title", "Author": "artist", "WM/AlbumTitle": "album",
+    "WM/Year": "date", "WM/Genre": "genre", "WM/TrackNumber": "track",
+    "Description": "comment",
+}
+# Tags that hold pictures or other non-text data; not shown.
+SKIP_TAGS = {"APIC", "PRIV", "GEOB", "MCDI", "covr", "metadata_block_picture",
+             "WM/Picture"}
+
 
 @dataclass
-class AudioFile:
-    """One audio file found during a scan."""
+class AudioInfo:
+    """What we could read from inside one audio file."""
 
-    name: str              # file name, e.g. "Suspense 1943-05-13 - Donovan's Brain.mp3"
-    folder: str            # folder relative to the library root ("" = top level)
-    size_bytes: int
-    duration_seconds: float | None  # None if the length couldn't be read
-
-
-@dataclass
-class ScanResult:
-    files: list[AudioFile]
-    unreadable: int        # audio files whose length couldn't be read
-
-    @property
-    def total_bytes(self) -> int:
-        return sum(f.size_bytes for f in self.files)
-
-    @property
-    def total_seconds(self) -> float:
-        return sum(f.duration_seconds or 0 for f in self.files)
+    duration_seconds: float | None = None
+    bitrate: int | None = None
+    tags: dict[str, str] = field(default_factory=dict)        # the common tags
+    all_tags: list[tuple[str, str]] = field(default_factory=list)
 
 
-def read_duration(path: Path) -> float | None:
-    """Return the length of an audio file in seconds, or None if unknown."""
+def _text(value) -> str:
+    """Turn any tag value into plain text."""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (bytes, bytearray)):
+        return ""
+    if isinstance(value, tuple) and len(value) == 2 and all(isinstance(v, int) for v in value):
+        number, total = value          # MP4 track number: (3, 10) -> "3/10"
+        return f"{number}/{total}" if total else str(number)
+    if isinstance(value, list):
+        return "; ".join(t for t in (_text(v) for v in value) if t)
+    if isinstance(value, Frame) and hasattr(value, "text"):   # ID3 text frames
+        return _text(list(value.text))
+    if isinstance(value, Frame) and hasattr(value, "url"):    # ID3 link frames
+        return str(value.url)
+    if hasattr(value, "value"):         # WMA attributes
+        return _text(value.value)
+    return str(value).strip()
+
+
+def _clip(text: str) -> str:
+    return text[:MAX_TAG_LENGTH]
+
+
+def _read_id3(tags: ID3, info: AudioInfo) -> None:
+    for frame_id, name in ID3_FRAMES.items():
+        text = _text(tags.getall(frame_id))
+        if text:
+            info.tags[name] = _clip(text)
+    # A file can have several comments. Prefer the plain one (no description),
+    # then any other except the short "ID3v1" copy.
+    comments = [c for c in tags.getall("COMM") if _text(c)]
+    best = (next((c for c in comments if c.desc == ""), None)
+            or next((c for c in comments if c.desc != "ID3v1 Comment"), None)
+            or (comments[0] if comments else None))
+    if best is not None:
+        info.tags["comment"] = _clip(_text(best))
+    for frame in tags.values():
+        if frame.FrameID in SKIP_TAGS:
+            continue
+        text = _text(frame)
+        if text:
+            info.all_tags.append((frame.HashKey[:60], _clip(text)))
+
+
+def _read_other(tags, info: AudioInfo) -> None:
+    for key, value in tags.items():
+        if key in SKIP_TAGS or (isinstance(key, str) and key.lower() in SKIP_TAGS):
+            continue
+        text = _text(value)
+        if not text:
+            continue
+        info.all_tags.append((str(key)[:60], _clip(text)))
+        name = OTHER_KEYS.get(key) or OTHER_KEYS.get(str(key).lower())
+        if name and name not in info.tags:
+            info.tags[name] = _clip(text)
+
+
+def read_audio(path: Path) -> AudioInfo:
+    """Read length, bitrate, and tags from one file. Never fails: anything
+    that can't be read is simply left empty."""
+    info = AudioInfo()
     try:
         audio = mutagen.File(path)
     except Exception:
-        return None
-    if audio is None or audio.info is None:
-        return None
-    length = getattr(audio.info, "length", None)
-    return float(length) if length else None
+        return info
+    if audio is None:
+        return info
+    if audio.info is not None:
+        length = getattr(audio.info, "length", None)
+        info.duration_seconds = float(length) if length else None
+        bitrate = getattr(audio.info, "bitrate", None)
+        info.bitrate = int(bitrate) if bitrate else None
+    try:
+        if isinstance(audio.tags, ID3):
+            _read_id3(audio.tags, info)
+        elif audio.tags is not None:
+            _read_other(audio.tags, info)
+    except Exception:
+        pass  # odd or damaged tags shouldn't stop the scan
+    return info
 
 
-def scan_library(root: Path) -> ScanResult:
-    """Walk every folder under ``root`` and collect the audio files."""
-    files: list[AudioFile] = []
-    unreadable = 0
-    if not root.is_dir():
-        return ScanResult(files=[], unreadable=0)
-
+def find_audio_files(root: Path) -> Iterator[tuple[Path, str, os.stat_result]]:
+    """Walk every folder under ``root``, yielding (path, folder, file info)
+    for each audio file. ``folder`` is relative to ``root``."""
     for dirpath, dirnames, filenames in os.walk(root):
         # Skip hidden folders such as ".Trash" or ".@__thumb".
         dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+        folder = Path(dirpath).relative_to(root).as_posix()
+        folder = "" if folder == "." else folder
         for filename in sorted(filenames):
             if filename.startswith("."):
                 continue
@@ -71,25 +165,83 @@ def scan_library(root: Path) -> ScanResult:
             if path.suffix.lower() not in AUDIO_EXTENSIONS:
                 continue
             try:
-                size = path.stat().st_size
+                stat = path.stat()
             except OSError:
                 continue
-            duration = read_duration(path)
-            if duration is None:
-                unreadable += 1
-            folder = str(Path(dirpath).relative_to(root))
-            files.append(AudioFile(
-                name=filename,
-                folder="" if folder == "." else folder,
-                size_bytes=size,
-                duration_seconds=duration,
-            ))
-    return ScanResult(files=files, unreadable=unreadable)
+            yield path, folder, stat
 
 
-def format_size(num_bytes: int) -> str:
+def _apply(row: AudioFile, info: AudioInfo, stat: os.stat_result) -> None:
+    """Copy freshly read facts onto a database row."""
+    row.size_bytes = stat.st_size
+    row.mtime_ns = stat.st_mtime_ns
+    row.duration_seconds = info.duration_seconds
+    row.bitrate = info.bitrate
+    for name in COMMON_TAGS:
+        setattr(row, f"tag_{name}", info.tags.get(name))
+    row.tags_json = json.dumps(info.all_tags) if info.all_tags else None
+    row.last_read = utcnow()
+
+
+def sync_library(engine: Engine, root: Path) -> ScanRun:
+    """Bring the database up to date with the library folder.
+
+    New files are added, changed files are re-read, and files that are gone
+    are removed from the database. Unchanged files aren't opened at all.
+    """
+    started = time.monotonic()
+    run = ScanRun(started_at=utcnow(), seconds=0.0, added=0, changed=0,
+                  removed=0, unchanged=0, library_missing=False)
+
+    with Session(engine, expire_on_commit=False) as session:
+        if not root.is_dir():
+            # Possibly a disk that isn't mounted: change nothing.
+            run.library_missing = True
+        else:
+            # What we knew before: path -> (id, size, modified time).
+            known = {
+                (folder, name): (row_id, size, mtime)
+                for row_id, folder, name, size, mtime in session.execute(
+                    select(AudioFile.id, AudioFile.folder, AudioFile.name,
+                           AudioFile.size_bytes, AudioFile.mtime_ns))
+            }
+            seen: set[tuple[str, str]] = set()
+            pending = 0
+            for path, folder, stat in find_audio_files(root):
+                key = (folder, path.name)
+                seen.add(key)
+                before = known.get(key)
+                if before and before[1] == stat.st_size and before[2] == stat.st_mtime_ns:
+                    run.unchanged += 1
+                    continue
+                info = read_audio(path)
+                if before:
+                    row = session.get(AudioFile, before[0])
+                    run.changed += 1
+                else:
+                    row = AudioFile(folder=folder, name=path.name, first_seen=utcnow())
+                    session.add(row)
+                    run.added += 1
+                _apply(row, info, stat)
+                pending += 1
+                if pending >= BATCH_SIZE:
+                    session.commit()
+                    pending = 0
+
+            gone = [known[key][0] for key in known.keys() - seen]
+            for i in range(0, len(gone), BATCH_SIZE):
+                session.execute(delete(AudioFile).where(AudioFile.id.in_(gone[i:i + BATCH_SIZE])))
+            run.removed = len(gone)
+
+        run.seconds = time.monotonic() - started
+        session.add(run)
+        session.commit()
+    return run
+
+
+def format_size(num_bytes: int | None) -> str:
     """1536 -> '1.5 KB'."""
-    size = float(num_bytes)
+    size = float(num_bytes or 0)
     for unit in ("bytes", "KB", "MB", "GB", "TB"):
         if size < 1024 or unit == "TB":
             return f"{size:.0f} {unit}" if unit == "bytes" else f"{size:.1f} {unit}"
@@ -110,3 +262,8 @@ def format_duration(seconds: float | None) -> str:
     if hours:
         return f"{hours}:{minutes:02d}:{secs:02d}"
     return f"{minutes}:{secs:02d}"
+
+
+def format_bitrate(bits_per_second: int | None) -> str:
+    """64000 -> '64 kbps'."""
+    return f"{round(bits_per_second / 1000)} kbps" if bits_per_second else "unknown"

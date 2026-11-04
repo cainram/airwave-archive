@@ -59,11 +59,30 @@ table.files { width: 100%; border-collapse: collapse; background: var(--panel); 
 .files tbody tr:hover { background: #eef2f8; }
 .files .num { text-align: right; white-space: nowrap; }
 .files .name { word-break: break-word; }
-.files .folder { color: var(--muted); word-break: break-word; }
 
-/* On narrow phone screens, hide the folder column to save space. */
+.files td { vertical-align: top; }
+.files .title { font-weight: 600; }
+.files .artist, .files .date { color: var(--muted); }
+
+/* The "details" fold-out under each file, listing all its tags. */
+.tags summary { color: var(--accent); cursor: pointer; font-size: 0.85rem; width: max-content; }
+.tags dl {
+  display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px;
+  margin: 8px 0 4px; padding: 10px; font-size: 0.85rem;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+}
+.tags dt { color: var(--muted); font-weight: 600; word-break: break-word; max-width: 14em; }
+.tags dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* "Previous / Next" page buttons. */
+.pager { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+.pager a { text-decoration: none; }
+
+/* On narrow phone screens, hide some columns to save space. */
 @media (max-width: 600px) {
-  .files .folder, .files th:nth-child(2) { display: none; }
+  .files .artist, .files .size { display: none; }
+  .tags dl { grid-template-columns: 1fr; }
+  .tags dt { max-width: none; }
 }
 
 .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 16px; }

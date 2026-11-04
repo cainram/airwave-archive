@@ -10,8 +10,12 @@ services:
       - "8000:8000"
     environment:
       AIRWAVE_LIBRARY: /library
+      AIRWAVE_DATA: /data
     volumes:
       # Your recordings folder, mounted READ-ONLY (":ro") so the app
       # cannot change your files. Change the left side if your
       # recordings live somewhere other than /srv/airwave/library.
       - /srv/airwave/library:/library:ro
+      # The app's own data (its database). This one is writable, and is
+      # the folder to back up: it will hold all your edits.
+      - /srv/airwave/data:/data

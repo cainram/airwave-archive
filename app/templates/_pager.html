@@ -1,0 +1,8 @@
+<nav class="pager">
+  {% if page > 1 %}<a class="button" href="/?page={{ page - 1 }}">← Previous</a>{% endif %}
+  <span class="muted">
+    Showing {{ first_index }}–{{ first_index + files | length - 1 }} of {{ count }}
+    (page {{ page }} of {{ pages }})
+  </span>
+  {% if page < pages %}<a class="button" href="/?page={{ page + 1 }}">Next →</a>{% endif %}
+</nav>
