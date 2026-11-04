@@ -203,7 +203,15 @@ like. For example, from another Linux or Mac computer:
 scp -r "/path/to/Suspense" youruser@<server-address>:/srv/airwave/library/
 ```
 
-Then press **Rescan** on the Library page.
+Then press **Rescan** on the Library page. The first scan reads every
+file; later scans only look at files that are new or have changed, so they
+are much faster.
+
+## Back up the data folder
+
+The app keeps its database in `/srv/airwave/data`. It's small, and it will
+hold all the information you add, so include it in your backups. (Your
+recordings in `/srv/airwave/library` are never changed by the app.)
 
 ---
 

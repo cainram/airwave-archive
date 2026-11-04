@@ -108,10 +108,15 @@ These come from the plan and should not be changed without the owner's OK:
 ## Project layout and commands
 
 - `app/main.py`: the web app (pages and routes)
-- `app/scanner.py`: finds audio files and reads their length
+- `app/db.py`: the database tables (SQLite file `airwave.db` in the data
+  folder, `AIRWAVE_DATA`)
+- `app/scanner.py`: finds audio files, reads length and tags, and keeps the
+  database in step with the library
 - `app/templates/`: HTML page templates; `app/static/`: stylesheet
 - `tests/`: automated tests. Run them with `pytest` after
-  `pip install -r requirements-dev.txt`.
+  `pip install -r requirements-dev.txt`. On the owner's VM, `python3-venv`
+  isn't installed, so run them in a throwaway container instead:
+  `docker run --rm -v "$PWD":/src:ro python:3.13-slim sh -c 'cp -r /src /w && cd /w && pip install -q -r requirements-dev.txt && python -m pytest -q -p no:cacheprovider'`
 - `Dockerfile`, `compose.yaml`: how the app is packaged and started
 - `docs/INSTALL.md`: owner-facing install guide. Keep it accurate when
   setup steps change.
