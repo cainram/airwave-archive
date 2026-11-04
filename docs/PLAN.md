@@ -26,6 +26,12 @@ browser on any device in your house.
 - **People who already have their recordings.** The project hosts and
   distributes **no content**. You bring your own files.
 
+### A personal project
+
+Airwave Archive is built for its owner's own use. It's free software (GPL v3)
+and anyone may use or adapt it, but it isn't run as a community project:
+there's no promise of support, feature requests, or releases on a schedule.
+
 ## 2. Key feature: the calendar
 
 The headline feature is a **calendar view** — like a TV guide for the past.
