@@ -134,13 +134,45 @@ source, **not** the Ubuntu "snap" version.
 
 ## Step 3 — Download and start Airwave Archive
 
-1. Download the project into your home folder:
+The project's GitHub repository is private, so the server must sign in to
+GitHub before it can download it. (If the repository is public, skip to
+item 4 and use `git clone https://github.com/cainram/airwave-archive.git`.)
+
+1. Install the GitHub command-line tool:
 
    ```bash
-   cd ~ && git clone https://github.com/cainram/airwave-archive.git
+   sudo apt-get install -y gh
    ```
 
-2. Build and start it:
+2. Sign in to GitHub:
+
+   ```bash
+   gh auth login
+   ```
+
+   It asks a few questions. Use the arrow keys and **Enter** to choose:
+   - Where do you use GitHub? → **GitHub.com**
+   - Preferred protocol → **HTTPS**
+   - Authenticate Git with your GitHub credentials? → **Yes**
+   - How would you like to authenticate? → **Login with a web browser**
+
+   It then shows a one-time code (like `ABCD-1234`). On any computer or phone,
+   open https://github.com/login/device, sign in to GitHub, and type the code.
+   Back in the terminal you should see "Logged in as …".
+
+3. Check it worked:
+
+   ```bash
+   gh auth status
+   ```
+
+4. Download the project into your home folder:
+
+   ```bash
+   cd ~ && gh repo clone cainram/airwave-archive
+   ```
+
+5. Build and start it:
 
    ```bash
    cd ~/airwave-archive && docker compose up -d --build
@@ -149,7 +181,7 @@ source, **not** the Ubuntu "snap" version.
    The first time takes a minute or two while it downloads and builds.
    `-d` means "keep running in the background."
 
-3. Open it in a browser: `http://<server-address>:8000`
+6. Open it in a browser: `http://<server-address>:8000`
 
    Replace `<server-address>` with the server's IP address, or its Tailscale
    name if you use Tailscale. To find the IP, run `hostname -I` on the server.

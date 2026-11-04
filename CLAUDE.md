@@ -12,8 +12,9 @@ it up to date if a decision changes.
 
 ## Guiding principle: a personal project
 
-The owner is building Airwave Archive **for themselves**. Others are welcome
-to use it (it's GPL v3 and public), but the owner is **not running a
+The owner is building Airwave Archive **for themselves**. The GitHub
+repository is **private** for now. If it's ever shared, others are welcome to
+use it under the GPL v3, but the owner is **not running a
 community project**. In practice:
 
 - Make decisions that suit the owner's setup and needs. Don't add options,
