@@ -1,0 +1,17 @@
+# Docker Compose settings: how to start Airwave Archive.
+# Start it with:  docker compose up -d --build
+services:
+  airwave:
+    build: .
+    container_name: airwave-archive
+    restart: unless-stopped
+    ports:
+      # "host port:container port". Open http://<server>:8000 in a browser.
+      - "8000:8000"
+    environment:
+      AIRWAVE_LIBRARY: /library
+    volumes:
+      # Your recordings folder, mounted READ-ONLY (":ro") so the app
+      # cannot change your files. Change the left side if your
+      # recordings live somewhere other than /srv/airwave/library.
+      - /srv/airwave/library:/library:ro

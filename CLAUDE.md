@@ -63,9 +63,10 @@ command, click something on GitHub, test a feature):
 
 These come from the plan and should not be changed without the owner's OK:
 
-- **Never copy, move, upload, or rename the owner's audio files.** The app
-  reads them where they already sit on disk. Writing tags back into files is
-  only allowed as an explicit, opt-in action the owner triggers.
+- **Never move, rename, or change files in the library.** The app reads
+  recordings where they sit. The only way files enter the library is when the
+  owner approves uploads from the **inbox** (`/srv/airwave/inbox`). Writing
+  tags back into files is only allowed as an explicit, opt-in action.
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud
@@ -80,8 +81,40 @@ These come from the plan and should not be changed without the owner's OK:
 
 - Python + FastAPI (the web server)
 - Jinja2 HTML templates + htmx (the pages)
-- SQLite (the database)
+- SQLite (the database), via SQLAlchemy, with indexes, WAL mode, and FTS5
+  search, so it stays fast for very large libraries
 - Docker Compose (how it's installed and run)
+
+## Project layout and commands
+
+- `app/main.py`: the web app (pages and routes)
+- `app/scanner.py`: finds audio files and reads their length
+- `app/templates/`: HTML page templates; `app/static/`: stylesheet
+- `tests/`: automated tests. Run them with `pytest` after
+  `pip install -r requirements-dev.txt`.
+- `Dockerfile`, `compose.yaml`: how the app is packaged and started
+- `docs/INSTALL.md`: owner-facing install guide. Keep it accurate when
+  setup steps change.
+
+**Testing Docker builds in a cloud session:** the sandbox's network proxy
+breaks `pip install` inside `docker build`. Don't change the real Dockerfile
+for this. Build from a temporary copy that adds
+`COPY --from=ca ca-bundle.crt /ca.crt` and `ENV PIP_CERT=/ca.crt` before the
+`pip install` line, using `--build-context ca=/root/.ccr`. Start the daemon
+with `dockerd &` if it isn't running.
+
+## Owner's test setup
+
+Public docs give general recommendations. The owner's own test machine is:
+
+- An Ubuntu Server VM on Proxmox: 128 GB boot disk, 2 TB thin-provisioned
+  recordings disk mounted at `/srv/airwave`
+  (`library/`, `inbox/`, `data/`).
+- Reached over the LAN via remote desktop, and over Tailscale. Their phone
+  can open the app over Tailscale, which is useful for testing the phone layout.
+- Libraries are expected to get very large. For example: an Art Bell archive of
+  about 70 GB / 147 days of audio at ~44 kbps, plus a sizeable old-time radio
+  collection (usually low bitrate).
 
 ## Git and GitHub
 

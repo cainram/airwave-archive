@@ -1,0 +1,66 @@
+/* Airwave Archive — basic dark theme. */
+:root {
+  --bg: #1f1f1f;
+  --panel: #2a2a2a;
+  --line: #3a3a3a;
+  --text: #ececec;
+  --muted: #a0a0a0;
+  --accent: #e5a00d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+code { font-size: 0.9em; color: var(--accent); }
+
+.topbar {
+  padding: 12px 16px;
+  background: #151515;
+  border-bottom: 1px solid var(--line);
+}
+.brand { color: var(--accent); font-weight: 700; font-size: 1.2rem; text-decoration: none; }
+
+.content { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+.summary {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px;
+}
+.summary h1 { margin: 0 0 4px; font-size: 1.8rem; }
+.muted { color: var(--muted); margin: 2px 0; }
+.small { font-size: 0.85rem; }
+
+.button {
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 18px; font: inherit; cursor: pointer;
+  background: var(--panel); color: var(--text);
+}
+.button.primary { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 600; }
+
+.notice {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 16px;
+}
+
+.table-wrap { overflow-x: auto; }
+table.files { width: 100%; border-collapse: collapse; }
+.files th, .files td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.files th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+.files tbody tr:hover { background: var(--panel); }
+.files .num { text-align: right; white-space: nowrap; }
+.files .name { word-break: break-word; }
+.files .folder { color: var(--muted); word-break: break-word; }
+
+/* On narrow phone screens, hide the folder column to save space. */
+@media (max-width: 600px) {
+  .files .folder, .files th:nth-child(2) { display: none; }
+}
+
+.footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 16px; }
