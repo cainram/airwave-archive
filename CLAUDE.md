@@ -67,6 +67,8 @@ These come from the plan and should not be changed without the owner's OK:
   recordings where they sit. The only way files enter the library is when the
   owner approves uploads from the **inbox** (`/srv/airwave/inbox`). Writing
   tags back into files is only allowed as an explicit, opt-in action.
+  Exports (PLAN.md section 5a) write tags into **copies** only, never the
+  originals.
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud

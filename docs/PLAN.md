@@ -165,9 +165,40 @@ opposed to the sound itself. The app gets it from several sources:
    like air date and network), so other players can see it too. Off by
    default; always an explicit action.
 
+### Airwave tags
+
+When the app writes information into files (tag write-back, section 5 item 5,
+or exports, section 5a), it uses a documented set of **custom tags** for the
+radio-specific fields: air date (including partial dates), air time, time
+zone, station/network, series, episode number, host, cast, notes, and a
+stable episode ID. Each audio format stores custom tags its own way (MP3: ID3
+"TXXX" frames; FLAC/OGG: Vorbis comments; M4A: freeform atoms), but the field
+names are the same everywhere. Another Airwave Archive server can then read
+them back exactly.
+
 When sources disagree, the app records **where each value came from** and
 **manual edits always win** over automatic ones, so a re-scan never
 overwrites your corrections.
+
+## 5a. Export and sharing
+
+You can select episodes (or a whole series) and **export** them as a zip
+file to share with someone else who runs Airwave Archive.
+
+- The export works on **copies**. Each copy gets the database information
+  written into its tags (standard and Airwave tags). **Library files are
+  never modified.**
+- The zip also includes a small **manifest** file listing every episode and
+  its information, plus series artwork. That way nothing is lost even for
+  formats with limited tag support.
+- Audio files are already compressed, so the zip stores them as-is ("store"
+  mode). This makes exports fast, and large exports (tens of GB) are
+  supported.
+- **Importing:** the receiving server accepts the zip into its **inbox**.
+  Every episode arrives already filled in, ready to review and add to the
+  library. Episode IDs let it spot episodes you already have.
+- The project itself provides no sharing service. Moving the zip between
+  people (and having the right to share the recordings) is up to them.
 
 ## 6. Suggested technology (and why)
 
@@ -297,6 +328,12 @@ earlier ones. Phases may be split into smaller steps as we go.
   writable.
 - **Try it:** write tags to one file, open it in another player, see the
   new info.
+
+### Phase 11 — Export and import
+- Export selected episodes or series as a zip of tagged copies + manifest.
+- Import an Airwave zip through the inbox, with duplicates detected.
+- **Try it:** export a series, import it on a second test server (or a
+  fresh install), and see it arrive fully labelled.
 
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
