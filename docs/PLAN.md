@@ -341,6 +341,30 @@ earlier ones. Phases may be split into smaller steps as we go.
 - **Try it:** export a series, import it on a second test server (or a
   fresh install), and see it arrive fully labelled.
 
+### Later — Desktop installers (Windows and Mac)
+For people who don't want Docker: package the app as a normal desktop
+program (a Windows installer, a Mac `.dmg`). It starts in the background,
+opens the browser to the Library page, and asks for the recordings folder
+on first run. Built automatically by GitHub for each release.
+- Open question: code signing. Without it, Windows and macOS show
+  "unknown publisher" warnings; signing costs roughly $100–400/yr
+  (Windows) plus $99/yr (Apple). The website explains how to get past
+  the warnings either way.
+
+### Later — Going public
+- Make the GitHub repository public. Turn off **Issues** and
+  **Discussions** (Settings → General → Features), since there's no
+  support channel.
+- Publish finished versions on GitHub **Releases** (installers and
+  Docker image).
+- **airwavearchive.org**: one static page covering what it is,
+  screenshots, download links (pointing to GitHub Releases), how to get
+  past install warnings, Docker instructions, GPL v3, and "provided as-is,
+  no support." No contact info.
+- Hosted on a small, separate VM on the public-facing VLAN, using Caddy
+  (automatic HTTPS), with only ports 80/443 open, SSH over Tailscale only,
+  and automatic security updates.
+
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
   database, import from online episode logs, podcast RSS feed subscriptions.
