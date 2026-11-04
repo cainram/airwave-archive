@@ -97,18 +97,23 @@ source, **not** the Ubuntu "snap" version.
    ```
 
    ```bash
-   sudo install -m 0755 -d /etc/apt/keyrings && sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && sudo chmod a+r /etc/apt/keyrings/docker.asc
+   sudo install -m 0755 -d /etc/apt/keyrings
    ```
 
    ```bash
-   sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-   Types: deb
-   URIs: https://download.docker.com/linux/ubuntu
-   Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-   Components: stable
-   Signed-By: /etc/apt/keyrings/docker.asc
-   EOF
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
    ```
+
+   ```bash
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
+   ```
+
+   ```bash
+   printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: %s\nComponents: stable\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")" | sudo tee /etc/apt/sources.list.d/docker.sources
+   ```
+
+   It prints five lines. The `Suites:` line should show your Ubuntu
+   version's codename (like `noble`).
 
 2. Install Docker:
 
