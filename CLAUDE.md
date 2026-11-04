@@ -10,6 +10,20 @@ downloaded radio programs (old-time radio, podcasts). The full plan lives in
 [`docs/PLAN.md`](docs/PLAN.md). **Read it before starting any work**, and keep
 it up to date if a decision changes.
 
+## Guiding principle: a personal project
+
+The owner is building Airwave Archive **for themselves**. The GitHub
+repository is **private** for now. If it's ever shared, others are welcome to
+use it under the GPL v3, but the owner is **not running a
+community project**. In practice:
+
+- Make decisions that suit the owner's setup and needs. Don't add options,
+  settings, or support for other platforms "in case someone wants them."
+- Don't add community scaffolding: contribution guides, issue/PR templates,
+  codes of conduct, release processes, changelogs for outsiders, badges.
+- Public docs (README, INSTALL) should be accurate and usable, but needn't
+  cover every setup or promise support.
+
 ## About the owner — read this first
 
 The project owner is **not a programmer**. The last time they wrote code was in

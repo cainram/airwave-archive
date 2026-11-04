@@ -12,6 +12,10 @@ day, week, or month.
 - Reads your recordings where they sit; never changes your library files.
 - Hosts no content. You bring your own recordings.
 
+This is a personal project, shared as-is. You're welcome to use or fork it
+under the GPL, but it isn't run as a community project, so there's no
+promise of support or of acting on feature requests.
+
 **Status:** early development, Phase 1. It scans a folder and lists the
 audio files on a web page. See the [project plan](docs/PLAN.md) for what's
 coming.
