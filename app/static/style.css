@@ -1,11 +1,13 @@
-/* Airwave Archive — basic dark theme. */
+/* Airwave Archive — light theme.
+   All colours are defined here; change them in one place. */
 :root {
-  --bg: #1f1f1f;
-  --panel: #2a2a2a;
-  --line: #3a3a3a;
-  --text: #ececec;
-  --muted: #a0a0a0;
-  --accent: #e5a00d;
+  --bg: #f5f6f8;        /* page background: soft off-white */
+  --panel: #ffffff;     /* cards, top bar, tables */
+  --line: #dde1e7;      /* borders and dividers */
+  --text: #1f2430;      /* main text: near-black */
+  --muted: #5d6676;     /* secondary text: grey */
+  --accent: #2b5a9b;    /* brand colour: deep radio-dial blue */
+  --accent-text: #ffffff; /* text on accent-coloured buttons */
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +23,7 @@ code { font-size: 0.9em; color: var(--accent); }
 
 .topbar {
   padding: 12px 16px;
-  background: #151515;
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 .brand { color: var(--accent); font-weight: 700; font-size: 1.2rem; text-decoration: none; }
@@ -42,7 +44,8 @@ code { font-size: 0.9em; color: var(--accent); }
   padding: 8px 18px; font: inherit; cursor: pointer;
   background: var(--panel); color: var(--text);
 }
-.button.primary { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 600; }
+.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.button.primary:hover { filter: brightness(1.1); }
 
 .notice {
   background: var(--panel); border: 1px solid var(--line);
@@ -50,10 +53,10 @@ code { font-size: 0.9em; color: var(--accent); }
 }
 
 .table-wrap { overflow-x: auto; }
-table.files { width: 100%; border-collapse: collapse; }
+table.files { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 .files th, .files td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .files th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
-.files tbody tr:hover { background: var(--panel); }
+.files tbody tr:hover { background: #eef2f8; }
 .files .num { text-align: right; white-space: nowrap; }
 .files .name { word-break: break-word; }
 .files .folder { color: var(--muted); word-break: break-word; }
