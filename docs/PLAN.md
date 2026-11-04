@@ -59,16 +59,60 @@ Rules:
 - Programs known only to the year or month appear in a side list ("Also from
   this month / year") so they're never hidden.
 
-## 3. How it treats your files
+### Overnight shows and multi-part broadcasts
 
-- **Reads audio files where they already sit on disk.** You point the app at
-  one or more folders; it never copies, moves, renames, or uploads them.
-- The app keeps its own information (titles, dates, notes) in a separate
-  database file. Deleting the app's database never touches your recordings.
-- **Writing tags back into files is optional** and only happens when you
-  explicitly ask for it (see section 5).
-- In Docker, music folders are mounted **read-only** by default, so the app
-  physically cannot change them unless you choose to allow it.
+- **Shows that cross midnight.** Overnight talk shows (e.g. Art Bell's
+  *Coast to Coast AM*, roughly 10 PM–3 AM Pacific) are stored with a start
+  time and a length, and appear on the calendar as **one** broadcast spanning
+  both dates — not split in two, not on the wrong day.
+- **One broadcast, several files.** Long shows are often saved as "Hour 1",
+  "Hour 2", and so on. The app can group those parts into a single episode
+  that plays straight through, while still remembering each separate file.
+
+## 3. Files and storage
+
+### Ground rule
+
+**The app never moves, renames, or changes files in your library.** The only
+ways files ever get added to the library are when *you* approve uploads from
+the inbox (below). Writing tags into files is a separate, opt-in action
+(section 5).
+
+### Where things live
+
+The recommended layout on the server is one folder, `/srv/airwave`, ideally
+on its own disk:
+
+| Folder | What's in it |
+|--------|--------------|
+| `/srv/airwave/library/` | Your recordings, in whatever folder structure you like. |
+| `/srv/airwave/inbox/` | Web uploads waiting for review (see below). |
+| `/srv/airwave/data/` | The app's database and artwork cache. Small, but holds all your edits — back this up. |
+
+- The app reads recordings **where they sit**; it never makes copies.
+- Deleting the app or its database never touches your recordings.
+- In Docker, the library is mounted **read-only** by default, so the app
+  physically cannot change it. Approving uploads (and the optional tag
+  writing) needs it mounted writable; the install guide will explain how
+  when we get there.
+- Network shares (NFS/SMB) aren't a goal for now. Anything mounted into
+  `/srv/airwave/library` by the operating system will simply work, though.
+
+### Uploads and the inbox
+
+You can upload recordings through the web page (useful for small batches;
+for large collections, copying files onto the server is faster).
+
+1. **Upload** — files land in the **inbox**, a holding area separate from the
+   library. Only audio file types are accepted, and nothing is ever
+   overwritten (duplicate names get a number added).
+2. **Review** — the inbox page shows each upload batch with what the app
+   worked out from tags and filenames (series, date, title). You fix
+   anything that's wrong.
+3. **Add to library** — approved files are moved into the library, filed in
+   a folder for their series (e.g. `library/Suspense/`).
+4. **Or reject** — rejected files are deleted from the inbox. The library is
+   never touched.
 
 ## 4. User interface
 
@@ -83,6 +127,8 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
   select many episodes and set the same field (e.g. network = "CBS") on all of
   them at once.
 - **Search** — across titles, series, cast, host, notes.
+- **Series totals** — number of episodes, total listening time, and total
+  size for each series.
 - **Continue listening** — remembers where you stopped in each episode and
   lists partly-played episodes on the home page.
 - **Persistent player bar** — a player at the bottom of the screen that keeps
@@ -119,9 +165,40 @@ opposed to the sound itself. The app gets it from several sources:
    like air date and network), so other players can see it too. Off by
    default; always an explicit action.
 
+### Airwave tags
+
+When the app writes information into files (tag write-back, section 5 item 5,
+or exports, section 5a), it uses a documented set of **custom tags** for the
+radio-specific fields: air date (including partial dates), air time, time
+zone, station/network, series, episode number, host, cast, notes, and a
+stable episode ID. Each audio format stores custom tags its own way (MP3: ID3
+"TXXX" frames; FLAC/OGG: Vorbis comments; M4A: freeform atoms), but the field
+names are the same everywhere. Another Airwave Archive server can then read
+them back exactly.
+
 When sources disagree, the app records **where each value came from** and
 **manual edits always win** over automatic ones, so a re-scan never
 overwrites your corrections.
+
+## 5a. Export and sharing
+
+You can select episodes (or a whole series) and **export** them as a zip
+file to share with someone else who runs Airwave Archive.
+
+- The export works on **copies**. Each copy gets the database information
+  written into its tags (standard and Airwave tags). **Library files are
+  never modified.**
+- The zip also includes a small **manifest** file listing every episode and
+  its information, plus series artwork. That way nothing is lost even for
+  formats with limited tag support.
+- Audio files are already compressed, so the zip stores them as-is ("store"
+  mode). This makes exports fast, and large exports (tens of GB) are
+  supported.
+- **Importing:** the receiving server accepts the zip into its **inbox**.
+  Every episode arrives already filled in, ready to review and add to the
+  library. Episode IDs let it spot episodes you already have.
+- The project itself provides no sharing service. Moving the zip between
+  people (and having the right to share the recordings) is up to them.
 
 ## 6. Suggested technology (and why)
 
@@ -130,35 +207,71 @@ overwrites your corrections.
 | Language | **Python** | A programming language known for being readable — closer to QBasic in spirit than most. It has excellent libraries for reading audio tags (e.g. *mutagen*) and handling dates. |
 | Web framework | **FastAPI** | A "framework" is a ready-made toolkit so we don't write a web server from scratch. FastAPI is modern, fast, well documented, and catches many mistakes automatically. |
 | Pages | **Server-rendered HTML templates (Jinja2) + htmx** | The server builds each page from a template (a page with blanks to fill in) and sends finished HTML to the browser. **htmx** is a small add-on that lets parts of a page update without reloading — e.g. saving an edit or keeping the player bar running. This avoids a big, complex JavaScript app. |
-| Database | **SQLite** | A database stored in a single ordinary file. No separate database server to install or manage; easy to back up (just copy the file). Plenty fast for one household. |
+| Database | **SQLite** | A database stored in a single ordinary file. No separate database server to install or manage; easy to back up (just copy the file). Plex and Jellyfin use it for the same kind of library. See "Large libraries" below. |
 | Deployment | **Docker Compose** | Docker packages the app with everything it needs into a "container" — a sealed box that runs the same way on any machine. Docker Compose is a short settings file describing how to start it, which folders it can see, and which port to use. Installing or updating becomes one or two commands. |
 
-## 7. License
+### Large libraries
+
+The app should stay fast with very large collections (hundreds of thousands
+of episodes, multiple terabytes of audio). For scale: talk radio at ~44 kbps
+is about 20 MB per hour; a 50,000-episode old-time radio collection is
+roughly 500 GB. The **database stays small** — a few hundred MB even for
+100,000 episodes — because it stores information *about* the files, not the
+audio.
+
+Speed comes from how the app is built:
+
+- **Indexes** — like the index at the back of a book, so "everything that
+  aired in May 1943" is looked up directly instead of reading every row.
+- **Full-text search** (SQLite's built-in FTS5) for fast search across titles,
+  cast, and notes.
+- **Incremental scanning** — re-scans only examine new or changed files.
+- **WAL mode** — a SQLite setting that lets pages keep loading while a scan is
+  saving changes.
+- **SQLAlchemy** — a standard Python library the code uses to talk to the
+  database, so a move to PostgreSQL (a larger, separate database server)
+  would be a contained job if it's ever needed.
+
+## 7. Recommended server
+
+Airwave Archive is light. Recommended starting point (e.g. a Proxmox VM):
+
+- **OS:** Ubuntu Server LTS (26.04 or 24.04).
+- **CPU / RAM:** 2 cores, 4 GB RAM (2 GB minimum).
+- **Boot disk:** 32 GB — operating system, Docker, and the app.
+- **Recordings disk:** a second disk mounted at `/srv/airwave`, sized for
+  your collection plus room to grow (500 GB is a reasonable start).
+- **Docker:** installed from Docker's own package repository, not the Ubuntu
+  "snap" version (which restricts which folders containers can see).
+
+Step-by-step setup is in [`INSTALL.md`](INSTALL.md).
+
+## 8. License
 
 **GNU General Public License v3 (GPL v3).** In plain terms: anyone may use,
 study, change, and share the software, but if they distribute a modified
 version they must share their source code under the same license. The full
 text is in the `LICENSE` file.
 
-## 8. Build phases
+## 9. Build phases
 
 Each phase ends with something you can see and try. Later phases build on
 earlier ones. Phases may be split into smaller steps as we go.
 
-### Phase 0 — Project setup *(this step)*
+### Phase 0 — Project setup ✅ *done*
 - `CLAUDE.md` (how to work together) and this plan.
 - **Try it:** read the plan on GitHub.
 
-### Phase 1 — Hello, library
+### Phase 1 — Hello, library ✅ *done*
 - Minimal FastAPI app that scans one folder and **lists the audio files on a
-  web page** (filename, folder, size, length).
+  web page** (filename, folder, size, length), with a Rescan button.
 - Runs locally and via Docker Compose, with the music folder mounted
   read-only.
 - **Try it:** start the app, open it in a browser, see your files listed.
 
 ### Phase 2 — Remember what we found
-- Store scan results in SQLite; re-scans pick up new, changed, and removed
-  files without starting over.
+- Store scan results in SQLite (with indexes and WAL mode from day one);
+  re-scans pick up new, changed, and removed files without starting over.
 - Read existing tags (ID3 etc.) and show them.
 - **Try it:** add a file to the folder, re-scan, see it appear.
 
@@ -171,12 +284,15 @@ earlier ones. Phases may be split into smaller steps as we go.
 - Database fields for series, episode number, station/network, host, cast,
   notes, and **partial air date + time + time zone**.
 - Filename parser with a preview/confirm screen.
+- Overnight broadcasts (start time + length) and grouping multi-file
+  broadcasts ("Hour 1", "Hour 2") into one episode.
 - Edit form on the episode page.
 - **Try it:** scan files named like `Suspense 1943-05-13 - …`, confirm the
   guesses, edit a cast list.
 
 ### Phase 5 — Browse like Plex
 - Series grid with artwork (from embedded art, a folder image, or upload).
+- Series totals (episodes, duration, size).
 - Series page with episodes in air-date order; episode detail page.
 - Mobile-friendly layout.
 - **Try it:** browse your collection on your phone.
@@ -188,23 +304,36 @@ earlier ones. Phases may be split into smaller steps as we go.
 - **Try it:** import an episode log for a series; fix a network on 50
   episodes at once.
 
-### Phase 7 — Continue listening
+### Phase 7 — Upload inbox
+- Upload files through the web page into the inbox.
+- Inbox review page; approve (file into library by series) or reject.
+- **Try it:** upload a few files from your laptop, fix their dates, add
+  them to the library.
+
+### Phase 8 — Continue listening
 - Save playback position; "Continue listening" row on the home page.
 - Mark as played / unplayed.
 - **Try it:** stop halfway through an episode, come back later, resume.
 
-### Phase 8 — The calendar
+### Phase 9 — The calendar
 - Month view, then week view, then day view.
-- Correct handling of partial dates, "time unknown", and time zones.
+- Correct handling of partial dates, "time unknown", time zones, and
+  overnight shows.
 - **Try it:** open the week of a famous broadcast and see everything you own
   from that week.
 
-### Phase 9 — Writing tags back (optional)
+### Phase 10 — Writing tags back (optional)
 - Opt-in action to write the app's metadata into the files' tags, with a
   preview and a clear warning. Requires the music folder to be mounted
   writable.
 - **Try it:** write tags to one file, open it in another player, see the
   new info.
+
+### Phase 11 — Export and import
+- Export selected episodes or series as a zip of tagged copies + manifest.
+- Import an Airwave zip through the inbox, with duplicates detected.
+- **Try it:** export a series, import it on a second test server (or a
+  fresh install), and see it arrive fully labelled.
 
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the

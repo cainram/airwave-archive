@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="summary">
+  <div>
+    <h1>Library</h1>
+    <p class="muted">
+      {{ scan.files | length }} audio file{{ "" if scan.files | length == 1 else "s" }}
+      · {{ scan.total_bytes | size }}
+      · {{ scan.total_seconds | duration }} of audio
+    </p>
+    <p class="muted small">
+      Folder: <code>{{ library_dir }}</code> · scanned in {{ "%.1f" | format(scan_seconds) }} s
+      {% if scan.unreadable %}· {{ scan.unreadable }} file(s) with unknown length{% endif %}
+    </p>
+  </div>
+  <form method="post" action="/rescan">
+    <button class="button primary" type="submit">Rescan</button>
+  </form>
+</section>
+
+{% if not library_exists %}
+  <div class="notice">
+    The library folder <code>{{ library_dir }}</code> doesn't exist.
+    Check the folder setting in <code>compose.yaml</code> (see docs/INSTALL.md).
+  </div>
+{% elif not scan.files %}
+  <div class="notice">
+    No audio files found in <code>{{ library_dir }}</code>. Copy some recordings
+    into the library folder and press <strong>Rescan</strong>.
+  </div>
+{% else %}
+  <div class="table-wrap">
+    <table class="files">
+      <thead>
+        <tr><th>File</th><th>Folder</th><th class="num">Length</th><th class="num">Size</th></tr>
+      </thead>
+      <tbody>
+        {% for f in scan.files %}
+        <tr>
+          <td class="name">{{ f.name }}</td>
+          <td class="folder">{{ f.folder or "—" }}</td>
+          <td class="num">{{ f.duration_seconds | duration }}</td>
+          <td class="num">{{ f.size_bytes | size }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

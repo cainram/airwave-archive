@@ -1,0 +1,5 @@
+# Libraries the app needs. Versions are pinned so every install gets the same ones.
+fastapi==0.162.0       # the web framework
+uvicorn==0.54.0        # the program that actually serves the web pages
+jinja2==3.1.6          # fills in the HTML page templates
+mutagen==1.48.1        # reads audio files: length, tags
