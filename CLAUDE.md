@@ -112,7 +112,11 @@ These come from the plan and should not be changed without the owner's OK:
   folder, `AIRWAVE_DATA`)
 - `app/scanner.py`: finds audio files, reads length and tags, and keeps the
   database in step with the library
-- `app/templates/`: HTML page templates; `app/static/`: stylesheet
+- `app/templates/`: HTML page templates. Pages use `{% extends layout %}`:
+  `base.html` for a full page, `_partial.html` when htmx asks for just the
+  middle (so the player bar keeps playing).
+- `app/static/`: stylesheet, `player.js` (the player bar), and
+  `htmx.min.js` (a copy of htmx 2.0.11; never load it from the internet)
 - `tests/`: automated tests. Run them with `pytest` after
   `pip install -r requirements-dev.txt`. On the owner's VM, `python3-venv`
   isn't installed, so run them in a throwaway container instead:

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends layout %}
 {% block content %}
 <section class="summary">
   <div>
@@ -44,6 +44,7 @@
     <table class="files">
       <thead>
         <tr>
+          <th class="play"><span class="visually-hidden">Play</span></th>
           <th>Title / file</th>
           <th class="artist">Artist · album</th>
           <th class="date">Date</th>
@@ -54,21 +55,10 @@
       <tbody>
         {% for f in files %}
         <tr>
+          <td class="play">{% include "_play_button.html" %}</td>
           <td class="name">
-            <div class="title">{{ f.tag_title or f.name }}</div>
+            <a class="title" href="/files/{{ f.id }}">{{ f.tag_title or f.name }}</a>
             {% if f.tag_title %}<div class="muted small">{{ f.name }}</div>{% endif %}
-            <details class="tags">
-              <summary>details</summary>
-              <dl>
-                <dt>Folder</dt><dd>{{ f.folder or "(top level)" }}</dd>
-                <dt>Quality</dt><dd>{{ f.bitrate | bitrate }}</dd>
-                {% for key, value in f.tags_json | fromjson %}
-                <dt>{{ key }}</dt><dd>{{ value }}</dd>
-                {% else %}
-                <dt>Tags</dt><dd class="muted">none found in this file</dd>
-                {% endfor %}
-              </dl>
-            </details>
           </td>
           <td class="artist">
             {{ f.tag_artist or "" }}{% if f.tag_artist and f.tag_album %} · {% endif %}{{ f.tag_album or "" }}

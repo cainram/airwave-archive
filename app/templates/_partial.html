@@ -1,0 +1,6 @@
+{#
+  Used instead of base.html when htmx asks for a page: only the title and
+  the middle of the page are sent, and htmx swaps them in.
+#}
+<title>{% block title %}Airwave Archive{% endblock %}</title>
+{% block content %}{% endblock %}

@@ -61,18 +61,56 @@ table.files { width: 100%; border-collapse: collapse; background: var(--panel); 
 .files .name { word-break: break-word; }
 
 .files td { vertical-align: top; }
-.files .title { font-weight: 600; }
+.files .title { font-weight: 600; color: var(--text); text-decoration: none; }
+.files .title:hover { color: var(--accent); text-decoration: underline; }
+.files .play { width: 1%; padding-right: 0; }
 .files .artist, .files .date { color: var(--muted); }
 
-/* The "details" fold-out under each file, listing all its tags. */
-.tags summary { color: var(--accent); cursor: pointer; font-size: 0.85rem; width: max-content; }
-.tags dl {
-  display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px;
-  margin: 8px 0 4px; padding: 10px; font-size: 0.85rem;
-  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+/* Play buttons. The pause sign shows while that recording is playing. */
+.play-button {
+  border: 1px solid var(--line); border-radius: 50%; width: 2.2em; height: 2.2em;
+  background: var(--panel); color: var(--accent); cursor: pointer; font: inherit;
+  font-size: 0.85rem; line-height: 1;
 }
-.tags dt { color: var(--muted); font-weight: 600; word-break: break-word; max-width: 14em; }
-.tags dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.play-button.button { border-radius: 6px; width: auto; height: auto; font-size: 1rem; }
+.play-button:hover { border-color: var(--accent); }
+.play-button .when-playing, .play-button.is-playing .when-stopped { display: none; }
+.play-button.is-playing .when-playing { display: inline; }
+
+/* Lists of facts on the episode page: name on the left, value on the right. */
+h2 { font-size: 1.1rem; margin: 28px 0 8px; }
+.facts {
+  display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px;
+  margin: 0; padding: 14px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.facts dt { color: var(--muted); font-weight: 600; word-break: break-word; max-width: 16em; }
+.facts dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.tag-code { display: block; font-weight: 400; font-size: 0.75rem; }
+
+/* The player bar, fixed to the bottom of the screen once something plays. */
+.player {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  padding: 10px 16px; background: var(--panel);
+  border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+}
+.player[hidden] { display: none; }
+.player-info { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; }
+.player-title {
+  font-weight: 600; color: var(--text); text-decoration: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.player-title:hover { color: var(--accent); }
+.player audio { flex: 2 1 300px; width: 100%; }
+/* Leave room so the player bar doesn't cover the bottom of the page. */
+body.has-player { padding-bottom: 110px; }
+
+/* Text for screen readers only. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
 
 /* "Previous / Next" page buttons. */
 .pager { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
@@ -81,8 +119,9 @@ table.files { width: 100%; border-collapse: collapse; background: var(--panel); 
 /* On narrow phone screens, hide some columns to save space. */
 @media (max-width: 600px) {
   .files .artist, .files .size { display: none; }
-  .tags dl { grid-template-columns: 1fr; }
-  .tags dt { max-width: none; }
+  .facts { grid-template-columns: 1fr; gap: 2px; }
+  .facts dd { margin-bottom: 8px; }
+  .facts dt { max-width: none; }
 }
 
 .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 16px; }

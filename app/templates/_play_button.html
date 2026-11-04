@@ -1,0 +1,8 @@
+{# A Play button for file `f` (set `big` for one with words). player.js does the rest. #}
+<button class="play-button{% if big %} button primary{% endif %}" type="button"
+        aria-label="Play {{ f.tag_title or f.name }}"
+        data-play data-src="/audio/{{ f.id }}" data-href="/files/{{ f.id }}"
+        data-title="{{ f.tag_title or f.name }}" data-subtitle="{{ f.tag_artist or '' }}">
+  <span class="when-stopped">▶{% if big %} Play{% endif %}</span>
+  <span class="when-playing">❚❚{% if big %} Pause{% endif %}</span>
+</button>
