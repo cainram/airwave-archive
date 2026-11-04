@@ -91,6 +91,10 @@ These come from the plan and should not be changed without the owner's OK:
   download them.
 - **Keep the front end light.** Server-rendered pages with htmx; no big
   JavaScript framework.
+- **Keep it easy to package for Windows and Mac later.** Folder locations
+  and settings come from configuration (environment variables or a
+  settings page), never hard-coded Linux paths. Avoid Linux-only
+  dependencies. Docker is the main way to run it, but not the only one.
 - **License:** GPL v3. New source files are covered by the `LICENSE` file.
 
 ## Tech stack (summary — details in docs/PLAN.md)
