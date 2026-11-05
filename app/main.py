@@ -11,7 +11,7 @@ import json
 import os
 import threading
 from urllib.parse import quote, urlencode
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -26,7 +26,7 @@ from app.db import (
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
-    day_heading, format_air_date, format_air_time, read_date_text, read_form,
+    day_heading, format_air_date, format_air_span, format_air_time, read_date_text, read_form,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
@@ -157,6 +157,7 @@ templates.env.filters["resume_point"] = listening.resume_point
 templates.env.filters["listened_at"] = listening.listened_at
 templates.env.filters["time_left"] = listening.time_left
 templates.env.filters["air_time"] = format_air_time
+templates.env.filters["air_span"] = format_air_span
 templates.env.globals["day_heading"] = day_heading
 
 
@@ -396,6 +397,36 @@ def calendar_month(request: Request, year: int | None = None, month: int | None 
         "before": airdates.next_month(year, month, -1), "after": airdates.next_month(year, month, 1),
         "day_names": airdates.DAY_NAMES, "month_names": MONTHS,
     })
+
+
+@app.get("/calendar/week", response_class=HTMLResponse)
+def calendar_week(request: Request, date_text: str = Query("", alias="date")):
+    """A week of broadcasts, Sunday to Saturday, holding the given date
+    (typed any common way). Without one: the week of the most recent
+    broadcast. A date with only a year and month goes to that month's
+    first week."""
+    error = None
+    found, problem = csvimport.read_date(date_text) if date_text.strip() else (None, None)
+    if problem or (found and found[1] is None):
+        error = problem or "Type a date with at least a month, like 1938-10-30."
+        found = None
+    with Session(get_engine()) as session:
+        try:
+            day = date(found[0], found[1], found[2] or 1) if found else None
+        except ValueError:
+            day, error = None, "That day doesn't exist."
+        if day is None:
+            day = airdates.latest_day(session) or date.today()
+        week = airdates.week_view(session, day)
+        earlier = airdates.nearest_week(session, week.start, later=False)
+        later = airdates.nearest_week(session, week.start, later=True)
+        session.expunge_all()
+    middle = week.start + timedelta(days=3)
+    return render(request, "calendar_week.html", {
+        "week": week, "earlier": earlier, "later": later, "error": error, "typed": date_text,
+        "before": week.start - timedelta(days=7), "after": week.start + timedelta(days=7),
+        "month": (middle.year, middle.month), "month_names": MONTHS,
+    }, status_code=400 if error else 200)
 
 
 @app.get("/series")

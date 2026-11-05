@@ -1,0 +1,50 @@
+{% extends layout %}
+{% block title %}{{ week.name }} · Calendar · Airwave Archive{% endblock %}
+{% block content %}
+{% macro week_link(d) %}/calendar/week?date={{ d.isoformat() }}{% endmacro %}
+<section class="summary">
+  <div>
+    <h1>{{ week.name }}</h1>
+    <p class="muted">
+      {% if week.count %}{{ week.count }} episode{{ "" if week.count == 1 else "s" }} aired this week{% else %}Nothing in your collection aired this week{% endif %}
+    </p>
+  </div>
+</section>
+
+<nav class="calendar-nav" aria-label="Other weeks">
+  <a class="button" href="{{ week_link(before) }}" aria-label="Previous week">←</a>
+  <a class="button" href="{{ week_link(after) }}" aria-label="Next week">→</a>
+  {% if earlier %}<a class="button" href="{{ week_link(earlier) }}">⇤ Earlier recordings</a>{% endif %}
+  {% if later %}<a class="button" href="{{ week_link(later) }}">Later recordings ⇥</a>{% endif %}
+  <a class="button" href="/calendar?year={{ month[0] }}&month={{ month[1] }}">Month view</a>
+</nav>
+
+<form class="calendar-jump" method="get" action="/calendar/week">
+  <label for="jump-date">Go to date</label>
+  <input id="jump-date" name="date" type="text" value="{{ typed if error else '' }}"
+         placeholder="1938-10-30" autocomplete="off" size="14">
+  <button class="button" type="submit">Go</button>
+</form>
+{% if error %}<p class="field-error" role="alert">{{ error }}</p>{% endif %}
+
+<div class="week">
+  {% for day, files in week.days %}
+  <section class="week-day{% if not files %} is-empty{% endif %}" id="day-{{ day.isoformat() }}">
+    <h2><span class="weekday">{{ day.strftime("%A") }}</span>
+      <span class="week-date">{{ month_names[day.month - 1] }} {{ day.day }}{% if day.year != week.end.year or week.start.year != week.end.year %}, {{ day.year }}{% endif %}</span></h2>
+    {% if files %}
+    <ul class="results">{% for f in files %}{% include "_calendar_row.html" %}{% endfor %}</ul>
+    {% else %}
+    <p class="muted small nothing">Nothing</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+{% for year, m, count in week.no_day %}
+<p class="muted small">
+  {{ count }} episode{{ "" if count == 1 else "s" }} from {{ month_names[m - 1] }} {{ year }} {{ "has" if count == 1 else "have" }} no known day, so {{ "it isn't" if count == 1 else "they aren't" }} in this week:
+  <a href="/calendar?year={{ year }}&month={{ m }}">see {{ month_names[m - 1] }} {{ year }}</a>.
+</p>
+{% endfor %}
+{% endblock %}

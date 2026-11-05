@@ -1,0 +1,16 @@
+{# One episode in a calendar list: Play, title, air time (with its end),
+   series, and badges. Needs `f` (the episode's first file). #}
+{% set ep = f.episode %}
+{% set first = ep.parts | rejectattr("missing") | first %}
+<li class="result">
+  <div class="result-play">{% if first %}{% with f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}</div>
+  <div class="result-text">
+    <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+    <div class="muted small">
+      {% if ep.air_day %}{{ ep | air_span }}{% if ep.series %} · {% endif %}{% endif %}{% if ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% endif %}
+      {% if ep.parts | length > 1 %}<span class="badge parts">{{ ep.parts | length }} parts</span>{% endif %}
+      {% if not first %}<span class="badge">missing</span>{% endif %}
+      {% include "_listened.html" %}
+    </div>
+  </div>
+</li>

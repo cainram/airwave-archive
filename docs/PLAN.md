@@ -556,6 +556,14 @@ overwrites, renames or deletes library files.
   "Earlier/Later recordings" jump over empty months; a month + year box
   jumps anywhere. Opens on the most recent month with recordings. Code in
   `app/airdates.py`.
+- 9b (week view) ✅ *done*: `/calendar/week?date=…` shows Sunday to
+  Saturday around any date (typed any common way, e.g. 10/30/1938). Each
+  day's episodes in time order with their span ("10:00 PM – 1:00 AM (next
+  day) US Pacific": start plus the recordings' length). Days stack on
+  phones, seven columns on wide screens. Previous/next week, jumps over
+  empty weeks, "Month view"; the month view has "Week view" and a "Week"
+  button on each day. Episodes with no known day are counted with a link
+  to their month.
 - Correct handling of partial dates, "time unknown", time zones, and
   overnight shows.
 - **Try it:** open the week of a famous broadcast and see everything you own
