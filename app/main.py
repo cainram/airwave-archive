@@ -5,6 +5,7 @@ Run locally with:   uvicorn app.main:app --reload
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -97,6 +98,30 @@ def tag_label(key: str) -> tuple[str, str]:
 
 
 templates = Jinja2Templates(directory=APP_DIR / "templates")
+
+
+def _version() -> str:
+    """A fingerprint of the files a browser keeps while you click around
+    (stylesheet, scripts, and the page frame). It changes with every update
+    that changes them."""
+    digest = hashlib.sha1()
+    for path in sorted([*(APP_DIR / "static").rglob("*"), APP_DIR / "templates" / "base.html"]):
+        if path.is_file():
+            digest.update(path.name.encode() + path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
+VERSION = _version()
+templates.env.globals["version"] = VERSION
+
+
+def static_url(path: str) -> str:
+    """The address of a stylesheet or script, with the version added, so a
+    browser never uses a copy saved before an update."""
+    return f"/static/{path}?v={VERSION}"
+
+
+templates.env.globals["static_url"] = static_url
 templates.env.filters["size"] = format_size
 templates.env.filters["duration"] = format_duration
 templates.env.filters["bitrate"] = format_bitrate
@@ -149,6 +174,14 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
     title and the middle of the page, so the player bar isn't replaced."""
     from_htmx = ("HX-Request" in request.headers
                  or "HX-History-Restore-Request" in request.headers)
+    if from_htmx and request.headers.get("X-Airwave-Version", VERSION) != VERSION:
+        # The tab was opened before the app was updated: it still has the
+        # old stylesheet and scripts. Ask it to load the whole page it was
+        # going to afresh (or, after sending a form, the page it's on).
+        if request.method == "GET":
+            target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+            return Response(headers={"HX-Redirect": target, "Vary": "HX-Request"})
+        return Response(headers={"HX-Refresh": "true", "Vary": "HX-Request"})
     context["layout"] = "_partial.html" if from_htmx else "base.html"
     response = templates.TemplateResponse(request, template, context, status_code=status_code)
     # Tell browsers the full and partial versions are different pages.

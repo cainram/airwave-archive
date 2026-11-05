@@ -412,6 +412,11 @@ Split into four smaller steps, done in order.
   without a picture get a coloured square with their initials. The
   Series page shows tiles, or a list. Database version 6 adds the
   pictures and makes the next scan read every file once more.
+- Found while trying 5b: a browser tab opened before an update kept the
+  old stylesheet (htmx only swaps the middle of the page), so the new
+  tiles looked broken in Chrome. Now the stylesheet and scripts carry a
+  version in their address, and a tab from before an update reloads the
+  page it's going to by itself.
 
 #### 5c — Uploading artwork
 - Upload your own picture for a series (kept in the data folder, never

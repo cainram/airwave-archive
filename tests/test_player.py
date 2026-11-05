@@ -94,3 +94,18 @@ def test_tag_codes_get_plain_names(client):
     assert tag_label("SOMETHING") == ("SOMETHING", "")
     page = client.get("/files/1")
     assert "Title" in page.text and "Comment" in page.text
+
+
+def test_stylesheet_and_scripts_carry_the_version(client):
+    import app.main as main
+    page = client.get("/").text
+    assert f'/static/style.css?v={main.VERSION}' in page
+    assert f'"X-Airwave-Version": "{main.VERSION}"' in page
+
+
+def test_a_tab_from_before_an_update_is_asked_to_reload(client):
+    import app.main as main
+    old = client.get("/series?view=list", headers={"HX-Request": "true", "X-Airwave-Version": "old"})
+    assert old.headers.get("HX-Redirect") == "/series?view=list" and old.text == ""
+    current = client.get("/series", headers={"HX-Request": "true", "X-Airwave-Version": main.VERSION})
+    assert "HX-Refresh" not in current.headers and "Series" in current.text
