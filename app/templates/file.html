@@ -24,6 +24,7 @@
   <div class="summary-text">
     <h1>{{ f | display_title }}</h1>
     {% if grouped %}<p class="part-of">Part {{ f.part_number }} of {{ parts | length }}</p>{% endif %}
+    {% if ep %}<p class="listened">{% include "_listened.html" %}</p>{% endif %}
     <p class="muted">
       {% if ep and ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% if (ep | air_date) or f.tag_date %} · {% endif %}{% endif %}{{ (ep | air_date) or f.tag_date or "" }}
     </p>
@@ -32,6 +33,18 @@
     {% set first = (parts | rejectattr("missing") | first) %}
     {% if first %}{% with big = true, f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}
     <a class="button" href="/files/{{ f.id }}/edit">Edit details</a>
+    {% if ep %}
+    <form method="post" action="/episodes/played">
+      <input type="hidden" name="ids" value="{{ ep.id }}">
+      <input type="hidden" name="back" value="/files/{{ f.id }}">
+      {% if ep.listening and (ep.listening.played or (ep | progress)) %}
+      <button class="button" type="submit" name="played" value="0">{{ "Mark not played" if ep.listening.played else "Start over" }}</button>
+      {% endif %}
+      {% if not (ep.listening and ep.listening.played) %}
+      <button class="button" type="submit" name="played" value="1">Mark played</button>
+      {% endif %}
+    </form>
+    {% endif %}
     <a class="button" href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
   </div>
 </section>

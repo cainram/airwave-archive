@@ -6,6 +6,11 @@
 //
 // An episode made of several files has a `data-queue` (the files' web
 // addresses, in order): when one part ends, the next one starts.
+//
+// Continue listening: while an episode plays, its place is sent to the app
+// every few seconds and when paused (`/listening/<episode>`). Its Play
+// button says where to pick up (`data-resume-file`, `data-resume-at`); a
+// place remembered here since the page was made wins if it's newer.
 (function () {
   "use strict";
 
@@ -28,6 +33,11 @@
   let index = 0;       // which one is playing
   let parts = 0;       // how many parts the episode has (0 = just one file)
   let info = {};       // title, link, subtitle of what's playing
+  let episode = "";    // the episode's number in the app ("" for inbox files)
+  let startAt = 0;     // seconds to jump to once the part is ready
+  let lastSaved = 0;
+  const places = {};   // episode -> {file, at, when}: places saved since the page loaded
+  const SAVE_EVERY = 10000, REWIND = 3;   // milliseconds; seconds
 
   // Show which Play buttons belong to the recording that's playing.
   function markButtons() {
@@ -43,8 +53,43 @@
     return (text || "").trim().split(/\s+/).filter(Boolean);
   }
 
+  function fileOf(address) {
+    const found = /\/audio\/(\d+)/.exec(address || "");
+    return found ? found[1] : "";
+  }
+
+  // Where to start: the button's resume point, or a newer one remembered here.
+  function startingPlace(button) {
+    let place = { file: button.dataset.resumeFile || "", at: Number(button.dataset.resumeAt || 0) };
+    const mine = places[button.dataset.episode];
+    if (mine && mine.when > Number(button.dataset.listened || 0)) {
+      place = { file: mine.file, at: Math.max(0, mine.at - REWIND) };
+    }
+    const i = queue.map(fileOf).indexOf(place.file);
+    return i < 0 ? { index: 0, at: 0 } : { index: i, at: place.at };
+  }
+
+  // Tell the app where listening is (or that it reached the end).
+  function save(finished) {
+    if (!episode || !queue.length) return;
+    // Not before it has jumped to where it should start (or would forget the place).
+    if (!finished && (startAt > 0 || !(audio.currentTime > 0))) return;
+    const file = fileOf(queue[index]);
+    const at = finished ? 0 : audio.currentTime || 0;
+    places[episode] = { file: finished ? "" : file, at: at, when: Date.now() };
+    lastSaved = Date.now();
+    const body = new FormData();
+    body.append("file", file);
+    body.append("at", at.toFixed(1));
+    if (finished) body.append("finished", "1");
+    fetch("/listening/" + episode, { method: "POST", body: body, keepalive: true })
+      .catch(function () { /* offline: the next save tries again */ });
+  }
+
   function load(button) {
+    if (episode && audio.currentTime > 0 && !audio.ended) save(false);   // the one being left
     current = button.dataset.src;
+    episode = button.dataset.episode || "";
     queue = words(button.dataset.queue);
     if (!queue.length) queue = [current];
     numbers = words(button.dataset.numbers);
@@ -57,7 +102,9 @@
     };
     art.hidden = true;
     if (info.art) art.src = info.art; else art.removeAttribute("src");
-    show(0);
+    const place = startingPlace(button);
+    show(place.index);
+    startAt = place.at;
     bar.hidden = false;
     document.body.classList.add("has-player");
   }
@@ -116,7 +163,17 @@
     seek.style.setProperty("--done", length ? (Number(seek.value) / length * 100) + "%" : "0%");
   }
   audio.addEventListener("timeupdate", showTime);
-  audio.addEventListener("loadedmetadata", showTime);
+  audio.addEventListener("loadedmetadata", function () {
+    if (startAt > 0) {   // picking up where listening stopped
+      const length = isFinite(audio.duration) ? audio.duration : Infinity;
+      audio.currentTime = Math.min(startAt, Math.max(0, length - 1));
+      startAt = 0;
+    }
+    showTime();
+  });
+  audio.addEventListener("timeupdate", function () {
+    if (!audio.paused && Date.now() - lastSaved > SAVE_EVERY) save(false);
+  });
   audio.addEventListener("emptied", showTime);
   seek.addEventListener("input", function () { dragging = true; showTime(); });
   seek.addEventListener("change", function () {
@@ -152,14 +209,22 @@
   }
 
   audio.addEventListener("play", markButtons);
-  audio.addEventListener("pause", markButtons);
+  audio.addEventListener("pause", function () {
+    if (!audio.ended) save(false);   // (at the very end, "ended" saves instead)
+    markButtons();
+  });
   audio.addEventListener("ended", function () {
     if (index + 1 < queue.length) {
       show(index + 1);    // on to the next part
       audio.play().catch(function () { /* the error handler below explains */ });
     } else {
+      save(true);         // heard to the end: played
       markButtons();
     }
+  });
+  // Leaving the page or locking the phone: save the place now.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden" && audio.currentTime > 0 && !audio.ended) save(false);
   });
   audio.addEventListener("error", function () {
     if (!current) return;

@@ -19,6 +19,27 @@
   {% endif %}
 </section>
 
+{% if unfinished %}
+<section class="continue" aria-labelledby="continue-heading">
+  <h2 id="continue-heading">Continue listening</h2>
+  <ul class="continue-list">
+    {% for f, done, art in unfinished %}
+    {% set ep = f.episode %}
+    <li class="continue-item">
+      {{ picture(art, ep.series or (f | display_title), "small") }}
+      <div class="continue-text">
+        <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+        <div class="muted small">{% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+        {% if done.percent is not none %}<div class="progress-bar" role="img" aria-label="{{ done.percent }}% heard"><span style="width: {{ done.percent }}%"></span></div>{% endif %}
+        <div class="muted small">{{ done | time_left }}</div>
+      </div>
+      {% include "_play_button.html" %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 {% if not series %}
 <div class="notice">No episodes yet. Add recordings to the library and press <strong>Rescan</strong>.</div>
 {% elif view == "tiles" %}

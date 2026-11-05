@@ -1,8 +1,13 @@
-{# Tick episodes in the table below, then "Edit ticked". The tick boxes
+{# Tick episodes in the table below, then "Edit ticked" (or mark them played
+   or not played). The tick boxes
    belong to this form (form="pick"), wherever they are on the page.
    Needs `back`: the page to return to afterwards. #}
 <form id="pick" class="pick-toolbar" method="get" action="/episodes/edit">
   <input type="hidden" name="back" value="{{ back }}">
   <button class="button" type="submit">Edit ticked…</button>
+  <button class="button" type="submit" formmethod="post" formaction="/episodes/played"
+          name="played" value="1">Mark played</button>
+  <button class="button" type="submit" formmethod="post" formaction="/episodes/played"
+          name="played" value="0">Mark not played</button>
   <span class="muted small" data-picked-count></span>
 </form>

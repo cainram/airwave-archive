@@ -1,4 +1,4 @@
-{# After a bulk edit or a rename: say what happened. #}
+{# After a bulk edit, a rename, or marking played: say what happened. #}
 {% set q = request.query_params %}
 {% set changed = q.get("changed", "-1") | int(-1) %}
 {% set skipped = q.get("skipped", "0") | int(0) %}
@@ -15,4 +15,11 @@
 {% endif %}
 {% if renamed %}
 <div class="notice success" role="status">Renamed {{ renamed }} episode{{ "" if renamed == 1 else "s" }}.</div>
+{% endif %}
+{% set marked = q.get("marked", "-1") | int(-1) %}
+{% if marked == 0 %}
+<div class="notice" role="status">No episodes were ticked.</div>
+{% elif marked > 0 %}
+<div class="notice success" role="status">
+  Marked {{ marked }} episode{{ "" if marked == 1 else "s" }} as {{ "played" if q.get("played") == "1" else "not played" }}.</div>
 {% endif %}

@@ -1,17 +1,21 @@
 {# A Play button for file `f` (set `big` for one with words). player.js does the rest.
-   For an episode made of several files, it plays from `f` to the last part. #}
+   For an episode made of several files, it plays from `f` to the last part.
+   If listening stopped partway, it picks up there (data-resume-*). #}
+{% set resume = f | resume_point %}
 {% set parts = f.episode.parts if f.episode else [f] %}
 {% set queue = (parts[parts.index(f):] if f in parts else [f]) | rejectattr("missing") | list %}
 <button class="play-button{% if big %} button primary{% endif %}" type="button"
         aria-label="Play {{ f | display_title }}"
         data-play data-src="/audio/{{ f.id }}" data-href="/files/{{ f.id }}"
         data-art="/files/{{ f.id }}/art"
+        {% if f.episode_id %}data-episode="{{ f.episode_id }}" data-listened="{{ (f | listened_at) or 0 }}"{% endif %}
+        {% if resume %}data-resume-file="{{ resume[0] }}" data-resume-at="{{ resume[1] | round(1) }}"{% endif %}
         {% if parts | length > 1 %}
         data-queue="{% for p in queue %}/audio/{{ p.id }} {% endfor %}"
         data-numbers="{% for p in queue %}{{ p.part_number }} {% endfor %}"
         data-parts="{{ parts | length }}"
         {% endif %}
         data-title="{{ f | display_title }}" data-subtitle="{{ (f.episode.series if f.episode else None) or f.tag_artist or '' }}">
-  <span class="when-stopped">▶{% if big %} Play{% endif %}</span>
+  <span class="when-stopped">▶{% if big %} {{ "Resume" if resume else "Play" }}{% endif %}</span>
   <span class="when-playing">❚❚{% if big %} Pause{% endif %}</span>
 </button>

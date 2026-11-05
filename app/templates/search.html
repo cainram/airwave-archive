@@ -48,6 +48,7 @@
         {% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}
         {% if ep.parts | length > 1 %}<span class="badge parts">{{ ep.parts | length }} parts</span>{% endif %}
         {% if not first %}<span class="badge">missing</span>{% endif %}
+        {% include "_listened.html" %}
       </div>
       {% if snippets[ep.id] %}<p class="snippet">{{ snippets[ep.id] }}</p>{% endif %}
     </div>

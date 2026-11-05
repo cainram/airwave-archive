@@ -45,7 +45,8 @@ DB_FILENAME = "airwave.db"
 #   7: Phase 5c, uploaded series pictures (series_art table)
 #   8: Phase 6b, search index (episode_search, a full-text search table)
 #   9: Phase 7a, the upload inbox (inbox_items table)
-SCHEMA_VERSION = 9
+#  10: Phase 8, where you stopped listening, and what's played (listening table)
+SCHEMA_VERSION = 10
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -85,6 +86,9 @@ class Episode(Base):
     updated_at: Mapped[datetime]   # UTC
 
     files: Mapped[list[AudioFile]] = relationship(back_populates="episode")
+    # Where listening stopped, and whether it's been played (None: never started).
+    listening: Mapped[Listening | None] = relationship(
+        lazy="selectin", cascade="all, delete-orphan", passive_deletes=True)
 
     __table_args__ = (
         Index("ix_episodes_series", "series"),
@@ -197,6 +201,22 @@ class SeriesArt(Base):
     series: Mapped[str] = mapped_column(primary_key=True)
     art_hash: Mapped[str]
     uploaded_at: Mapped[datetime]   # UTC
+
+
+class Listening(Base):
+    """Where the owner stopped listening to an episode, and whether it's
+    been played to the end. Removed along with its episode."""
+
+    __tablename__ = "listening"
+
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True)
+    # The part playing when listening stopped, and how far into it (seconds).
+    file_id: Mapped[int | None]
+    position: Mapped[float] = mapped_column(default=0.0)
+    played: Mapped[bool] = mapped_column(default=False)
+    played_at: Mapped[datetime | None]   # UTC
+    updated_at: Mapped[datetime] = mapped_column(index=True)   # UTC
 
 
 class InboxItem(Base):
