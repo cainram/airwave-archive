@@ -146,23 +146,69 @@ h2 { font-size: 1.1rem; margin: 28px 0 8px; }
 .facts dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
 .tag-code { display: block; font-weight: 400; font-size: 0.75rem; }
 
-/* The player bar, fixed to the bottom of the screen once something plays. */
+/* The player bar, fixed to the bottom of the screen once something plays.
+   Two rows: picture, title and buttons; then the progress bar. */
 .player {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  display: flex; flex-direction: column; gap: 4px;
   padding: 10px 16px; background: var(--panel);
-  border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
 }
 .player[hidden] { display: none; }
-.player-info { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; }
+.player audio { display: none; }
+.player-top { display: flex; align-items: center; gap: 12px; }
+.player-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .player-title {
   font-weight: 600; color: var(--text); text-decoration: none;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .player-title:hover { color: var(--accent); }
-.player audio { flex: 2 1 300px; width: 100%; }
+#player-subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.player-buttons { display: flex; align-items: center; gap: 6px; flex: none; }
+.player-buttons button {
+  border: none; cursor: pointer; font: inherit; color: var(--accent);
+  -webkit-tap-highlight-color: transparent;
+}
+.player-toggle {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); color: white !important; font-size: 1.4rem; line-height: 1;
+}
+.player-toggle:active { transform: scale(0.95); }
+.player-toggle .when-playing, .player-toggle.is-playing .when-stopped { display: none; }
+.player-toggle.is-playing .when-playing { display: inline; }
+.player-skip {
+  width: 48px; height: 48px; border-radius: 50%; background: #e6effa;
+  font-weight: 700; font-size: 0.9rem;
+}
+.player-skip:active { background: #d3e2f5; }
+
+.player-progress { display: flex; align-items: center; gap: 10px; }
+.player-time { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.6em; }
+.player-time:last-child { text-align: right; }
+/* The progress bar: a thick line (blue up to where you are) with a big
+   round handle, inside a 44-pixel-tall area that's easy to touch. */
+.player-seek {
+  flex: 1; height: 44px; margin: 0; background: transparent; cursor: pointer;
+  -webkit-appearance: none; appearance: none; --done: 0%;
+}
+.player-seek::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--accent) var(--done), var(--line) var(--done));
+}
+.player-seek::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+.player-seek::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+.player-seek::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 24px; height: 24px; margin-top: -9px;
+  border-radius: 50%; background: white; border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.player-seek::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; background: white;
+  border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
 /* Leave room so the player bar doesn't cover the bottom of the page. */
-body.has-player { padding-bottom: 110px; }
+body.has-player { padding-bottom: 150px; }
 
 /* Text for screen readers only. */
 .visually-hidden {
@@ -233,4 +279,42 @@ body.has-player { padding-bottom: 110px; }
 .upload-form label { font-weight: 600; }
 .upload-form input[type="file"] {
   padding: 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--panel);
+}
+
+/* The show's picture in the player bar. */
+.player-art { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex: none; }
+.player-art[hidden] { display: none; }
+
+/* ---- Phones and tablets ------------------------------------------------- */
+
+/* Touch screens: everything you tap is at least 44 pixels (about a
+   fingertip), as Apple and Google recommend. */
+@media (pointer: coarse) {
+  .menu a, .view-switch a { min-height: 44px; display: inline-flex; align-items: center; }
+  .button, a.button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .play-button { width: 44px; height: 44px; font-size: 1rem; }
+  .play-button.button { width: auto; height: auto; }
+  input[type="checkbox"] { width: 22px; height: 22px; }
+  .part-choices label, .review-file { min-height: 44px; }
+  .edit-form input, .edit-form select, .review-field input { min-height: 44px; }
+  .pager a { min-height: 44px; }
+}
+
+@media (max-width: 600px) {
+  /* Text boxes of at least 16 pixels: smaller ones make iPhones zoom the
+     whole page in when you tap them. */
+  input, select, textarea { font-size: 16px; }
+  /* Series list: leave the names room, so they don't break mid-word. */
+  .series-list .date { display: none; }
+  .files .title { overflow-wrap: break-word; word-break: normal; }
+  /* A bit less empty space around the page. */
+  .content { padding: 16px 12px; }
+  .summary h1 { font-size: 1.5rem; }
+  .art-large { width: 120px; }
+  .art-large.art-none { font-size: 2rem; }
+  .tiles { gap: 14px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .player { padding: 8px 12px calc(4px + env(safe-area-inset-bottom)); }
+  .player-top { gap: 10px; }
+  .player-buttons { gap: 4px; }
+  .player-skip { width: 44px; height: 44px; font-size: 0.85rem; }
 }

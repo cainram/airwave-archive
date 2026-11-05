@@ -13,6 +13,15 @@
   const audio = document.getElementById("player-audio");
   const title = document.getElementById("player-title");
   const subtitle = document.getElementById("player-subtitle");
+  const art = document.getElementById("player-art");
+  const toggle = document.getElementById("player-toggle");
+  const seek = document.getElementById("player-seek");
+  const timeNow = document.getElementById("player-time");
+  const timeAll = document.getElementById("player-length");
+  const BACK = 15, FORWARD = 30;   // seconds the skip buttons jump
+  // A picture that can't be found (no artwork) just isn't shown.
+  art.addEventListener("error", function () { art.hidden = true; });
+  art.addEventListener("load", function () { art.hidden = false; });
   let current = null; // the Play button's recording (first in its queue)
   let queue = [];      // web addresses still to play, in order
   let numbers = [];    // their part numbers
@@ -26,6 +35,8 @@
     document.querySelectorAll("[data-play]").forEach(function (button) {
       button.classList.toggle("is-playing", Boolean(playing && button.dataset.src === current));
     });
+    toggle.classList.toggle("is-playing", !audio.paused);
+    toggle.setAttribute("aria-label", audio.paused ? "Play" : "Pause");
   }
 
   function words(text) {
@@ -42,7 +53,10 @@
       title: button.dataset.title,
       href: button.dataset.href,
       subtitle: button.dataset.subtitle || "",
+      art: button.dataset.art || "",
     };
+    art.hidden = true;
+    if (info.art) art.src = info.art; else art.removeAttribute("src");
     show(0);
     bar.hidden = false;
     document.body.classList.add("has-player");
@@ -62,7 +76,12 @@
     subtitle.textContent = sub;
     // Lets phones show the title on the lock screen.
     if ("mediaSession" in navigator && window.MediaMetadata) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: info.title, artist: sub });
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: info.title,
+        artist: sub,
+        // The show's picture on the lock screen (if it has one).
+        artwork: info.art ? [{ src: new URL(info.art, location.href).href, type: "image/jpeg" }] : [],
+      });
     }
   }
 
@@ -77,6 +96,60 @@
     if (button.dataset.src !== current) load(button);
     audio.play().catch(function () { /* the error handler below explains */ });
   });
+
+  // ---- The player bar's own controls ----
+
+  function clock(seconds) {
+    seconds = Math.max(0, Math.floor(seconds || 0));
+    const h = Math.floor(seconds / 3600), m = Math.floor(seconds % 3600 / 60), s = seconds % 60;
+    const mm = h ? String(m).padStart(2, "0") : String(m);
+    return (h ? h + ":" : "") + mm + ":" + String(s).padStart(2, "0");
+  }
+
+  let dragging = false;   // while the finger is on the progress bar
+  function showTime() {
+    const length = isFinite(audio.duration) ? audio.duration : 0;
+    seek.max = String(Math.floor(length));
+    if (!dragging) seek.value = String(Math.floor(audio.currentTime));
+    timeNow.textContent = clock(dragging ? Number(seek.value) : audio.currentTime);
+    timeAll.textContent = clock(length);
+    seek.style.setProperty("--done", length ? (Number(seek.value) / length * 100) + "%" : "0%");
+  }
+  audio.addEventListener("timeupdate", showTime);
+  audio.addEventListener("loadedmetadata", showTime);
+  audio.addEventListener("emptied", showTime);
+  seek.addEventListener("input", function () { dragging = true; showTime(); });
+  seek.addEventListener("change", function () {
+    audio.currentTime = Number(seek.value);
+    dragging = false;
+    showTime();
+  });
+
+  function skip(seconds) {
+    const length = isFinite(audio.duration) ? audio.duration : Infinity;
+    audio.currentTime = Math.min(Math.max(0, audio.currentTime + seconds), length);
+    showTime();
+  }
+  toggle.addEventListener("click", function () {
+    if (audio.paused) audio.play().catch(function () { /* the error handler explains */ });
+    else audio.pause();
+  });
+  document.getElementById("player-back").addEventListener("click", function () { skip(-BACK); });
+  document.getElementById("player-forward").addEventListener("click", function () { skip(FORWARD); });
+
+  // The lock screen's buttons do the same.
+  if ("mediaSession" in navigator) {
+    const actions = {
+      play: function () { audio.play(); },
+      pause: function () { audio.pause(); },
+      seekbackward: function (details) { skip(-(details.seekOffset || BACK)); },
+      seekforward: function (details) { skip(details.seekOffset || FORWARD); },
+      seekto: function (details) { audio.currentTime = details.seekTime; showTime(); },
+    };
+    Object.keys(actions).forEach(function (action) {
+      try { navigator.mediaSession.setActionHandler(action, actions[action]); } catch (e) { /* not supported */ }
+    });
+  }
 
   audio.addEventListener("play", markButtons);
   audio.addEventListener("pause", markButtons);

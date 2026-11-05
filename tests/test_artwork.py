@@ -231,3 +231,13 @@ def test_renaming_a_whole_series_keeps_its_uploaded_picture(client):
     import app.main as main
     with Session(main._engine) as session:
         assert session.get(SeriesArt, "Campbell Playhouse") is None
+
+
+def test_the_player_can_find_an_episodes_picture(client):
+    found = files(client)
+    hour = found["Coast to Coast - Mar 01 2010 - Hour 1.wav"]
+    page = client.get(f"/files/{hour.id}").text
+    assert f'data-art="/files/{hour.id}/art"' in page
+    sent = client.get(f"/files/{hour.id}/art", follow_redirects=False)
+    assert sent.status_code == 307 and sent.headers["location"] == f"/art/{hour.art_hash}.jpg"
+    assert client.get(f"/files/{found['loose.wav'].id}/art").status_code == 404   # no picture

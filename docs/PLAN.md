@@ -433,9 +433,19 @@ Split into four smaller steps, done in order.
   version 7 adds the `series_art` table. Pictures for single episodes
   aren't offered (could be added later).
 
-#### 5d — Phone-friendly layout
+#### 5d — Phone-friendly layout ✅ *done*
 - Check every page on a phone, and fix what doesn't fit.
 - **Try it:** browse your collection on your phone.
+- Notes: checked every page at phone size (390 pixels wide). On touch
+  screens everything tappable is at least 44 pixels; text boxes use
+  16-pixel text so iPhones don't zoom in; the series list hides its
+  Years column on phones so names don't break mid-word. The player bar
+  shows the show's picture, and so does the phone's lock screen
+  (`/files/{id}/art` finds an episode's picture).
+- The browser's own audio controls were too small on the iPhone, so the
+  player bar has the app's own: a big Play/Pause button, back 15 s and
+  forward 30 s buttons (also on the lock screen), and a wide progress
+  bar with a big handle.
 
 ### Phase 6 — Bulk editing, search, CSV import
 - Select many episodes and edit fields together.
