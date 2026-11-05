@@ -139,6 +139,11 @@ These come from the plan and should not be changed without the owner's OK:
 - `docs/INSTALL.md`: owner-facing install guide. Keep it accurate when
   setup steps change.
 
+**Navigation links are buttons** (owner's choice): "← Back", "← All
+series", "← Back without saving" and similar links are written as
+`<nav class="back"><a class="button" href="...">← ...</a></nav>`, never
+as plain text links. Do the same for any new page.
+
 **Browser checks against the owner's running app** must not save anything
 into their real database (it holds their edits, and test values could be
 invented dates). Use a throwaway copy of the app with its own data folder

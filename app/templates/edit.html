@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Edit {{ f | display_title }} · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="/files/{{ f.id }}">← Back without saving</a></p>
+<nav class="back"><a class="button" href="/files/{{ f.id }}">← Back without saving</a></nav>
 <h1>Edit episode details</h1>
 <p class="muted">{{ f.name }}</p>
 {% if f.episode and f.episode.files | length > 1 %}

@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Edit {{ episodes | length }} episodes · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="{{ back }}">← Back without saving</a></p>
+<nav class="back"><a class="button" href="{{ back }}">← Back without saving</a></nav>
 <h1>Edit {{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }} at once</h1>
 
 {% if errors.none or not episodes %}

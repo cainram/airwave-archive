@@ -349,3 +349,7 @@ body.has-player { padding-bottom: 150px; }
   .bulk-field input[type="radio"] { width: 22px; height: 22px; }
   .files .pick input { width: 24px; height: 24px; }
 }
+
+/* "← Back" buttons at the top of a page. */
+.back { margin: 0 0 16px; }
+.back .button { font-size: 0.95rem; }
