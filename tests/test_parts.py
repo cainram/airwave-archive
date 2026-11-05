@@ -86,7 +86,7 @@ def test_grouping_makes_one_episode_that_plays_straight_through(client):
     assert parts[0].episode.title == "Art Bell - May 2 1996"  # first part's tag, less "Hour 1"
 
     # The library shows the broadcast once, with its total length.
-    library = client.get("/").text
+    library = client.get("/library").text
     assert SHOW.format(1) in library and SHOW.format(2) not in library
     assert "3 parts" in library and "0:06" in library
 
@@ -125,7 +125,7 @@ def test_splitting_gives_each_file_its_own_details_again(client):
     assert files[SHOW.format(1)].episode.title == "Kept on the first"
     assert files[SHOW.format(2)].episode.title == "Art Bell - May 2 1996 - Hour 2"   # its own tag
     assert episode_count(client) == 4
-    assert "3 parts" not in client.get("/").text
+    assert "3 parts" not in client.get("/library").text
 
 
 def test_moving_a_part_from_another_group(client):

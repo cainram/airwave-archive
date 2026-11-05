@@ -4,15 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Airwave Archive{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
-  <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
-  <script src="{{ url_for('static', path='player.js') }}" defer></script>
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  <script src="{{ static_url('htmx.min.js') }}" defer></script>
+  <script src="{{ static_url('player.js') }}" defer></script>
 </head>
 {#
   hx-boost: links and forms fetch just the middle of the next page (#content)
   and swap it in, so the player bar below keeps playing.
+  hx-headers: each of those requests says which version of the app this tab
+  was loaded with; after an update, the app asks the tab to reload fully.
 #}
-<body hx-boost="true" hx-target="#content" hx-swap="innerHTML show:window:top">
+<body hx-boost="true" hx-target="#content" hx-swap="innerHTML show:window:top"
+      hx-headers='{"X-Airwave-Version": "{{ version }}"}'>
   <header class="topbar">
     <a class="brand" href="/">Airwave Archive</a>
     {% include "_menu.html" %}

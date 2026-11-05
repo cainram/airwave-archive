@@ -1,7 +1,13 @@
 {# The menu in the top bar. Sent with every page (see _partial.html), so the
-   current section stays highlighted as you move around. #}
+   current section stays highlighted as you move around. `data-paths` lists
+   the addresses that belong to each section (player.js uses it too). #}
 {% set here = request.url.path %}
 <nav id="menu" class="menu"{% if oob %} hx-swap-oob="true"{% endif %}>
-  <a href="/"{% if here == "/" or here.startswith("/files") or here.startswith("/review") %} aria-current="page"{% endif %}>Library</a>
-  <a href="/series"{% if here.startswith("/series") %} aria-current="page"{% endif %}>Series</a>
+  {% for href, label, paths in [("/", "Series", "/ /series"), ("/library", "Library", "/library /files /review")] %}
+  {% set ns = namespace(current=false) %}
+  {% for path in paths.split() %}
+    {% if here == path or (path != "/" and here.startswith(path)) %}{% set ns.current = true %}{% endif %}
+  {% endfor %}
+  <a href="{{ href }}" data-paths="{{ paths }}"{% if ns.current %} aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
 </nav>

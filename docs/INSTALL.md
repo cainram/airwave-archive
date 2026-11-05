@@ -191,8 +191,8 @@ item 4 and use `git clone https://github.com/cainram/airwave-archive.git`.)
    Replace `<server-address>` with the server's IP address, or its Tailscale
    name if you use Tailscale. To find the IP, run `hostname -I` on the server.
 
-   You should see the **Library** page. It will say no audio files were found
-   until you add some.
+   You should see the **Series** page. It will say there are no episodes
+   until you add some recordings.
 
 ## Step 4 — Add some recordings
 
@@ -203,7 +203,7 @@ like. For example, from another Linux or Mac computer:
 scp -r "/path/to/Suspense" youruser@<server-address>:/srv/airwave/library/
 ```
 
-Then press **Rescan** on the Library page. The first scan reads every
+Then click **Library** in the menu at the top and press **Rescan**. The first scan reads every
 file; later scans only look at files that are new or have changed, so they
 are much faster.
 
@@ -212,6 +212,14 @@ are much faster.
 The app keeps its database in `/srv/airwave/data`. It's small, and it will
 hold all the information you add, so include it in your backups. (Your
 recordings in `/srv/airwave/library` are never changed by the app.)
+
+The `artwork` folder inside it holds the app's small copies of pictures
+from your library. It doesn't need backing up: a scan makes the copies
+again.
+
+To give a series a picture, put a picture file named `cover.jpg` (or
+`folder.jpg`, or `.png`) in its folder in the library, and press
+**Rescan**.
 
 When a new version of the app needs to change how its database is laid
 out, it first saves a copy named like `airwave.db.before-v2` in the same

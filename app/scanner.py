@@ -19,7 +19,8 @@ from mutagen.id3 import ID3, Frame
 from sqlalchemy import Engine, delete, exists, select
 from sqlalchemy.orm import Session
 
-from app.db import AudioFile, Episode, ScanRun, utcnow
+from app.artwork import embedded_picture, folder_image_rank, save_picture
+from app.db import AudioFile, Episode, FolderArt, ScanRun, utcnow
 from app.episodes import fill_from_tags
 
 # File endings we treat as audio.
@@ -66,6 +67,7 @@ class AudioInfo:
     bitrate: int | None = None
     tags: dict[str, str] = field(default_factory=dict)        # the common tags
     all_tags: list[tuple[str, str]] = field(default_factory=list)
+    picture: bytes | None = None   # a picture stored in the file
 
 
 def _text(value) -> str:
@@ -148,12 +150,17 @@ def read_audio(path: Path) -> AudioInfo:
             _read_other(audio.tags, info)
     except Exception:
         pass  # odd or damaged tags shouldn't stop the scan
+    info.picture = embedded_picture(audio)
     return info
 
 
-def find_audio_files(root: Path) -> Iterator[tuple[Path, str, os.stat_result]]:
+def find_audio_files(root: Path, pictures: dict | None = None
+                     ) -> Iterator[tuple[Path, str, os.stat_result]]:
     """Walk every folder under ``root``, yielding (path, folder, file info)
-    for each audio file. ``folder`` is relative to ``root``."""
+    for each audio file. ``folder`` is relative to ``root``.
+
+    If a ``pictures`` dictionary is given, the best picture file in each
+    folder (cover.jpg...) is noted in it: folder -> (path, file info)."""
     for dirpath, dirnames, filenames in os.walk(root):
         # Skip hidden folders such as ".Trash" or ".@__thumb".
         dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
@@ -164,6 +171,13 @@ def find_audio_files(root: Path) -> Iterator[tuple[Path, str, os.stat_result]]:
                 continue
             path = Path(dirpath) / filename
             if path.suffix.lower() not in AUDIO_EXTENSIONS:
+                if pictures is not None and (rank := folder_image_rank(filename)) is not None:
+                    best = pictures.get(folder)
+                    if best is None or rank < folder_image_rank(best[0].name):
+                        try:
+                            pictures[folder] = (path, path.stat())
+                        except OSError:
+                            pass
                 continue
             try:
                 stat = path.stat()
@@ -172,8 +186,10 @@ def find_audio_files(root: Path) -> Iterator[tuple[Path, str, os.stat_result]]:
             yield path, folder, stat
 
 
-def _apply(row: AudioFile, info: AudioInfo, stat: os.stat_result) -> None:
-    """Copy freshly read facts onto a database row."""
+def _apply(row: AudioFile, info: AudioInfo, stat: os.stat_result,
+           art_dir: Path | None = None) -> None:
+    """Copy freshly read facts onto a database row. With ``art_dir``, a
+    picture in the file is saved there (as a smaller copy)."""
     row.size_bytes = stat.st_size
     row.mtime_ns = stat.st_mtime_ns
     row.duration_seconds = info.duration_seconds
@@ -181,6 +197,8 @@ def _apply(row: AudioFile, info: AudioInfo, stat: os.stat_result) -> None:
     for name in COMMON_TAGS:
         setattr(row, f"tag_{name}", info.tags.get(name))
     row.tags_json = json.dumps(info.all_tags) if info.all_tags else None
+    if art_dir is not None:
+        row.art_hash = save_picture(info.picture, art_dir)
     row.last_read = utcnow()
 
 
@@ -189,8 +207,11 @@ def _new_episode() -> Episode:
     return Episode(created_at=now, updated_at=now)
 
 
-def sync_library(engine: Engine, root: Path) -> ScanRun:
+def sync_library(engine: Engine, root: Path, art_dir: Path | None = None) -> ScanRun:
     """Bring the database up to date with the library folder.
+
+    With ``art_dir``, pictures (inside files, and cover.jpg-style files in
+    folders) are saved there as smaller copies.
 
     - New files are added, each with its own episode.
     - Changed files are re-read. Unchanged files aren't opened at all.
@@ -215,7 +236,8 @@ def sync_library(engine: Engine, root: Path) -> ScanRun:
                     select(AudioFile.id, AudioFile.folder, AudioFile.name,
                            AudioFile.size_bytes, AudioFile.mtime_ns, AudioFile.missing))
             }
-            found = list(find_audio_files(root))
+            pictures: dict = {}
+            found = list(find_audio_files(root, pictures))
             seen = {(folder, path.name) for path, folder, _ in found}
             gone = {key: known[key] for key in known.keys() - seen}
             # Files that are gone, by name and size, in case they turn up
@@ -245,7 +267,7 @@ def sync_library(engine: Engine, root: Path) -> ScanRun:
                                     episode=_new_episode())
                     session.add(row)
                     run.added += 1
-                _apply(row, read_audio(path), stat)
+                _apply(row, read_audio(path), stat, art_dir)
                 if row.episode is not None:
                     fill_from_tags(row.episode, row)
                 row.missing = False
@@ -260,11 +282,36 @@ def sync_library(engine: Engine, root: Path) -> ScanRun:
                 if row_id not in reconnected and not was_missing
             ])
             _give_files_episodes(session)
+            if art_dir is not None:
+                _sync_folder_art(session, pictures, art_dir)
 
         run.seconds = time.monotonic() - started
         session.add(run)
         session.commit()
     return run
+
+
+def _sync_folder_art(session: Session, pictures: dict, art_dir: Path) -> None:
+    """Keep the list of folder pictures in step with the library. A picture
+    file that hasn't changed isn't opened again."""
+    known = {row.folder: row for row in session.scalars(select(FolderArt))}
+    for folder, (path, stat) in pictures.items():
+        row = known.pop(folder, None)
+        if (row is not None and row.name == path.name and row.size_bytes == stat.st_size
+                and row.mtime_ns == stat.st_mtime_ns):
+            continue
+        if row is None:
+            row = FolderArt(folder=folder)
+            session.add(row)
+        try:
+            data = path.read_bytes()
+        except OSError:
+            data = None
+        row.name, row.size_bytes, row.mtime_ns = path.name, stat.st_size, stat.st_mtime_ns
+        row.art_hash = save_picture(data, art_dir)
+    for row in known.values():   # folders whose picture is gone
+        session.delete(row)
+    session.commit()
 
 
 def _handle_gone(session: Session, ids: list[int]) -> int:

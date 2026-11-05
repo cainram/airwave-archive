@@ -229,7 +229,7 @@ def test_edit_form_saves_details(client):
     assert "<h1>The Patriot</h1>" in page.text
     assert "Friday, April 14th, 1939, 8:00 PM US Eastern" in page.text
     assert "Anna May Wong" in page.text
-    library = client.get("/")
+    library = client.get("/library")
     assert "The Patriot" in library.text and "Apr 14, 1939" in library.text
     assert "The Campbell Playhouse" in library.text
 
@@ -240,7 +240,7 @@ def test_edit_form_explains_mistakes_and_keeps_what_was_typed(client):
     assert page.status_code == 200
     assert "April 1939 doesn&#39;t have a day 31" in page.text
     assert "Anna May Wong" in page.text            # nothing typed is lost
-    assert "The Patriot" not in client.get("/").text   # and nothing was saved
+    assert "The Patriot" not in client.get("/library").text   # and nothing was saved
 
 
 def test_edit_from_htmx_keeps_the_player_going(client):
@@ -253,7 +253,7 @@ def test_missing_file_is_shown_and_can_be_forgotten(client, tmp_path):
     (tmp_path / "library" / "CampbellPlayhouse39-04-14ThePatriot.wav").unlink()
     client.post("/rescan")
 
-    library = client.get("/")
+    library = client.get("/library")
     assert "1 missing" in library.text and 'data-src="/audio/1"' not in library.text
     page = client.get("/files/1")
     assert "This file is missing" in page.text

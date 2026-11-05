@@ -1,4 +1,5 @@
 {% extends layout %}
+{% from "_art.html" import picture %}
 {% block title %}Series · Airwave Archive{% endblock %}
 {% block content %}
 <section class="summary">
@@ -10,10 +11,28 @@
       · {{ series | sum(attribute="seconds") | duration }} of audio
     </p>
   </div>
+  {% if series %}
+  <nav class="view-switch" aria-label="Show as">
+    <a href="/"{% if view == "tiles" %} aria-current="page"{% endif %}>Tiles</a>
+    <a href="/?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
+  </nav>
+  {% endif %}
 </section>
 
 {% if not series %}
 <div class="notice">No episodes yet. Add recordings to the library and press <strong>Rescan</strong>.</div>
+{% elif view == "tiles" %}
+<ul class="tiles">
+  {% for s in series %}
+  <li>
+    <a class="tile" href="{{ s.name | series_url }}">
+      {{ picture(s.art, s.name or "?") }}
+      <span class="tile-name">{{ s.name or "No series yet" }}</span>
+      <span class="muted small">{{ s.episodes }} episode{{ "" if s.episodes == 1 else "s" }}{% if s.years %} · {{ s.years }}{% endif %}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
 {% else %}
 <p class="muted small">A series is every episode with the same <strong>Series</strong> name.
   To join two spellings into one, change the name on their episodes.</p>
@@ -21,6 +40,7 @@
   <table class="files series-list">
     <thead>
       <tr>
+        <th class="play"><span class="visually-hidden">Picture</span></th>
         <th>Series</th>
         <th class="num">Episodes</th>
         <th class="date">Years</th>
@@ -31,6 +51,7 @@
     <tbody>
       {% for s in series %}
       <tr>
+        <td class="play">{{ picture(s.art, s.name or "?", "small") }}</td>
         <td class="name">
           <a class="title" href="{{ s.name | series_url }}">{{ s.name or "No series yet" }}</a>
           {% if s.name is none %}<div class="muted small">episodes without a Series name</div>{% endif %}

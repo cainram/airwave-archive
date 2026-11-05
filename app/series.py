@@ -12,7 +12,8 @@ import re
 from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.orm import Session
 
-from app.db import FIRST_PARTS, WITH_PARTS, AudioFile, Episode, natural_key
+from app.artwork import folder_art
+from app.db import FIRST_PARTS, WITH_PARTS, AudioFile, Episode, FolderArt, natural_key
 
 # Words ignored at the start of a name when sorting, so "The Shadow" is
 # listed under S.
@@ -54,17 +55,56 @@ def _totals(session: Session, where=None) -> list[dict]:
     ]
 
 
+def folder_pictures(session: Session) -> dict[str, str]:
+    """Folder -> fingerprint of its picture (cover.jpg...)."""
+    rows = session.execute(
+        select(FolderArt.folder, FolderArt.art_hash).where(FolderArt.art_hash.is_not(None)))
+    return {folder: art for folder, art in rows}
+
+
+def _add_art(session: Session, found: list[dict], where=None) -> None:
+    """Give each series a picture: the folder picture of the folder most of
+    its files are in (or one above it), else a picture from inside its
+    files."""
+    query = (select(Episode.series, AudioFile.folder, func.count(),
+                    func.max(AudioFile.art_hash))
+             .join(AudioFile, AudioFile.episode_id == Episode.id)
+             .group_by(Episode.series, AudioFile.folder))
+    if where is not None:
+        query = query.where(where)
+    folders: dict = {}   # series -> [(files, folder, picture in files)]
+    for name, folder, count, inside in session.execute(query):
+        folders.setdefault(name, []).append((count, folder, inside))
+    pictures = folder_pictures(session)
+    for series in found:
+        places = sorted(folders.get(series["name"], []), key=lambda p: (-p[0], p[1]))
+        series["art"] = (
+            next((art for _c, folder, _i in places if (art := folder_art(pictures, folder))), None)
+            or next((inside for _c, _f, inside in places if inside), None))
+
+
 def all_series(session: Session) -> list[dict]:
-    """Every series with its totals (episodes, seconds, bytes, years), in
-    name order. Episodes without a series come last, under the name None."""
+    """Every series with its totals (episodes, seconds, bytes, years) and
+    picture, in name order. Episodes without a series come last, under the
+    name None."""
     found = _totals(session)
+    _add_art(session, found)
     return sorted(found, key=lambda s: (s["name"] is None, sort_key(s["name"] or "")))
 
 
 def one_series(session: Session, name: str | None) -> dict | None:
-    """One series' totals, or None if it has no episodes."""
+    """One series' totals and picture, or None if it has no episodes."""
     found = _totals(session, _in_series(name))
+    _add_art(session, found, _in_series(name))
     return found[0] if found else None
+
+
+def episode_art(f: AudioFile, pictures: dict[str, str]) -> str | None:
+    """An episode's picture: from inside its files (first part first), else
+    its folder's."""
+    parts = f.episode.parts if f.episode else [f]
+    return (next((p.art_hash for p in parts if p.art_hash), None)
+            or folder_art(pictures, f.folder))
 
 
 def series_files(session: Session, name: str | None, page: int, page_size: int):

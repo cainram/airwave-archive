@@ -156,7 +156,7 @@ def test_guesses_that_replace_your_own_edits_start_unticked(client):
 
 
 def test_library_links_to_review(client):
-    assert 'href="/review/filenames"' in client.get("/").text
+    assert 'href="/review/filenames"' in client.get("/library").text
 
 
 def test_a_corrected_card_does_not_come_back(client):

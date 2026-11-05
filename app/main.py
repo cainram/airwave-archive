@@ -1,10 +1,11 @@
-"""Airwave Archive web app — Phase 5a: the library, episode details, and series.
+"""Airwave Archive web app — Phase 5b: the library, episode details, series, and artwork.
 
 Run locally with:   uvicorn app.main:app --reload
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -28,7 +29,8 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app.series import all_series, one_series, series_files
+from app.artwork import HASH_PATTERN, art_path
+from app.series import all_series, episode_art, folder_pictures, one_series, series_files
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
 APP_DIR = Path(__file__).parent
@@ -96,6 +98,30 @@ def tag_label(key: str) -> tuple[str, str]:
 
 
 templates = Jinja2Templates(directory=APP_DIR / "templates")
+
+
+def _version() -> str:
+    """A fingerprint of the files a browser keeps while you click around
+    (stylesheet, scripts, and the page frame). It changes with every update
+    that changes them."""
+    digest = hashlib.sha1()
+    for path in sorted([*(APP_DIR / "static").rglob("*"), APP_DIR / "templates" / "base.html"]):
+        if path.is_file():
+            digest.update(path.name.encode() + path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
+VERSION = _version()
+templates.env.globals["version"] = VERSION
+
+
+def static_url(path: str) -> str:
+    """The address of a stylesheet or script, with the version added, so a
+    browser never uses a copy saved before an update."""
+    return f"/static/{path}?v={VERSION}"
+
+
+templates.env.globals["static_url"] = static_url
 templates.env.filters["size"] = format_size
 templates.env.filters["duration"] = format_duration
 templates.env.filters["bitrate"] = format_bitrate
@@ -118,6 +144,17 @@ def series_url(name: str | None) -> str:
 
 
 templates.env.filters["series_url"] = series_url
+
+
+def initials(name: str | None) -> str:
+    """'The Campbell Playhouse' -> 'CP' (for a series without a picture)."""
+    words = [w for w in (name or "?").split() if w.lower() not in ("the", "a", "an")]
+    return "".join(w[0] for w in words[:2] if w[0].isalnum()).upper() or "?"
+
+
+templates.env.filters["initials"] = initials
+# A colour (hue on the colour wheel) that's always the same for a name.
+templates.env.filters["hue"] = lambda name: sum(map(ord, name or "")) * 47 % 360
 templates.env.filters["fromjson"] = lambda text: json.loads(text) if text else []
 
 _engine: Engine | None = None
@@ -137,6 +174,14 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
     title and the middle of the page, so the player bar isn't replaced."""
     from_htmx = ("HX-Request" in request.headers
                  or "HX-History-Restore-Request" in request.headers)
+    if from_htmx and request.headers.get("X-Airwave-Version", VERSION) != VERSION:
+        # The tab was opened before the app was updated: it still has the
+        # old stylesheet and scripts. Ask it to load the whole page it was
+        # going to afresh (or, after sending a form, the page it's on).
+        if request.method == "GET":
+            target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+            return Response(headers={"HX-Redirect": target, "Vary": "HX-Request"})
+        return Response(headers={"HX-Refresh": "true", "Vary": "HX-Request"})
     context["layout"] = "_partial.html" if from_htmx else "base.html"
     response = templates.TemplateResponse(request, template, context, status_code=status_code)
     # Tell browsers the full and partial versions are different pages.
@@ -161,18 +206,29 @@ def go_to(request: Request, path: str) -> Response:
     return RedirectResponse(path, status_code=303)
 
 
+def art_dir() -> Path:
+    """Where the app keeps its copies of pictures: next to the database."""
+    return Path(get_engine().url.database).parent / "artwork"
+
+
 def run_scan() -> ScanRun:
     with _scan_lock:
-        return sync_library(get_engine(), LIBRARY_DIR)
+        return sync_library(get_engine(), LIBRARY_DIR, art_dir())
 
 
-@app.get("/", response_class=HTMLResponse)
-def library_page(request: Request, page: int = 1):
-    engine = get_engine()
-    with Session(engine) as session:
+def last_scan_or_scan() -> ScanRun:
+    """The latest scan. On the very first visit there's none yet: scan
+    straight away, so the first page you open isn't empty."""
+    with Session(get_engine()) as session:
         last_scan = session.scalars(select(ScanRun).order_by(ScanRun.id.desc()).limit(1)).first()
-    if last_scan is None:
-        last_scan = run_scan()  # very first visit: scan straight away
+    return last_scan or run_scan()
+
+
+@app.get("/library", response_class=HTMLResponse)
+def library_page(request: Request, page: int = 1):
+    """Every file, in folder order."""
+    engine = get_engine()
+    last_scan = last_scan_or_scan()
 
     with Session(engine) as session:
         present = AudioFile.missing.is_(False)
@@ -200,7 +256,7 @@ def library_page(request: Request, page: int = 1):
         "files": files,
         "count": count,
         "rows": rows,
-        "pager_url": "/?page=",
+        "pager_url": "/library?page=",
         "missing": missing,
         "total_bytes": total_bytes or 0,
         "total_seconds": total_seconds or 0,
@@ -217,12 +273,15 @@ def library_page(request: Request, page: int = 1):
 @app.post("/rescan")
 def rescan(request: Request):
     run_scan()
-    return go_to(request, "/")
+    return go_to(request, "/library")
 
 
 @app.get("/files/{file_id}", response_class=HTMLResponse)
 def file_page(request: Request, file_id: int):
-    return render(request, "file.html", {"f": get_file(file_id)})
+    f = get_file(file_id)
+    with Session(get_engine()) as session:
+        art = episode_art(f, folder_pictures(session))
+    return render(request, "file.html", {"f": f, "art": art})
 
 
 def render_edit_form(request: Request, f: AudioFile, values: dict, errors: dict | None = None):
@@ -277,17 +336,27 @@ def forget(request: Request, file_id: int):
         if episode_id is not None and (episode := session.get(Episode, episode_id)):
             renumber(episode)   # the other parts, if it was one of several
         session.commit()
-    return go_to(request, "/")
+    return go_to(request, "/library")
 
 
 # ------------------------------------------------------------------ series
 
 
-@app.get("/series", response_class=HTMLResponse)
-def series_list(request: Request):
+@app.get("/", response_class=HTMLResponse)
+def series_list(request: Request, view: str = "tiles"):
+    """The front page: all series, as picture tiles or (view=list) as a
+    table."""
+    last_scan_or_scan()
     with Session(get_engine()) as session:
         found = all_series(session)
-    return render(request, "series.html", {"series": found})
+    return render(request, "series.html",
+                  {"series": found, "view": "list" if view == "list" else "tiles"})
+
+
+@app.get("/series")
+def old_series_address(request: Request):
+    """The series list used to be here; it's the front page now."""
+    return RedirectResponse("/" + (f"?{request.url.query}" if request.url.query else ""), 303)
 
 
 @app.get("/series/episodes", response_class=HTMLResponse)
@@ -459,6 +528,17 @@ def audio(file_id: int):
         raise HTTPException(status_code=404, detail="File is missing; try a rescan")
     media_type = AUDIO_TYPES.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path, media_type=media_type)
+
+
+@app.get("/art/{art_hash}.jpg")
+def artwork(art_hash: str):
+    """A picture, from the app's own copies. Pictures never change (a new
+    picture gets a new name), so browsers may keep them for a long time."""
+    path = art_path(art_dir(), art_hash) if HASH_PATTERN.match(art_hash) else None
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="No such picture")
+    return FileResponse(path, media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/health")

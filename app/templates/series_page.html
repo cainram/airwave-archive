@@ -1,9 +1,11 @@
 {% extends layout %}
+{% from "_art.html" import picture %}
 {% block title %}{{ name or "No series yet" }} · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="/series">← All series</a></p>
-<section class="summary">
-  <div>
+<p class="small"><a href="/">← All series</a></p>
+<section class="summary with-art">
+  {{ picture(totals.art, name or "?", "large") }}
+  <div class="summary-text">
     <h1>{{ name or "No series yet" }}</h1>
     <p class="muted">
       {{ totals.episodes }} episode{{ "" if totals.episodes == 1 else "s" }}

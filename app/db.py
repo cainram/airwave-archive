@@ -11,6 +11,7 @@ Tables:
 - ``audio_files``: one row per audio file in the library. Each file belongs
   to an episode. One episode can have several files ("parts"), such as
   a long show saved as Hour 1, Hour 2, Hour 3.
+- ``folder_art``: picture files found in library folders (cover.jpg...).
 - ``scan_runs``: one row per scan, recording what changed.
 """
 
@@ -38,7 +39,8 @@ DB_FILENAME = "airwave.db"
 #   3: Phase 4b, episode details filled in from tags (no layout change)
 #   4: Phase 4e, files can be parts of one episode (part_number)
 #   5: Phase 4e, a group's notes gather all parts' descriptions (no layout change)
-SCHEMA_VERSION = 5
+#   6: Phase 5b, pictures (art_hash on files, folder_art table)
+SCHEMA_VERSION = 6
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -154,6 +156,10 @@ class AudioFile(Base):
     # None for a file that is a whole episode by itself.
     part_number: Mapped[int | None]
 
+    # The picture stored inside the file, if any: the fingerprint of the
+    # app's copy in the data folder (see app/artwork.py).
+    art_hash: Mapped[str | None]
+
     # True if the file wasn't found by the last scan but is kept because its
     # episode has edits.
     missing: Mapped[bool] = mapped_column(default=False)
@@ -161,6 +167,19 @@ class AudioFile(Base):
 
     # Each path appears once. This also creates an index (fast lookup by path).
     __table_args__ = (UniqueConstraint("folder", "name", name="uq_audio_files_path"),)
+
+
+class FolderArt(Base):
+    """A picture file in a library folder (cover.jpg, folder.png...), as
+    last seen by a scan. Only the best one in each folder is kept."""
+
+    __tablename__ = "folder_art"
+
+    folder: Mapped[str] = mapped_column(primary_key=True)   # "" = the top level
+    name: Mapped[str]
+    size_bytes: Mapped[int]
+    mtime_ns: Mapped[int]
+    art_hash: Mapped[str | None]   # None if it couldn't be read as a picture
 
 
 # Load a file's episode and all that episode's parts along with it.
@@ -213,6 +232,12 @@ def _migrate(conn) -> None:
     # Version 4: files can be parts of one episode.
     if "part_number" not in columns:
         conn.exec_driver_sql("ALTER TABLE audio_files ADD COLUMN part_number INTEGER")
+    # Version 6: pictures.
+    if "art_hash" not in columns:
+        conn.exec_driver_sql("ALTER TABLE audio_files ADD COLUMN art_hash VARCHAR")
+        # Files were read before pictures were looked for: the next scan
+        # reads every file again, once.
+        conn.exec_driver_sql("UPDATE audio_files SET mtime_ns = 0")
 
 
 def make_engine(db_path: Path) -> Engine:
