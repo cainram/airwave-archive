@@ -442,6 +442,10 @@ Split into four smaller steps, done in order.
   Years column on phones so names don't break mid-word. The player bar
   shows the show's picture, and so does the phone's lock screen
   (`/files/{id}/art` finds an episode's picture).
+- The browser's own audio controls were too small on the iPhone, so the
+  player bar has the app's own: a big Play/Pause button, back 15 s and
+  forward 30 s buttons (also on the lock screen), and a wide progress
+  bar with a big handle.
 
 ### Phase 6 — Bulk editing, search, CSV import
 - Select many episodes and edit fields together.

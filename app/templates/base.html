@@ -27,13 +27,30 @@
     Airwave Archive · free software under the GNU GPL v3
   </footer>
 
+  {# The player bar. The app draws its own controls (big enough for a
+     thumb); the audio element itself is hidden. #}
   <div id="player" class="player" hidden>
-    <img id="player-art" class="player-art" alt="" hidden>
-    <div class="player-info">
-      <a id="player-title" class="player-title" href="/"></a>
-      <span id="player-subtitle" class="muted small"></span>
+    <div class="player-top">
+      <img id="player-art" class="player-art" alt="" hidden>
+      <div class="player-info">
+        <a id="player-title" class="player-title" href="/"></a>
+        <span id="player-subtitle" class="muted small"></span>
+      </div>
+      <div class="player-buttons">
+        <button id="player-back" class="player-skip" type="button" aria-label="Back 15 seconds">−15</button>
+        <button id="player-toggle" class="player-toggle" type="button" aria-label="Play">
+          <span class="when-stopped">▶</span><span class="when-playing">❚❚</span>
+        </button>
+        <button id="player-forward" class="player-skip" type="button" aria-label="Forward 30 seconds">+30</button>
+      </div>
     </div>
-    <audio id="player-audio" controls preload="none"></audio>
+    <div class="player-progress">
+      <span id="player-time" class="player-time">0:00</span>
+      <input id="player-seek" class="player-seek" type="range" min="0" max="0" step="1" value="0"
+             aria-label="Position in the recording">
+      <span id="player-length" class="player-time">0:00</span>
+    </div>
+    <audio id="player-audio" preload="none"></audio>
   </div>
 </body>
 </html>
