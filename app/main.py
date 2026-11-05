@@ -11,7 +11,7 @@ import json
 import os
 import threading
 from urllib.parse import quote, urlencode
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -26,11 +26,11 @@ from app.db import (
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
-    format_air_date, read_date_text, read_form,
+    day_heading, format_air_date, format_air_time, read_date_text, read_form,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import csvimport, inbox, listening
+from app import airdates, csvimport, inbox, listening
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -156,6 +156,8 @@ templates.env.filters["progress"] = listening.progress
 templates.env.filters["resume_point"] = listening.resume_point
 templates.env.filters["listened_at"] = listening.listened_at
 templates.env.filters["time_left"] = listening.time_left
+templates.env.filters["air_time"] = format_air_time
+templates.env.globals["day_heading"] = day_heading
 
 
 def initials(name: str | None) -> str:
@@ -375,6 +377,25 @@ def series_list(request: Request, view: str = "tiles"):
     return render(request, "series.html",
                   {"series": found, "view": "list" if view == "list" else "tiles",
                    "unfinished": unfinished})
+
+
+@app.get("/calendar", response_class=HTMLResponse)
+def calendar_month(request: Request, year: int | None = None, month: int | None = None):
+    """A month of broadcasts: a calendar grid, and the episodes day by day.
+    Without a month: the most recent month anything aired in."""
+    with Session(get_engine()) as session:
+        if year is None or month is None or not (1 <= month <= 12 and 1 <= year <= 9999):
+            year, month = airdates.latest_month(session) or (date.today().year, date.today().month)
+        view = airdates.month_view(session, year, month)
+        earlier = airdates.nearest_month(session, year, month, later=False)
+        later = airdates.nearest_month(session, year, month, later=True)
+        years = airdates.years_with_episodes(session)
+        session.expunge_all()
+    return render(request, "calendar_month.html", {
+        "view": view, "earlier": earlier, "later": later, "years": years,
+        "before": airdates.next_month(year, month, -1), "after": airdates.next_month(year, month, 1),
+        "day_names": airdates.DAY_NAMES, "month_names": MONTHS,
+    })
 
 
 @app.get("/series")
