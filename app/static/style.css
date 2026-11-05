@@ -318,3 +318,34 @@ body.has-player { padding-bottom: 150px; }
   .player-buttons { gap: 4px; }
   .player-skip { width: 44px; height: 44px; font-size: 0.85rem; }
 }
+
+/* Ticking episodes to edit together. */
+.files .pick { width: 1%; padding-right: 0; }
+.files .pick input { width: 20px; height: 20px; margin: 4px 0 0; }
+.pick-toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 10px; }
+
+/* The bulk edit form. */
+.chosen { margin: 6px 0 14px; }
+.chosen summary { cursor: pointer; color: var(--accent); }
+.chosen ul { max-height: 240px; overflow-y: auto; margin: 6px 0; padding-left: 1.4em; }
+.bulk-form { display: grid; gap: 12px; max-width: 700px; }
+.bulk-field {
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px 12px;
+  display: grid; gap: 6px; background: var(--panel);
+}
+.bulk-field.has-error { border-color: #e3a1a1; }
+.bulk-field legend { font-weight: 600; padding: 0 4px; }
+.bulk-field label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.bulk-field input[type="radio"] { width: 18px; height: 18px; margin: 0; }
+.bulk-field input[type="text"], .bulk-field textarea, .bulk-field select, .bulk-field input[type="time"] {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--text); width: 100%;
+}
+.bulk-time { display: flex; gap: 8px; flex-wrap: wrap; }
+.bulk-time input { max-width: 10em; }
+.bulk-time select { flex: 1; min-width: 12em; }
+@media (pointer: coarse) {
+  .bulk-field label { min-height: 44px; }
+  .bulk-field input[type="radio"] { width: 22px; height: 22px; }
+  .files .pick input { width: 24px; height: 24px; }
+}

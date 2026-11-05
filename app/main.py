@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 5d: the library, episode details, series, and artwork.
+"""Airwave Archive web app — Phase 6a: the library, episode details, series, artwork, and bulk editing.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -13,7 +13,7 @@ from urllib.parse import quote
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -29,6 +29,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
+from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
     all_series, episode_art, follow_rename, one_series, series_files, set_uploaded_picture,
@@ -386,6 +387,99 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
     })
+
+
+# ------------------------------------------------------------ bulk editing
+
+
+def safe_back(back: str | None) -> str:
+    """Where to return to after a form: only addresses inside the app."""
+    return back if back and back.startswith("/") and not back.startswith("//") else "/"
+
+
+def with_query(path: str, **values) -> str:
+    """'/library' + changed=3 -> '/library?changed=3' (or '&changed=3')."""
+    extra = "&".join(f"{k}={v}" for k, v in values.items() if v)
+    return path + (("&" if "?" in path else "?") + extra if extra else "")
+
+
+def chosen_episodes(session: Session, ids: list[int], series: str) -> list[Episode]:
+    """The episodes picked for bulk editing: ticked ones, or a whole series."""
+    if series:
+        query = select(Episode).where(Episode.series == series)
+    else:
+        query = select(Episode).where(Episode.id.in_(ids[:5000]))
+    return list(session.scalars(query.order_by(Episode.air_year, Episode.air_month,
+                                               Episode.air_day, Episode.title)))
+
+
+def render_bulk(request: Request, episodes, ids, series, back, typed=None, errors=None):
+    return render(request, "bulk_edit.html", {
+        "episodes": episodes, "ids": [e.id for e in episodes] if not series else [],
+        "series": series, "back": safe_back(back), "fields": BULK_FIELDS,
+        "time_zones": TIME_ZONES, "typed": typed or {}, "errors": errors or {},
+    }, status_code=400 if errors else 200)
+
+
+@app.get("/episodes/edit", response_class=HTMLResponse)
+def bulk_edit_page(request: Request, ids: list[int] = Query(default=[]),
+                   whole_series: str = "", back: str = "/"):
+    with Session(get_engine()) as session:
+        episodes = chosen_episodes(session, ids, whole_series)
+    return render_bulk(request, episodes, ids, whole_series, back)
+
+
+@app.post("/episodes/edit", response_class=HTMLResponse)
+async def bulk_edit_save(request: Request):
+    form = await request.form()
+    ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
+    series, back = form.get("whole_series", ""), safe_back(form.get("back"))
+    changes, time, errors = read_bulk_form(form)
+    with Session(get_engine()) as session:
+        episodes = chosen_episodes(session, ids, series)
+        if errors or not episodes:
+            return render_bulk(request, episodes, ids, series, back, dict(form),
+                               errors or {"none": "No episodes were ticked."})
+        old_names = {e.series for e in episodes}
+        changed = skipped = 0
+        for episode in episodes:
+            did, missed = apply_bulk(episode, changes, time)
+            changed += did
+            skipped += missed
+        if changes.get("series"):
+            for old in old_names:
+                follow_rename(session, old, changes["series"])
+            back = series_url(changes["series"])   # the series' new page
+        elif "series" in changes:
+            back = series_url(None)
+        session.commit()
+    return go_to(request, with_query(back, changed=str(changed), skipped=str(skipped)))
+
+
+@app.get("/series/rename", response_class=HTMLResponse)
+def rename_page(request: Request, name: str = "", error: str | None = None, typed: str = ""):
+    with Session(get_engine()) as session:
+        totals = series_or_404(session, name)
+        others = [s["name"] for s in all_series(session) if s["name"] and s["name"] != name]
+    return render(request, "rename.html", {"name": name, "totals": totals, "error": error,
+                                           "typed": typed or name, "others": others},
+                  status_code=400 if error else 200)
+
+
+@app.post("/series/rename", response_class=HTMLResponse)
+async def rename_save(request: Request, name: str = ""):
+    new = " ".join(str((await request.form()).get("new_name", "")).split())
+    if not new:
+        return rename_page(request, name, "Please type the new name.", new)
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+        if new != name:
+            count = rename_series(session, name, new)
+            follow_rename(session, name, new)
+            session.commit()
+        else:
+            count = 0
+    return go_to(request, with_query(series_url(new), renamed=str(count)))
 
 
 def series_or_404(session: Session, name: str | None) -> dict:

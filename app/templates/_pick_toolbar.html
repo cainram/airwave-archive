@@ -1,0 +1,8 @@
+{# Tick episodes in the table below, then "Edit ticked". The tick boxes
+   belong to this form (form="pick"), wherever they are on the page.
+   Needs `back`: the page to return to afterwards. #}
+<form id="pick" class="pick-toolbar" method="get" action="/episodes/edit">
+  <input type="hidden" name="back" value="{{ back }}">
+  <button class="button" type="submit">Edit ticked…</button>
+  <span class="muted small" data-picked-count></span>
+</form>

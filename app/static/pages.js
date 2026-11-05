@@ -1,0 +1,33 @@
+// Small helpers for pages (the player bar has its own file, player.js).
+(function () {
+  "use strict";
+
+  // Tick boxes for choosing episodes: "tick all", and a count of how many
+  // are ticked.
+  function countTicked() {
+    const count = document.querySelectorAll('input[form="pick"][name="ids"]:checked').length;
+    document.querySelectorAll("[data-picked-count]").forEach(function (place) {
+      place.textContent = count ? count + " ticked" : "Tick episodes below to edit them together.";
+    });
+  }
+  document.addEventListener("change", function (event) {
+    const box = event.target;
+    if (box.matches("[data-select-all]")) {
+      document.querySelectorAll('input[form="pick"][name="ids"]').forEach(function (other) {
+        other.checked = box.checked;
+      });
+    }
+    if (box.matches('input[form="pick"]')) countTicked();
+  });
+
+  // Bulk edit form: typing a new value picks "Change to" for that detail.
+  document.addEventListener("input", function (event) {
+    const field = event.target.closest("[data-bulk-field]");
+    if (!field || event.target.type === "radio") return;
+    const set = field.querySelector('input[type="radio"][value="set"]');
+    if (set) set.checked = true;
+  });
+
+  document.addEventListener("DOMContentLoaded", countTicked);
+  document.addEventListener("htmx:afterSettle", countTicked);
+})();

@@ -1,0 +1,19 @@
+{% extends layout %}
+{% block title %}Rename {{ name }} · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ name | series_url }}">← Back to {{ name }}</a></p>
+<h1>Rename series</h1>
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+<p class="muted">This changes the Series name on all {{ totals.episodes }} episode{{ "" if totals.episodes == 1 else "s" }}
+  of <strong>{{ name }}</strong>. Its picture comes along.</p>
+<form class="upload-form" method="post" action="/series/rename?name={{ name | urlencode }}">
+  <label for="new_name">New name</label>
+  <input id="new_name" name="new_name" type="text" value="{{ typed }}" list="other-series" required>
+  <datalist id="other-series">{% for other in others %}<option value="{{ other }}">{% endfor %}</datalist>
+  <p class="muted small">To join this series with another one, type (or pick) that series' exact name.</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Rename</button>
+    <a class="button" href="{{ name | series_url }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

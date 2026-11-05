@@ -122,12 +122,14 @@ These come from the plan and should not be changed without the owner's OK:
   series' episodes in air-date order
 - `app/artwork.py`: finds pictures in files and folders, and keeps small
   copies in the data folder (`artwork/`)
+- `app/bulk.py`: editing many episodes at once, and renaming a series
 - `app/scanner.py`: finds audio files, reads length and tags, and keeps the
   database in step with the library
 - `app/templates/`: HTML page templates. Pages use `{% extends layout %}`:
   `base.html` for a full page, `_partial.html` when htmx asks for just the
   middle (so the player bar keeps playing).
-- `app/static/`: stylesheet, `player.js` (the player bar), and
+- `app/static/`: stylesheet, `player.js` (the player bar), `pages.js`
+  (small page helpers such as "tick all"), and
   `htmx.min.js` (a copy of htmx 2.0.11; never load it from the internet)
 - `tests/`: automated tests. Run them with `pytest` after
   `pip install -r requirements-dev.txt`. On the owner's VM, `python3-venv`

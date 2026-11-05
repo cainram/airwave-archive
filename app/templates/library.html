@@ -1,5 +1,6 @@
 {% extends layout %}
 {% block content %}
+{% include "_done_notice.html" %}
 <section class="summary">
   <div>
     <h1>Library</h1>
@@ -44,10 +45,13 @@
   {% endif %}
 {% else %}
   {% if pages > 1 %}{% include "_pager.html" %}{% endif %}
+  {% set back = "/library?page=" ~ page %}
+  {% include "_pick_toolbar.html" %}
   <div class="table-wrap">
     <table class="files">
       <thead>
         <tr>
+          <th class="pick"><input type="checkbox" form="pick" data-select-all aria-label="Tick all on this page"></th>
           <th class="play"><span class="visually-hidden">Play</span></th>
           <th>Title / file</th>
           <th class="artist">Series</th>
@@ -61,6 +65,7 @@
         {% set ep = f.episode %}
         {% set parts = ep.parts if ep else [f] %}
         <tr{% if f.missing %} class="is-missing"{% endif %}>
+          <td class="pick">{% if ep %}<input type="checkbox" form="pick" name="ids" value="{{ ep.id }}" aria-label="Tick {{ f | display_title }}">{% endif %}</td>
           <td class="play">{% if not f.missing %}{% include "_play_button.html" %}{% endif %}</td>
           <td class="name">
             <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
