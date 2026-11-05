@@ -4,6 +4,10 @@
 <p class="small"><a href="/files/{{ f.id }}">← Back without saving</a></p>
 <h1>Edit episode details</h1>
 <p class="muted">{{ f.name }}</p>
+{% if f.episode and f.episode.files | length > 1 %}
+<p class="notice">This file is one of {{ f.episode.files | length }} parts of a broadcast.
+  These details belong to all the parts.</p>
+{% endif %}
 
 {% if errors %}
 <div class="notice error" role="alert">

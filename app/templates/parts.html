@@ -1,0 +1,46 @@
+{% extends layout %}
+{% block title %}Parts of {{ f | display_title }} · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="/files/{{ f.id }}">← Back without saving</a></p>
+<h1>Which files are parts of this broadcast?</h1>
+<p class="muted">
+  Tick every file that belongs to the same broadcast as <strong>{{ f.name }}</strong>,
+  for example "Hour 1", "Hour 2", "Hour 3". They'll play in file-name order, as one
+  episode with one set of details (the details of {{ f | display_title }}).
+  Untick a file to make it separate again.
+</p>
+{% if error %}
+<div class="notice error" role="alert">Please tick at least one file.</div>
+{% endif %}
+<p class="muted small">Showing files near this one in the folder
+  <code>{{ f.folder or "(top level)" }}</code>.</p>
+
+<form method="post" action="/files/{{ f.id }}/parts">
+  <ul class="part-choices">
+    {% for row in candidates %}
+    {% set ep = row.episode %}
+    {% set mine = ep and f.episode and ep.id == f.episode.id %}
+    <li>
+      <label>
+        <input type="checkbox" name="part" value="{{ row.id }}" {% if mine %}checked{% endif %}>
+        <span class="{% if row.id == f.id %}is-current{% endif %}">{{ row.name }}</span>
+        <span class="muted small">{{ row.duration_seconds | duration }}</span>
+        {% if row.missing %}<span class="badge">missing</span>{% endif %}
+      </label>
+      {% if not mine and ep %}
+        {% if ep.files | length > 1 %}
+        <p class="muted small">Now part of another broadcast ({{ ep.title or "untitled" }}); ticking it moves it here.</p>
+        {% elif ep.has_manual_edits %}
+        <p class="warning-text small">Has details you typed ({{ ep.title or ep.series or "untitled" }}).
+          Ticking it replaces them with this broadcast's details.</p>
+        {% endif %}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save parts</button>
+    <a class="button" href="/files/{{ f.id }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

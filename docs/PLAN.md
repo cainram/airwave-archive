@@ -359,10 +359,19 @@ Split into five smaller steps, done in order.
   time zone so nights when the clocks change come out right. The `tzdata`
   package carries the time zone rules so this also works on Windows.
 
-#### 4e — Multi-part broadcasts
+#### 4e — Multi-part broadcasts ✅ *done*
 - Group files ("Hour 1", "Hour 2", …) into one episode that plays straight
   through, while still remembering each file.
 - **Try it:** group three files and play them as one.
+- Notes: grouping is by hand, from a file's page ("Group with other
+  files…"), choosing among nearby files in the same folder. Parts play in
+  file-name order ("Hour 2" before "Hour 10"); each file gets a
+  `part_number` (database version 4). The group keeps the details of the
+  episode it was made from; details from tags come from part 1 only. The
+  library shows a group as one row with its total length; the overnight end
+  time uses the total too. Grouping counts as a manual edit, so a missing
+  part is kept (and skipped when playing). Not done: guessing groups
+  automatically from file names (could be added to the review page later).
 
 ### Phase 5 — Browse like Plex
 - Series grid with artwork (from embedded art, a folder image, or upload).

@@ -157,7 +157,12 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
     Anything typed by hand is left alone. Values that came from tags before
     are updated (or cleared) to match the tags now. Returns True if
     anything changed.
+
+    For an episode made of several files, only the first part's tags are
+    used (the others are often just "Hour 2" and so on).
     """
+    if f.part_number not in (None, 1):
+        return False
     sources = episode.sources
     changed = False
     found = {

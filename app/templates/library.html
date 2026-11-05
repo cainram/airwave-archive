@@ -59,17 +59,19 @@
       <tbody>
         {% for f in files %}
         {% set ep = f.episode %}
+        {% set parts = ep.parts if ep else [f] %}
         <tr{% if f.missing %} class="is-missing"{% endif %}>
           <td class="play">{% if not f.missing %}{% include "_play_button.html" %}{% endif %}</td>
           <td class="name">
             <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
             {% if f.missing %}<span class="badge">missing</span>{% endif %}
+            {% if parts | length > 1 %}<span class="badge parts">{{ parts | length }} parts</span>{% endif %}
             {% if (f | display_title) != f.name %}<div class="muted small">{{ f.name }}</div>{% endif %}
           </td>
           <td class="artist">{{ (ep.series if ep else None) or f.tag_artist or "" }}</td>
           <td class="date">{{ (ep | air_date(short=true)) or f.tag_date or "" }}</td>
-          <td class="num">{{ f.duration_seconds | duration }}</td>
-          <td class="num size">{{ f.size_bytes | size }}</td>
+          <td class="num">{{ (ep.length if parts | length > 1 else f.duration_seconds) | duration }}</td>
+          <td class="num size">{{ parts | sum(attribute="size_bytes") | size }}</td>
         </tr>
         {% endfor %}
       </tbody>
