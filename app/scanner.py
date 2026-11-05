@@ -341,6 +341,9 @@ def forget_files(session: Session, ids: list[int]) -> None:
         session.execute(delete(Episode).where(
             Episode.id.in_(episode_ids),
             ~exists().where(AudioFile.episode_id == Episode.id)))
+    if ids:
+        from app.search import drop_forgotten   # here, to avoid a circular import
+        drop_forgotten(session.connection())
 
 
 def _give_files_episodes(session: Session) -> None:

@@ -42,7 +42,8 @@ DB_FILENAME = "airwave.db"
 #   5: Phase 4e, a group's notes gather all parts' descriptions (no layout change)
 #   6: Phase 5b, pictures (art_hash on files, folder_art table)
 #   7: Phase 5c, uploaded series pictures (series_art table)
-SCHEMA_VERSION = 7
+#   8: Phase 6b, search index (episode_search, a full-text search table)
+SCHEMA_VERSION = 8
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -279,9 +280,15 @@ def make_engine(db_path: Path) -> Engine:
                 log.warning("Updating database to version %s; backup saved as %s",
                             SCHEMA_VERSION, backup)
 
+    from app import search   # here, to avoid a circular import
+    search.keep_index_up_to_date()
+
     Base.metadata.create_all(engine)   # creates any tables that don't exist yet
     with engine.begin() as conn:
         _migrate(conn)
+        conn.exec_driver_sql(search.CREATE)
+        if version < 8:
+            search.rebuild_index(conn)   # version 8: index what's there already
     if 0 < version < 5:
         _fill_all_from_tags(engine)
     with engine.begin() as conn:

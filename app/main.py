@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 6a: the library, episode details, series, artwork, and bulk editing.
+"""Airwave Archive web app — Phase 6b: the library, episode details, series, artwork, bulk editing, and search.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -29,6 +29,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
+from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
@@ -386,6 +387,38 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         "name": name, "totals": totals, "files": files, "rows": rows,
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
+    })
+
+
+# ------------------------------------------------------------------ search
+
+SEARCH_PAGE_SIZE = 50
+
+
+@app.get("/search", response_class=HTMLResponse)
+def search_page(request: Request, q: str = "", page: int = 1):
+    """Series and episodes matching the words typed in the search box."""
+    q = q.strip()[:200]
+    series, files, snippets, total = [], [], {}, 0
+    page = max(1, page)
+    if q:
+        with Session(get_engine()) as session:
+            words = words_of(q)
+            series = [s for s in all_series(session)
+                      if s["name"] and all(w in s["name"].lower() for w in words)][:12]
+            found, total = search(session, q, SEARCH_PAGE_SIZE, (page - 1) * SEARCH_PAGE_SIZE)
+            snippets = dict(found)
+            # Each episode is shown by its first file (with all parts).
+            rows = session.scalars(select(AudioFile).where(
+                AudioFile.episode_id.in_(snippets), FIRST_PARTS).options(WITH_PARTS)).unique().all()
+            by_episode = {f.episode_id: f for f in rows}
+            files = [by_episode[e] for e in snippets if e in by_episode]
+    pages = max(1, -(-total // SEARCH_PAGE_SIZE))
+    return render(request, "search.html", {
+        "q": q, "series": series, "files": files, "snippets": snippets, "total": total,
+        "page": page, "pages": pages, "rows": total,
+        "first_index": (page - 1) * SEARCH_PAGE_SIZE + 1,
+        "pager_url": with_query("/search", q=quote(q)) + "&page=",
     })
 
 

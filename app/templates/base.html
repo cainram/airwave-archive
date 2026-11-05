@@ -20,6 +20,9 @@
   <header class="topbar">
     <a class="brand" href="/">Airwave Archive</a>
     {% include "_menu.html" %}
+    <form class="search-box" action="/search" method="get" role="search">
+      <input type="search" name="q" placeholder="Search" aria-label="Search titles, series, people, notes">
+    </form>
   </header>
   <main id="content" class="content" hx-history-elt>
     {% block content %}{% endblock %}

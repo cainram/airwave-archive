@@ -1,0 +1,60 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}{% if q %}“{{ q }}” · {% endif %}Search · Airwave Archive{% endblock %}
+{% block content %}
+<h1>Search</h1>
+<form class="search-page-form" action="/search" method="get" role="search">
+  <input type="search" name="q" value="{{ q }}" aria-label="Search for"
+         placeholder="A title, series, actor, host, station, notes…" autofocus>
+  <button class="button primary" type="submit">Search</button>
+</form>
+
+{% if not q %}
+<p class="muted">Type a few words: a title, a series, an actor or host, a station, or
+  something from the notes. Every word must match, in any order, and the end of a word
+  can be left off ("welle" finds Welles). Put words in quotes to find them together,
+  like "our town".</p>
+{% elif not series and not files %}
+<div class="notice">Nothing found for <strong>{{ q }}</strong>. Try fewer words, or shorter ones.</div>
+{% else %}
+
+{% if series %}
+<h2>Series</h2>
+<ul class="tiles tiles-small">
+  {% for s in series %}
+  <li>
+    <a class="tile" href="{{ s.name | series_url }}">
+      {{ picture(s.art, s.name) }}
+      <span class="tile-name">{{ s.name }}</span>
+      <span class="muted small">{{ s.episodes }} episode{{ "" if s.episodes == 1 else "s" }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if files %}
+<h2>Episodes <span class="muted small">({{ total }})</span></h2>
+{% if pages > 1 %}{% include "_pager.html" %}{% endif %}
+<ul class="results">
+  {% for f in files %}
+  {% set ep = f.episode %}
+  {% set first = ep.parts | rejectattr("missing") | first %}
+  <li class="result">
+    <div class="result-play">{% if first %}{% with f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}</div>
+    <div class="result-text">
+      <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+      <div class="muted small">
+        {% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}
+        {% if ep.parts | length > 1 %}<span class="badge parts">{{ ep.parts | length }} parts</span>{% endif %}
+        {% if not first %}<span class="badge">missing</span>{% endif %}
+      </div>
+      {% if snippets[ep.id] %}<p class="snippet">{{ snippets[ep.id] }}</p>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% if pages > 1 %}{% include "_pager.html" %}{% endif %}
+{% endif %}
+{% endif %}
+{% endblock %}
