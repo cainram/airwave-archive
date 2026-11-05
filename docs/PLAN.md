@@ -465,9 +465,17 @@ Split into three smaller steps, done in order.
   them); an uploaded picture follows. Titles, episode numbers and dates
   are per-episode and not offered for bulk editing.
 
-#### 6b — Search
+#### 6b — Search ✅ *done*
 - Search box across titles, series, cast, host, notes (SQLite FTS5).
 - **Try it:** search for an actor's name and find their episodes.
+- Notes: a search box in the top bar (its own row on phones) and a
+  `/search` page. It searches titles, series, cast and host, station,
+  episode numbers, notes and file names. Every word must match, in any
+  order; the end of a word can be left off; accents and capitals don't
+  matter; "quoted words" must be together. Best matches first (a match in
+  the title counts most), with highlighted snippets; matching series are
+  shown as tiles above. The index (`episode_search`, database version 8)
+  is updated automatically whenever episodes or files are saved.
 
 #### 6c — CSV import
 - Import an episode log (a CSV spreadsheet) with a preview before

@@ -353,3 +353,29 @@ body.has-player { padding-bottom: 150px; }
 /* "← Back" buttons at the top of a page. */
 .back { margin: 0 0 16px; }
 .back .button { font-size: 0.95rem; }
+
+/* Search: the box in the top bar, and the results page. */
+.search-box { margin-left: auto; flex: 0 1 280px; }
+.search-box input, .search-page-form input {
+  width: 100%; font: inherit; padding: 8px 12px; border: 1px solid var(--line);
+  border-radius: 20px; background: var(--bg, #f4f6f9); color: var(--text);
+}
+.search-box input:focus, .search-page-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search-page-form { display: flex; gap: 8px; max-width: 640px; margin: 0 0 16px; }
+.search-page-form input { flex: 1; }
+.tiles-small { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px; }
+.results { list-style: none; padding: 0; margin: 0; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; }
+.result { display: flex; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.result:last-child { border-bottom: none; }
+.result-text { min-width: 0; flex: 1; }
+.result .title { font-weight: 600; color: var(--text); text-decoration: none; overflow-wrap: break-word; }
+.result .title:hover { color: var(--accent); text-decoration: underline; }
+.snippet { margin: 4px 0 0; font-size: 0.9rem; color: var(--muted); overflow-wrap: break-word; }
+mark { background: #fff1a8; color: var(--text); border-radius: 2px; padding: 0 1px; }
+@media (max-width: 600px) {
+  .search-box { flex: 1 1 100%; margin-left: 0; }
+}
+@media (pointer: coarse) {
+  .search-box input, .search-page-form input { min-height: 44px; }
+}
