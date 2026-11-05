@@ -100,10 +100,10 @@ on its own disk:
 
 - The app reads recordings **where they sit**; it never makes copies.
 - Deleting the app or its database never touches your recordings.
-- In Docker, the library is mounted **read-only** by default, so the app
-  physically cannot change it. Approving uploads (and the optional tag
-  writing) needs it mounted writable; the install guide will explain how
-  when we get there.
+- In Docker, the library is mounted **writable** (owner's choice, Phase 7)
+  so approved uploads can be added to it. The app still never changes,
+  renames or deletes the recordings already there; the owner keeps backups
+  and snapshots.
 - Network shares (NFS/SMB) aren't a goal for now. Anything mounted into
   `/srv/airwave/library` by the operating system will simply work, though.
 
@@ -517,11 +517,19 @@ overwrites, renames or deletes library files.
   gaps and giving the date if fuller. Each waiting file can be played. The
   `inbox_items` table (database version 9) holds the details.
 
-#### 7b — Add to the library
+#### 7b — Add to the library ✅ *done*
 - Approve files: moved into `library/<Series>/`, scanned, with the
   details confirmed in the inbox saved on their episodes.
 - **Try it:** upload a few files from your laptop, fix their dates, add
   them to the library.
+- Notes: an "Add to library" button on each waiting file (it saves what
+  was typed first). The file goes into the folder holding most of its
+  series' recordings; if the series is new, a folder named after it
+  (made safe); with no series, `Unsorted`. Names are never reused. Between
+  disks the file is copied under a hidden name, then renamed, then removed
+  from the inbox. Only that one file is read (no full rescan). Its details
+  count as manual edits. The library is mounted writable in
+  `compose.yaml`.
 
 ### Phase 8 — Continue listening
 - Save playback position; "Continue listening" row on the home page.

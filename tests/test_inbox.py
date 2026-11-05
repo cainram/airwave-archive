@@ -8,7 +8,7 @@ from mutagen.id3 import TDRC, TIT2, TPE1
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import InboxItem, make_engine
+from app.db import AudioFile, InboxItem, make_engine
 from app.inbox import free_name, safe_name
 from test_scanner import add_tags, make_wav
 
@@ -130,3 +130,96 @@ def test_listening_and_rejecting(client):
 
 def test_the_menu_has_the_inbox(client):
     assert '<a href="/inbox" data-paths="/inbox"' in client.get("/").text
+
+
+# ------------------------------------------------------- adding to the library
+
+def test_folder_names():
+    from app.inbox import folder_name
+    assert folder_name("Suspense") == "Suspense"
+    assert folder_name("Lux Radio Theatre: Hollywood/USA") == "Lux Radio Theatre_ Hollywood_USA"
+    assert folder_name("../..") == "_"                  # never climbs out of the library
+    assert folder_name("...") == "Unsorted"
+    assert folder_name(None) == "Unsorted"
+
+
+def episode_of(name):
+    import app.main as main
+    with Session(main._engine) as session:
+        f = session.scalars(select(AudioFile).where(AudioFile.name == name)).one()
+        return f.folder, f.episode.series, f.episode.title, f.episode.episode_number, \
+            (f.episode.air_year, f.episode.air_month, f.episode.air_day), f.episode.sources
+
+
+def test_adding_a_file_to_the_library(client):
+    make_wav(client.box / "new show.wav", 1)
+    client.get("/inbox")
+    item = items(client)["new show.wav"]
+    # What's typed on the page is saved first, then the file is added.
+    sent = client.post(f"/inbox/{item.id}/add", follow_redirects=False, data={
+        f"series-{item.id}": "Suspense", f"title-{item.id}": "Donovan's Brain",
+        f"episode_number-{item.id}": "7", f"date-{item.id}": "1943-05-13"})
+    assert sent.headers["location"].startswith("/inbox?added=")
+    assert not (client.box / "new show.wav").exists()
+    assert (client.lib / "Suspense" / "new show.wav").exists()      # a new folder for the series
+    folder, series, title, number, date, sources = episode_of("new show.wav")
+    assert (folder, series, title, number, date) == ("Suspense", "Suspense", "Donovan's Brain", "7", (1943, 5, 13))
+    assert sources["title"] == "manual" and sources["air_date"] == "manual"
+    assert items(client) == {}
+    page = client.get(sent.headers["location"]).text
+    assert "Added “new show.wav” to your library" in page and "<strong>Suspense</strong>" in page
+    assert "Donovan&#39;s Brain" in client.get("/series/episodes?name=Suspense").text
+
+
+def test_files_go_next_to_their_series_and_never_replace_anything(client):
+    make_wav(client.lib / "otr_suspense" / "show.wav", 1)
+    client.post("/rescan")
+    import app.main as main
+    with Session(main._engine) as session:
+        session.scalars(select(AudioFile)).one().episode.series = "Suspense"
+        session.commit()
+    make_wav(client.box / "show.wav", 2)
+    client.get("/inbox")
+    item = items(client)["show.wav"]
+    client.post(f"/inbox/{item.id}/add", data={
+        f"series-{item.id}": "Suspense", f"title-{item.id}": "", f"episode_number-{item.id}": "",
+        f"date-{item.id}": ""})
+    assert sorted(p.name for p in (client.lib / "otr_suspense").iterdir()) == ["show (2).wav", "show.wav"]
+    assert episode_of("show (2).wav")[:2] == ("otr_suspense", "Suspense")
+
+
+def test_a_file_without_a_series_goes_to_unsorted(client):
+    make_wav(client.box / "who knows.wav", 1)
+    client.get("/inbox")
+    item = items(client)["who knows.wav"]
+    client.post(f"/inbox/{item.id}/add")
+    assert (client.lib / "Unsorted" / "who knows.wav").exists()
+    assert episode_of("who knows.wav")[4] == (None, None, None)     # no date invented
+
+
+def test_a_bad_date_stops_the_add(client):
+    make_wav(client.box / "show.wav", 1)
+    client.get("/inbox")
+    item = items(client)["show.wav"]
+    sent = client.post(f"/inbox/{item.id}/add", data={
+        f"series-{item.id}": "Suspense", f"title-{item.id}": "", f"episode_number-{item.id}": "",
+        f"date-{item.id}": "1943-13"})
+    assert sent.status_code == 400
+    assert (client.box / "show.wav").exists() and list(client.lib.iterdir()) == []
+
+
+def test_moving_across_disks_copies_then_removes(tmp_path, monkeypatch):
+    import os
+    from app import inbox
+    source = tmp_path / "in" / "a.wav"
+    make_wav(source, 1)
+    original = source.read_bytes()
+    real_rename = os.rename
+    def no_rename(old, new):                 # like moving between two disks
+        if str(old) == str(source):
+            raise OSError(18, "Invalid cross-device link")
+        return real_rename(old, new)
+    monkeypatch.setattr(os, "rename", no_rename)
+    moved = inbox.move_into(source, tmp_path / "lib" / "Suspense")
+    assert moved.read_bytes() == original and not source.exists()
+    assert [p.name for p in moved.parent.iterdir()] == ["a.wav"]    # no leftover temporary file

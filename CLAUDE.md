@@ -126,7 +126,8 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/csvimport.py`: importing episode logs from CSV spreadsheets
   (reading, matching rows to episodes, preview, saving)
 - `app/inbox.py`: the upload inbox (saving uploads safely, listing what
-  waits, guessing details, rejecting)
+  waits, guessing details, rejecting, adding approved files to the
+  library next to their series)
 - `app/search.py`: the search index (SQLite FTS5) and searching. The
   index updates itself after every save (an `after_flush` hook); changes
   made with raw SQL or bulk `delete()` must update it themselves.

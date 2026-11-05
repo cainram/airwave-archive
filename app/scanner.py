@@ -291,6 +291,20 @@ def sync_library(engine: Engine, root: Path, art_dir: Path | None = None) -> Sca
     return run
 
 
+def add_one_file(session: Session, root: Path, path: Path,
+                 art_dir: Path | None = None) -> AudioFile:
+    """Read one file that was just put into the library, and add it (with
+    its own episode) without scanning the whole library."""
+    folder = path.parent.relative_to(root).as_posix()
+    row = AudioFile(folder="" if folder == "." else folder, name=path.name,
+                    first_seen=utcnow(), episode=_new_episode())
+    session.add(row)
+    _apply(row, read_audio(path), path.stat(), art_dir)
+    fill_from_tags(row.episode, row)
+    row.missing = False
+    return row
+
+
 def _sync_folder_art(session: Session, pictures: dict, art_dir: Path) -> None:
     """Keep the list of folder pictures in step with the library. A picture
     file that hasn't changed isn't opened again."""
