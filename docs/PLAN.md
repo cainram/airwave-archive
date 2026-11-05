@@ -397,10 +397,21 @@ Split into four smaller steps, done in order.
   · Series) is in the top bar; series names in the library and on
   episode pages link to the series.
 
-#### 5b — Artwork from the files and folders
+#### 5b — Artwork from the files and folders ✅ *done*
 - Pictures stored inside the audio files, or an image in the folder
   (`cover.jpg`, `folder.jpg`...), shown as tiles in a series grid.
 - **Try it:** see the series grid with pictures.
+- Notes: pictures are read from MP3/WAV/AIFF (ID3), FLAC, M4A and
+  Ogg/Opus files (not WMA), and from `cover`, `folder`, `front`,
+  `poster`, `album`, `artwork` + `.jpg/.jpeg/.png/.webp` in a folder (or
+  a folder above it, but not the very top of the library). The app keeps
+  600-pixel JPEG copies in `data/artwork/`, named by a fingerprint of the
+  picture, so a logo shared by many files is kept once. A series uses its
+  main folder's picture first, then one from inside its files; an episode
+  uses its own (first part's) picture first, then its folder's. Series
+  without a picture get a coloured square with their initials. The
+  Series page shows tiles, or a list. Database version 6 adds the
+  pictures and makes the next scan read every file once more.
 
 #### 5c — Uploading artwork
 - Upload your own picture for a series (kept in the data folder, never

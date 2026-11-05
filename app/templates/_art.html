@@ -1,0 +1,9 @@
+{# picture(art, name, size): a picture, or a coloured square with the name's
+   initials when there's no picture. `size` is "tile", "large" or "small". #}
+{% macro picture(art, name, size="tile") %}
+{% if art %}
+<img class="art art-{{ size }}" src="/art/{{ art }}.jpg" alt="" loading="lazy">
+{% else %}
+<span class="art art-{{ size }} art-none" style="--hue: {{ name | hue }}" aria-hidden="true">{{ name | initials }}</span>
+{% endif %}
+{% endmacro %}

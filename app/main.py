@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 5a: the library, episode details, and series.
+"""Airwave Archive web app — Phase 5b: the library, episode details, series, and artwork.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -28,7 +28,8 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app.series import all_series, one_series, series_files
+from app.artwork import HASH_PATTERN, art_path
+from app.series import all_series, episode_art, folder_pictures, one_series, series_files
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
 APP_DIR = Path(__file__).parent
@@ -118,6 +119,17 @@ def series_url(name: str | None) -> str:
 
 
 templates.env.filters["series_url"] = series_url
+
+
+def initials(name: str | None) -> str:
+    """'The Campbell Playhouse' -> 'CP' (for a series without a picture)."""
+    words = [w for w in (name or "?").split() if w.lower() not in ("the", "a", "an")]
+    return "".join(w[0] for w in words[:2] if w[0].isalnum()).upper() or "?"
+
+
+templates.env.filters["initials"] = initials
+# A colour (hue on the colour wheel) that's always the same for a name.
+templates.env.filters["hue"] = lambda name: sum(map(ord, name or "")) * 47 % 360
 templates.env.filters["fromjson"] = lambda text: json.loads(text) if text else []
 
 _engine: Engine | None = None
@@ -161,9 +173,14 @@ def go_to(request: Request, path: str) -> Response:
     return RedirectResponse(path, status_code=303)
 
 
+def art_dir() -> Path:
+    """Where the app keeps its copies of pictures: next to the database."""
+    return Path(get_engine().url.database).parent / "artwork"
+
+
 def run_scan() -> ScanRun:
     with _scan_lock:
-        return sync_library(get_engine(), LIBRARY_DIR)
+        return sync_library(get_engine(), LIBRARY_DIR, art_dir())
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -222,7 +239,10 @@ def rescan(request: Request):
 
 @app.get("/files/{file_id}", response_class=HTMLResponse)
 def file_page(request: Request, file_id: int):
-    return render(request, "file.html", {"f": get_file(file_id)})
+    f = get_file(file_id)
+    with Session(get_engine()) as session:
+        art = episode_art(f, folder_pictures(session))
+    return render(request, "file.html", {"f": f, "art": art})
 
 
 def render_edit_form(request: Request, f: AudioFile, values: dict, errors: dict | None = None):
@@ -284,10 +304,12 @@ def forget(request: Request, file_id: int):
 
 
 @app.get("/series", response_class=HTMLResponse)
-def series_list(request: Request):
+def series_list(request: Request, view: str = "tiles"):
+    """All series, as picture tiles or (view=list) as a table."""
     with Session(get_engine()) as session:
         found = all_series(session)
-    return render(request, "series.html", {"series": found})
+    return render(request, "series.html",
+                  {"series": found, "view": "list" if view == "list" else "tiles"})
 
 
 @app.get("/series/episodes", response_class=HTMLResponse)
@@ -459,6 +481,17 @@ def audio(file_id: int):
         raise HTTPException(status_code=404, detail="File is missing; try a rescan")
     media_type = AUDIO_TYPES.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path, media_type=media_type)
+
+
+@app.get("/art/{art_hash}.jpg")
+def artwork(art_hash: str):
+    """A picture, from the app's own copies. Pictures never change (a new
+    picture gets a new name), so browsers may keep them for a long time."""
+    path = art_path(art_dir(), art_hash) if HASH_PATTERN.match(art_hash) else None
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="No such picture")
+    return FileResponse(path, media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/health")

@@ -213,6 +213,14 @@ The app keeps its database in `/srv/airwave/data`. It's small, and it will
 hold all the information you add, so include it in your backups. (Your
 recordings in `/srv/airwave/library` are never changed by the app.)
 
+The `artwork` folder inside it holds the app's small copies of pictures
+from your library. It doesn't need backing up: a scan makes the copies
+again.
+
+To give a series a picture, put a picture file named `cover.jpg` (or
+`folder.jpg`, or `.png`) in its folder in the library, and press
+**Rescan**.
+
 When a new version of the app needs to change how its database is laid
 out, it first saves a copy named like `airwave.db.before-v2` in the same
 folder. Once the new version is working, you can delete these copies.

@@ -62,7 +62,7 @@ def test_sorting_ignores_the_and_reads_numbers():
 
 
 def test_series_list_has_totals_in_name_order(client):
-    page = client.get("/series").text
+    page = client.get("/series?view=list").text
     names = re.findall(r'<a class="title" href="[^"]*">([^<]+)</a>', page)
     assert names == ["Abbott and Costello", "The Campbell Playhouse",
                      "Escape &amp; Suspense / Mixed", "No series yet"]
@@ -83,7 +83,7 @@ def test_series_page_lists_episodes_in_air_date_order(client):
 
 def test_numbered_episodes_go_in_number_order(client):
     # The link from the list works for names with "&" and "/".
-    link = re.search(r'href="([^"]*)">Escape &amp; Suspense', client.get("/series").text)[1]
+    link = re.search(r'href="([^"]*)">Escape &amp; Suspense', client.get("/series?view=list").text)[1]
     page = client.get(link.replace("&amp;", "&")).text
     assert titles_in_order(page) == ["Two", "Ten"]
     assert ">Ep.<" in page
@@ -104,8 +104,15 @@ def test_series_names_link_to_their_pages(client):
     assert href in client.get(f"/files/{client.ids['patriot.wav']}").text   # episode page
 
 
-def test_menu_shows_where_you_are(client):
+def test_series_tiles_show_initials_without_pictures(client):
     page = client.get("/series").text
+    assert '<ul class="tiles">' in page
+    assert ">CP</span>" in page            # The Campbell Playhouse, no picture
+    assert "5 episodes · 1938–1939" in page
+
+
+def test_menu_shows_where_you_are(client):
+    page = client.get("/series?view=list").text
     assert '<a href="/series" aria-current="page">Series</a>' in page
     assert '<a href="/" aria-current="page">Library</a>' in client.get("/").text
     # Pages fetched by htmx bring the menu along, to replace the old one.

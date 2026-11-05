@@ -1,4 +1,5 @@
 {% extends layout %}
+{% from "_art.html" import picture %}
 {% block title %}{{ f | display_title }} · Airwave Archive{% endblock %}
 {% block content %}
 {% set ep = f.episode %}
@@ -18,8 +19,9 @@
 </div>
 {% endif %}
 
-<section class="summary">
-  <div>
+<section class="summary with-art">
+  {{ picture(art, (ep.series if ep else None) or (f | display_title), "large") }}
+  <div class="summary-text">
     <h1>{{ f | display_title }}</h1>
     {% if grouped %}<p class="part-of">Part {{ f.part_number }} of {{ parts | length }}</p>{% endif %}
     <p class="muted">
