@@ -30,7 +30,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import csvimport, inbox
+from app import csvimport, inbox, listening
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -152,6 +152,10 @@ def series_url(name: str | None) -> str:
 
 
 templates.env.filters["series_url"] = series_url
+templates.env.filters["progress"] = listening.progress
+templates.env.filters["resume_point"] = listening.resume_point
+templates.env.filters["listened_at"] = listening.listened_at
+templates.env.filters["time_left"] = listening.time_left
 
 
 def initials(name: str | None) -> str:
@@ -365,8 +369,12 @@ def series_list(request: Request, view: str = "tiles"):
     last_scan_or_scan()
     with Session(get_engine()) as session:
         found = all_series(session)
+        unfinished = [(f, done, episode_art(session, f))
+                      for f, done in listening.continue_listening(session)]
+        session.expunge_all()
     return render(request, "series.html",
-                  {"series": found, "view": "list" if view == "list" else "tiles"})
+                  {"series": found, "view": "list" if view == "list" else "tiles",
+                   "unfinished": unfinished})
 
 
 @app.get("/series")
@@ -748,6 +756,38 @@ async def bulk_edit_save(request: Request):
             back = series_url(None)
         session.commit()
     return go_to(request, with_query(back, changed=str(changed), skipped=str(skipped)))
+
+
+@app.post("/episodes/played")
+async def mark_played(request: Request):
+    """Mark the ticked episodes (or one) as played, or as not played
+    (which also forgets where listening stopped)."""
+    form = await request.form()
+    ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
+    played, back = form.get("played") == "1", safe_back(form.get("back"))
+    with Session(get_engine()) as session:
+        episodes = chosen_episodes(session, ids, "")
+        listening.mark(session, episodes, played)
+        session.commit()
+    return go_to(request, with_query(back, marked=str(len(episodes)),
+                                     played="1" if played else "0"))
+
+
+@app.post("/listening/{episode_id}", status_code=204)
+async def save_listening_place(request: Request, episode_id: int):
+    """The player bar reporting where it is (or that it reached the end)."""
+    form = await request.form()
+    try:
+        file_id, seconds = int(form.get("file", "")), float(form.get("at", 0))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Which part, and where?")
+    with Session(get_engine()) as session:
+        episode = session.get(Episode, episode_id)
+        if episode is None:
+            raise HTTPException(status_code=404, detail="No such episode")
+        listening.save_place(session, episode, file_id, seconds, form.get("finished") == "1")
+        session.commit()
+    return Response(status_code=204)
 
 
 @app.get("/series/rename", response_class=HTMLResponse)

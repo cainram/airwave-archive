@@ -532,10 +532,19 @@ overwrites, renames or deletes library files.
   count as manual edits. The library is mounted writable in
   `compose.yaml`.
 
-### Phase 8 — Continue listening
+### Phase 8 — Continue listening ✅ *done*
 - Save playback position; "Continue listening" row on the home page.
 - Mark as played / unplayed.
 - **Try it:** stop halfway through an episode, come back later, resume.
+- Notes: the player reports its place (part + seconds) every 10 seconds,
+  on pause, when switching episodes and when the page is hidden. Play
+  picks up 3 seconds before that place (a later part's own button only
+  resumes within or after that part). Under 10 seconds in doesn't count as
+  started. Hearing the last part to its end marks the episode played;
+  playing it again un-marks it. "Mark played" / "Mark not played" (or
+  "Start over") on the episode page and for ticked episodes. Lists show
+  "✓ Played" or the time left. The `listening` table (database version
+  10) is removed along with its episode.
 
 ### Phase 9 — The calendar
 - Month view, then week view, then day view.

@@ -1,0 +1,3 @@
+{# How far the owner got with episode `ep`: "✓ Played", or time left. #}
+{% if ep and ep.listening and ep.listening.played %}<span class="badge played">✓ Played</span>
+{% else %}{% set done = ep | progress %}{% if done %}<span class="badge in-progress">{{ done | time_left }}</span>{% endif %}{% endif %}

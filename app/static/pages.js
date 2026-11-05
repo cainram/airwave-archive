@@ -7,7 +7,7 @@
   function countTicked() {
     const count = document.querySelectorAll('input[form="pick"][name="ids"]:checked').length;
     document.querySelectorAll("[data-picked-count]").forEach(function (place) {
-      place.textContent = count ? count + " ticked" : "Tick episodes below to edit them together.";
+      place.textContent = count ? count + " ticked" : "Tick episodes below to edit or mark them together.";
     });
   }
   document.addEventListener("change", function (event) {

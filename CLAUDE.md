@@ -128,6 +128,9 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/inbox.py`: the upload inbox (saving uploads safely, listing what
   waits, guessing details, rejecting, adding approved files to the
   library next to their series)
+- `app/listening.py`: continue listening (where playback stopped in each
+  episode, the front page's "Continue listening" row) and played / not
+  played
 - `app/search.py`: the search index (SQLite FTS5) and searching. The
   index updates itself after every save (an `after_flush` hook); changes
   made with raw SQL or bulk `delete()` must update it themselves.

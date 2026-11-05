@@ -72,6 +72,7 @@
             <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
             {% if f.missing %}<span class="badge">missing</span>{% endif %}
             {% if parts | length > 1 %}<span class="badge parts">{{ parts | length }} parts</span>{% endif %}
+            {% include "_listened.html" %}
             {% if (f | display_title) != f.name %}<div class="muted small">{{ f.name }}</div>{% endif %}
           </td>
           <td class="artist">{% if ep and ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% else %}{{ f.tag_artist or "" }}{% endif %}</td>
