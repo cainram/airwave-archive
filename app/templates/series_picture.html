@@ -2,7 +2,7 @@
 {% from "_art.html" import picture %}
 {% block title %}Picture for {{ name }} · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="{{ name | series_url }}">← Back to {{ name }}</a></p>
+<nav class="back"><a class="button" href="{{ name | series_url }}">← Back to {{ name }}</a></nav>
 <h1>Picture for {{ name }}</h1>
 
 {% if error %}

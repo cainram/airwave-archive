@@ -5,7 +5,7 @@
 {% set ep = f.episode %}
 {% set parts = ep.parts if ep else [f] %}
 {% set grouped = parts | length > 1 %}
-<p class="small"><a href="/library">← Library</a></p>
+<nav class="back"><a class="button" href="/library">← Library</a></nav>
 
 {% if f.missing %}
 <div class="notice warning">

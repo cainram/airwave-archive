@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Parts of {{ f | display_title }} · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="/files/{{ f.id }}">← Back without saving</a></p>
+<nav class="back"><a class="button" href="/files/{{ f.id }}">← Back without saving</a></nav>
 <h1>Which files are parts of this broadcast?</h1>
 <p class="muted">
   Tick every file that belongs to the same broadcast as <strong>{{ f.name }}</strong>,

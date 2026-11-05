@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Rename {{ name }} · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="{{ name | series_url }}">← Back to {{ name }}</a></p>
+<nav class="back"><a class="button" href="{{ name | series_url }}">← Back to {{ name }}</a></nav>
 <h1>Rename series</h1>
 {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
 <p class="muted">This changes the Series name on all {{ totals.episodes }} episode{{ "" if totals.episodes == 1 else "s" }}
