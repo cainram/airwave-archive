@@ -1,0 +1,71 @@
+{% extends layout %}
+{% block title %}Inbox · Airwave Archive{% endblock %}
+{% block content %}
+<h1>Inbox</h1>
+
+{% if uploaded is not none %}
+<div class="notice success" role="status">Uploaded {{ uploaded }} file{{ "" if uploaded == 1 else "s" }}.
+  {% if skipped %}{{ skipped }} {{ "wasn't an audio file" if skipped == 1 else "weren't audio files" }}, so
+  {{ "it was" if skipped == 1 else "they were" }} left out.{% endif %}</div>
+{% endif %}
+{% if saved is not none %}<div class="notice success" role="status">Saved the details.</div>{% endif %}
+{% if rejected %}<div class="notice" role="status">The file was deleted from the inbox.</div>{% endif %}
+{% if errors %}<div class="notice error" role="alert">Nothing was saved yet: some dates need fixing. See the notes in red below.</div>{% endif %}
+
+<p class="muted">New recordings wait here until you add them to your library. Check the details
+  the app worked out for each one, fix anything that's wrong, or reject files you don't want.
+  Nothing in your library changes until you add a file.</p>
+
+<form class="upload-form inbox-upload" method="post" action="/inbox/upload"
+      enctype="multipart/form-data" data-upload-progress>
+  <label for="files">Upload recordings</label>
+  <input id="files" name="files" type="file" multiple required
+         accept="audio/*,.mp3,.m4a,.m4b,.aac,.flac,.ogg,.oga,.opus,.wav,.wma,.aiff,.aif">
+  <p class="muted small">Choose one or more audio files. Big files take a while: keep this page
+    open until the upload finishes. (For a whole collection, copying files onto the server is faster.)</p>
+  <progress hidden max="100" value="0"></progress>
+  <div class="form-buttons"><button class="button primary" type="submit">Upload</button></div>
+</form>
+
+{% if not rows %}
+<div class="notice">The inbox is empty.</div>
+{% else %}
+<h2>Waiting ({{ rows | length }})</h2>
+<p class="muted small">Dates are written like 1939-04-14, 1939-04 (day unknown), or 1939 (only the year).</p>
+<form method="post" action="/inbox">
+  <div class="form-buttons"><button class="button primary" type="submit">Save details</button></div>
+  {% for row in rows %}
+  {% set item = row.item %}
+  <section class="review-card{% if errors[item.id] %} has-error{% endif %}">
+    <div class="review-file inbox-file">
+      <button class="play-button" type="button" aria-label="Listen to {{ item.name }}"
+              data-play data-src="/inbox/{{ item.id }}/audio" data-href="/inbox"
+              data-title="{{ row.vals.title or item.name }}" data-subtitle="In the inbox">
+        <span class="when-stopped">▶</span><span class="when-playing">❚❚</span>
+      </button>
+      <span>{{ item.name }}</span>
+      <span class="muted small">{{ item.duration_seconds | duration }} · {{ item.size_bytes | size }}</span>
+    </div>
+    <div class="review-fields">
+      {% for key, label in fields.items() %}
+      <div class="review-field review-{{ key }}">
+        <label for="{{ key }}-{{ item.id }}">{{ label }}</label>
+        <input id="{{ key }}-{{ item.id }}" name="{{ key }}-{{ item.id }}" type="text" value="{{ row.vals[key] }}">
+      </div>
+      {% endfor %}
+    </div>
+    {% if errors[item.id] %}<p class="field-error">{{ errors[item.id] }}</p>{% endif %}
+    <div class="form-buttons">
+      {# Belongs to its own small form below (forms can't be inside each other). #}
+      <button class="button" type="submit" form="reject-{{ item.id }}">Reject (delete)</button>
+    </div>
+  </section>
+  {% endfor %}
+  <div class="form-buttons"><button class="button primary" type="submit">Save details</button></div>
+</form>
+{% for row in rows %}
+<form id="reject-{{ row.item.id }}" method="post" action="/inbox/{{ row.item.id }}/reject" hidden
+      hx-confirm="Delete “{{ row.item.name }}” from the inbox? Your library isn't affected."></form>
+{% endfor %}
+{% endif %}
+{% endblock %}

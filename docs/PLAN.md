@@ -500,8 +500,26 @@ Split into three smaller steps, done in order.
   importing it unchanged touches nothing).
 
 ### Phase 7 — Upload inbox
-- Upload files through the web page into the inbox.
-- Inbox review page; approve (file into library by series) or reject.
+Split into two steps. Owner's choice (2026-11-05): the whole library is
+mounted writable, and approved files go into `library/<Series>/` next to
+existing ones (they keep backups and snapshots). The app still never
+overwrites, renames or deletes library files.
+
+#### 7a — Upload and review ✅ *done*
+- Upload files through the web page into the inbox (`/srv/airwave/inbox`,
+  `AIRWAVE_INBOX`); fix the details worked out for each; reject (delete
+  from the inbox). The library isn't touched.
+- **Try it:** upload a few files, fix their details, reject one.
+- Notes: an "Inbox" menu item. Only audio files are accepted; names are
+  made safe and never overwrite (a number is added). Uploads are written
+  under a hidden name until complete. Files copied into the inbox by hand
+  appear too. Details come from tags first, with the file name filling
+  gaps and giving the date if fuller. Each waiting file can be played. The
+  `inbox_items` table (database version 9) holds the details.
+
+#### 7b — Add to the library
+- Approve files: moved into `library/<Series>/`, scanned, with the
+  details confirmed in the inbox saved on their episodes.
 - **Try it:** upload a few files from your laptop, fix their dates, add
   them to the library.
 

@@ -13,6 +13,7 @@ Tables:
   a long show saved as Hour 1, Hour 2, Hour 3.
 - ``folder_art``: picture files found in library folders (cover.jpg...).
 - ``series_art``: pictures the owner uploaded for a series.
+- ``inbox_items``: uploaded files waiting in the inbox, with their details.
 - ``scan_runs``: one row per scan, recording what changed.
 """
 
@@ -43,7 +44,8 @@ DB_FILENAME = "airwave.db"
 #   6: Phase 5b, pictures (art_hash on files, folder_art table)
 #   7: Phase 5c, uploaded series pictures (series_art table)
 #   8: Phase 6b, search index (episode_search, a full-text search table)
-SCHEMA_VERSION = 8
+#   9: Phase 7a, the upload inbox (inbox_items table)
+SCHEMA_VERSION = 9
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -195,6 +197,26 @@ class SeriesArt(Base):
     series: Mapped[str] = mapped_column(primary_key=True)
     art_hash: Mapped[str]
     uploaded_at: Mapped[datetime]   # UTC
+
+
+class InboxItem(Base):
+    """A file waiting in the inbox (uploaded, or copied there), with the
+    details worked out for it and any fixes the owner made. It goes into
+    the library only when the owner approves it."""
+
+    __tablename__ = "inbox_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)   # the file's name in the inbox
+    size_bytes: Mapped[int]
+    duration_seconds: Mapped[float | None]
+    added_at: Mapped[datetime]   # UTC
+    series: Mapped[str | None]
+    episode_number: Mapped[str | None]
+    title: Mapped[str | None]
+    air_year: Mapped[int | None]
+    air_month: Mapped[int | None]
+    air_day: Mapped[int | None]
 
 
 # Load a file's episode and all that episode's parts along with it.
