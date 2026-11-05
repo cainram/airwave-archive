@@ -1,0 +1,60 @@
+{% extends layout %}
+{% block title %}{{ day_heading(view.day.year, view.day.month, view.day.day) }} · Calendar · Airwave Archive{% endblock %}
+{% block content %}
+{% macro day_link(d) %}/calendar/day?date={{ d.isoformat() }}{% endmacro %}
+<section class="summary">
+  <div>
+    <h1>{{ day_heading(view.day.year, view.day.month, view.day.day) }}</h1>
+    <p class="muted">
+      {% if view.count %}{{ view.count }} broadcast{{ "" if view.count == 1 else "s" }} this day{% else %}Nothing in your collection aired this day{% endif %}
+    </p>
+  </div>
+</section>
+
+<nav class="calendar-nav" aria-label="Other days">
+  <a class="button" href="{{ day_link(before) }}" aria-label="Previous day">←</a>
+  <a class="button" href="{{ day_link(after) }}" aria-label="Next day">→</a>
+  {% if earlier %}<a class="button" href="{{ day_link(earlier) }}">⇤ Earlier recordings</a>{% endif %}
+  {% if later %}<a class="button" href="{{ day_link(later) }}">Later recordings ⇥</a>{% endif %}
+  <a class="button" href="/calendar/week?date={{ view.day.isoformat() }}">Week view</a>
+  <a class="button" href="/calendar?year={{ view.day.year }}&month={{ view.day.month }}">Month view</a>
+</nav>
+
+<form class="calendar-jump" method="get" action="/calendar/day">
+  <label for="jump-date">Go to date</label>
+  <input id="jump-date" name="date" type="text" value="{{ typed if error else '' }}"
+         placeholder="1938-10-30" autocomplete="off" size="14">
+  <button class="button" type="submit">Go</button>
+</form>
+{% if error %}<p class="field-error" role="alert">{{ error }}</p>{% endif %}
+
+{% if view.carried %}
+<section class="calendar-hour carried">
+  <h2>Continued from the night before</h2>
+  <ul class="results">
+    {% for f, end in view.carried %}
+    {% include "_calendar_row.html" %}
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% for hour, files in view.hours %}
+<section class="calendar-hour">
+  <h2>{{ hour_label(hour) }}</h2>
+  <ul class="results">{% for f in files %}{% include "_calendar_row.html" %}{% endfor %}</ul>
+</section>
+{% endfor %}
+
+{% if view.unknown %}
+<section class="calendar-hour">
+  <h2>Time unknown</h2>
+  <ul class="results">{% for f in view.unknown %}{% include "_calendar_row.html" %}{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if view.mixed_zones %}
+<p class="muted small">These shows are placed by their own local time, as listed in the newspapers of the day,
+  so times in different zones aren't the same moment.</p>
+{% endif %}
+{% endblock %}

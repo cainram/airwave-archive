@@ -67,7 +67,7 @@
 {% for day, files in view.days | dictsort %}
 <section class="calendar-day" id="day-{{ day }}">
   <div class="day-heading">
-    <h2>{{ day_heading(view.year, view.month, day) }}</h2>
+    <h2><a class="day-title" href="/calendar/day?date={{ '%04d-%02d-%02d' % (view.year, view.month, day) }}">{{ day_heading(view.year, view.month, day) }}</a></h2>
     <a class="button small-button" href="/calendar/week?date={{ '%04d-%02d-%02d' % (view.year, view.month, day) }}">Week</a>
   </div>
   <ul class="results">{% for f in files %}{% include "_calendar_row.html" %}{% endfor %}</ul>
