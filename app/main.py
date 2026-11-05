@@ -10,7 +10,7 @@ import hashlib
 import json
 import os
 import threading
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from datetime import datetime
 from pathlib import Path
 
@@ -419,14 +419,16 @@ def render_inbox(request: Request, typed=None, errors=None, **notices):
 @app.get("/inbox", response_class=HTMLResponse)
 def inbox_page(request: Request, uploaded: int | None = None, skipped: int | None = None,
                saved: int | None = None, rejected: int | None = None,
-               added: int | None = None):
+               added: int | None = None, added_all: int | None = None,
+               folder: list[str] = Query(default=[])):
     added_file = None
     if added is not None:
         with Session(get_engine()) as session:
             added_file = session.get(AudioFile, added)
             session.expunge_all()
     return render_inbox(request, uploaded=uploaded, skipped=skipped, saved=saved,
-                        rejected=rejected, added=added_file)
+                        rejected=rejected, added=added_file, added_all=added_all,
+                        folders=folder)
 
 
 @app.post("/inbox/upload")
@@ -485,6 +487,27 @@ async def inbox_save(request: Request):
     if errors:
         return render_inbox(request, typed, errors)
     return go_to(request, f"/inbox?saved={saved}")
+
+
+@app.post("/inbox/add-all", response_class=HTMLResponse)
+async def inbox_add_all(request: Request):
+    """Save what was typed, then add every waiting file to the library."""
+    typed, errors, _saved = save_inbox_details(await request.form())
+    if errors:
+        return render_inbox(request, typed, errors)
+    added, folders = 0, []
+    with Session(get_engine()) as session:
+        for item in session.scalars(select(InboxItem).order_by(InboxItem.name)).all():
+            row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+            if row is None:            # gone from the inbox meanwhile
+                session.delete(item)
+            else:
+                added += 1
+                if row.folder not in folders:
+                    folders.append(row.folder)
+            session.commit()            # one at a time: each one done stays done
+    return go_to(request, "/inbox?" + urlencode(
+        [("added_all", added), *(("folder", folder) for folder in folders)]))
 
 
 @app.post("/inbox/{item_id}/add", response_class=HTMLResponse)

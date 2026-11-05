@@ -522,7 +522,8 @@ overwrites, renames or deletes library files.
   details confirmed in the inbox saved on their episodes.
 - **Try it:** upload a few files from your laptop, fix their dates, add
   them to the library.
-- Notes: an "Add to library" button on each waiting file (it saves what
+- Notes: an "Add to library" button on each waiting file, and "Add all" for
+  every waiting file at once (both save what
   was typed first). The file goes into the folder holding most of its
   series' recordings; if the series is new, a folder named after it
   (made safe); with no series, `Unsorted`. Names are never reused. Between

@@ -12,6 +12,10 @@
 {% if added %}<div class="notice success" role="status">Added “{{ added.name }}” to your library,
   in the folder <strong>{{ added.folder or "(top of the library)" }}</strong>.
   <a href="/files/{{ added.id }}">See it</a></div>{% endif %}
+{% if added_all is not none %}<div class="notice success" role="status">
+  Added {{ added_all }} file{{ "" if added_all == 1 else "s" }} to your library{% if folders %}, in
+  {{ "the folder" if folders | length == 1 else "the folders" }}
+  {% for f in folders %}<strong>{{ f or "(top of the library)" }}</strong>{{ ", " if not loop.last }}{% endfor %}{% endif %}.</div>{% endif %}
 {% if rejected %}<div class="notice" role="status">The file was deleted from the inbox.</div>{% endif %}
 {% if errors %}<div class="notice error" role="alert">Nothing was saved yet: some dates need fixing. See the notes in red below.</div>{% endif %}
 
@@ -37,7 +41,10 @@
 <h2>Waiting ({{ rows | length }})</h2>
 <p class="muted small">Dates are written like 1939-04-14, 1939-04 (day unknown), or 1939 (only the year).</p>
 <form method="post" action="/inbox">
-  <div class="form-buttons"><button class="button primary" type="submit">Save details</button></div>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save details</button>
+    <button class="button primary" type="submit" formaction="/inbox/add-all">Add all {{ rows | length }} to library</button>
+  </div>
   {% for row in rows %}
   {% set item = row.item %}
   <section class="review-card{% if errors[item.id] %} has-error{% endif %}">
@@ -66,7 +73,10 @@
     </div>
   </section>
   {% endfor %}
-  <div class="form-buttons"><button class="button primary" type="submit">Save details</button></div>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save details</button>
+    <button class="button primary" type="submit" formaction="/inbox/add-all">Add all {{ rows | length }} to library</button>
+  </div>
 </form>
 {% for row in rows %}
 <form id="reject-{{ row.item.id }}" method="post" action="/inbox/{{ row.item.id }}/reject" hidden

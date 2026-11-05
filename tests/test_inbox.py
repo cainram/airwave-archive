@@ -223,3 +223,27 @@ def test_moving_across_disks_copies_then_removes(tmp_path, monkeypatch):
     moved = inbox.move_into(source, tmp_path / "lib" / "Suspense")
     assert moved.read_bytes() == original and not source.exists()
     assert [p.name for p in moved.parent.iterdir()] == ["a.wav"]    # no leftover temporary file
+
+
+def test_adding_everything_at_once(client):
+    for name in ("a.wav", "b.wav", "c.wav"):
+        make_wav(client.box / name, 1)
+    client.get("/inbox")
+    found = items(client)
+    data = {}
+    for name, series in (("a.wav", "Suspense"), ("b.wav", "Suspense"), ("c.wav", "")):
+        i = found[name].id
+        data.update({f"series-{i}": series, f"title-{i}": "", f"episode_number-{i}": "",
+                     f"date-{i}": ""})
+    data[f"date-{found['c.wav'].id}"] = "1943-02-30"            # one bad date: nothing is added
+    assert client.post("/inbox/add-all", data=data).status_code == 400
+    assert len(list(client.box.iterdir())) == 3 and list(client.lib.iterdir()) == []
+
+    data[f"date-{found['c.wav'].id}"] = "1943"
+    sent = client.post("/inbox/add-all", data=data, follow_redirects=False)
+    assert sent.headers["location"] == "/inbox?added_all=3&folder=Suspense&folder=Unsorted"
+    assert list(client.box.iterdir()) == [] and items(client) == {}
+    assert sorted(p.name for p in (client.lib / "Suspense").iterdir()) == ["a.wav", "b.wav"]
+    assert episode_of("c.wav")[4] == (1943, None, None)
+    page = client.get(sent.headers["location"]).text
+    assert "Added 3 files to your library" in page and "<strong>Unsorted</strong>" in page
