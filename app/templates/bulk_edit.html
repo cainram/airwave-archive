@@ -1,0 +1,73 @@
+{% extends layout %}
+{% block title %}Edit {{ episodes | length }} episodes · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ back }}">← Back without saving</a></p>
+<h1>Edit {{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }} at once</h1>
+
+{% if errors.none or not episodes %}
+<div class="notice error" role="alert">No episodes were ticked. Go back and tick the ones to change.</div>
+{% else %}
+{% if errors %}
+<div class="notice error" role="alert">Nothing was changed yet. See the notes in red below.</div>
+{% endif %}
+
+<details class="chosen">
+  <summary>{{ "All episodes of " ~ series if series else "The episodes you ticked" }}
+    ({{ episodes | length }})</summary>
+  <ul>
+    {% for e in episodes[:200] %}<li>{{ e.title or "(no title)" }}{% if e | air_date(short=true) %} <span class="muted small">· {{ e | air_date(short=true) }}</span>{% endif %}</li>{% endfor %}
+    {% if episodes | length > 200 %}<li class="muted">…and {{ episodes | length - 200 }} more</li>{% endif %}
+  </ul>
+</details>
+
+<p class="muted">For each detail, choose to leave it as it is (each episode keeps its own),
+  change it to the same thing on all of them, or empty it on all of them.</p>
+
+<form class="bulk-form" method="post" action="/episodes/edit">
+  {% for id in ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+  <input type="hidden" name="whole_series" value="{{ series }}">
+  <input type="hidden" name="back" value="{{ back }}">
+
+  {% for name, label in fields.items() %}
+  {% set action = typed.get("do-" ~ name, "keep") %}
+  <fieldset class="bulk-field{% if errors[name] %} has-error{% endif %}" data-bulk-field>
+    <legend>{{ label }}</legend>
+    <label><input type="radio" name="do-{{ name }}" value="keep" {% if action == "keep" %}checked{% endif %}> Leave as it is</label>
+    <label class="bulk-set"><input type="radio" name="do-{{ name }}" value="set" {% if action == "set" %}checked{% endif %}> Change to:</label>
+    {% if name in ("cast", "notes") %}
+    <textarea name="{{ name }}" rows="3" aria-label="New {{ label }}">{{ typed.get(name, "") }}</textarea>
+    {% else %}
+    <input name="{{ name }}" type="text" value="{{ typed.get(name, '') }}" aria-label="New {{ label }}">
+    {% endif %}
+    <label><input type="radio" name="do-{{ name }}" value="clear" {% if action == "clear" %}checked{% endif %}> Empty it</label>
+    {% if errors[name] %}<p class="field-error">{{ errors[name] }}</p>{% endif %}
+  </fieldset>
+  {% endfor %}
+
+  {% set action = typed.get("do-time", "keep") %}
+  <fieldset class="bulk-field{% if errors.time %} has-error{% endif %}" data-bulk-field>
+    <legend>Start time</legend>
+    <label><input type="radio" name="do-time" value="keep" {% if action == "keep" %}checked{% endif %}> Leave as it is</label>
+    <label class="bulk-set"><input type="radio" name="do-time" value="set" {% if action == "set" %}checked{% endif %}> Change to:</label>
+    <div class="bulk-time">
+      <input name="air_time" type="time" value="{{ typed.get('air_time', '') }}" aria-label="New start time">
+      <select name="air_timezone" aria-label="Time zone">
+        <option value="">time zone unknown</option>
+        {% for zone, label in time_zones.items() %}
+        <option value="{{ zone }}" {% if typed.get("air_timezone") == zone %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <label><input type="radio" name="do-time" value="clear" {% if action == "clear" %}checked{% endif %}> Remove the time</label>
+    <p class="muted small">A time is only given to episodes whose full air date (year, month and day)
+      is known. The others are left as they are, and you'll be told how many.</p>
+    {% if errors.time %}<p class="field-error">{{ errors.time }}</p>{% endif %}
+  </fieldset>
+
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save changes</button>
+    <a class="button" href="{{ back }}">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

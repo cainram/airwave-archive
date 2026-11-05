@@ -3,6 +3,7 @@
 {% block title %}{{ name or "No series yet" }} · Airwave Archive{% endblock %}
 {% block content %}
 <p class="small"><a href="/">← All series</a></p>
+{% include "_done_notice.html" %}
 <section class="summary with-art">
   {{ picture(totals.art, name or "?", "large") }}
   <div class="summary-text">
@@ -21,6 +22,8 @@
   {% if name is not none %}
   <div class="actions">
     <a class="button" href="/series/picture?name={{ name | urlencode }}">Change picture…</a>
+    <a class="button" href="/series/rename?name={{ name | urlencode }}">Rename…</a>
+    <a class="button" href="/episodes/edit?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Edit all {{ totals.episodes }}…</a>
   </div>
   {% endif %}
 </section>
@@ -28,10 +31,13 @@
 {# The "Ep." column only when some episode on this page has a number. #}
 {% set numbered = files | selectattr("episode.episode_number") | list | length > 0 %}
 {% if pages > 1 %}{% include "_pager.html" %}{% endif %}
+{% set back = (name | series_url) ~ ("&" if name else "?") ~ "page=" ~ page %}
+{% include "_pick_toolbar.html" %}
 <div class="table-wrap">
   <table class="files">
     <thead>
       <tr>
+        <th class="pick"><input type="checkbox" form="pick" data-select-all aria-label="Tick all on this page"></th>
         <th class="play"><span class="visually-hidden">Play</span></th>
         <th class="date">Aired</th>
         {% if numbered %}<th class="num">Ep.</th>{% endif %}
@@ -45,6 +51,7 @@
       {% set parts = ep.parts %}
       {% set first = parts | rejectattr("missing") | first %}
       <tr{% if not first %} class="is-missing"{% endif %}>
+        <td class="pick"><input type="checkbox" form="pick" name="ids" value="{{ ep.id }}" aria-label="Tick {{ f | display_title }}"></td>
         <td class="play">{% if first %}{% with f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}</td>
         <td class="date">{{ (ep | air_date(short=true)) or "date unknown" }}</td>
         {% if numbered %}<td class="num">{{ ep.episode_number or "" }}</td>{% endif %}

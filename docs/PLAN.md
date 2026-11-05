@@ -448,11 +448,31 @@ Split into four smaller steps, done in order.
   bar with a big handle.
 
 ### Phase 6 — Bulk editing, search, CSV import
-- Select many episodes and edit fields together.
-- Search box across titles, series, cast, host, notes.
-- CSV import with a preview before anything is saved.
-- **Try it:** import an episode log for a series; fix a network on 50
-  episodes at once.
+Split into three smaller steps, done in order.
+
+#### 6a — Bulk editing ✅ *done*
+- Tick several episodes (or all of a series) and set details for all of
+  them at once: series, station/network, host, cast, notes, and a start
+  time with time zone.
+- Rename a whole series in one step.
+- **Try it:** fix a network on many episodes at once; rename a series.
+- Notes: tick boxes on series pages and the library ("tick all" ticks
+  the page); "Edit all N…" on a series page takes every episode of the
+  series, across pages. Each detail: leave as it is / change to / empty
+  it. A start time only goes on episodes with a full air date (the rest
+  are counted and reported). Changed details count as manual. "Rename…"
+  renames every episode of a series (typing another series' name joins
+  them); an uploaded picture follows. Titles, episode numbers and dates
+  are per-episode and not offered for bulk editing.
+
+#### 6b — Search
+- Search box across titles, series, cast, host, notes (SQLite FTS5).
+- **Try it:** search for an actor's name and find their episodes.
+
+#### 6c — CSV import
+- Import an episode log (a CSV spreadsheet) with a preview before
+  anything is saved.
+- **Try it:** import an episode log for a series.
 
 ### Phase 7 — Upload inbox
 - Upload files through the web page into the inbox.

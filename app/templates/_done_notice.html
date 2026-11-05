@@ -1,0 +1,18 @@
+{# After a bulk edit or a rename: say what happened. #}
+{% set q = request.query_params %}
+{% set changed = q.get("changed", "-1") | int(-1) %}
+{% set skipped = q.get("skipped", "0") | int(0) %}
+{% set renamed = q.get("renamed", "0") | int(0) %}
+{% if changed > 0 %}
+<div class="notice success" role="status">Changed {{ changed }} episode{{ "" if changed == 1 else "s" }}.
+{% elif changed == 0 %}
+<div class="notice" role="status">Nothing needed changing.
+{% endif %}
+{% if changed >= 0 %}
+  {% if skipped %}{{ skipped }} {{ "episode was" if skipped == 1 else "episodes were" }} not given
+  the start time, because the full air date isn't known.{% endif %}
+</div>
+{% endif %}
+{% if renamed %}
+<div class="notice success" role="status">Renamed {{ renamed }} episode{{ "" if renamed == 1 else "s" }}.</div>
+{% endif %}
