@@ -450,3 +450,22 @@ mark { background: #fff1a8; color: var(--text); border-radius: 2px; padding: 0 1
 .calendar-day { scroll-margin-top: 12px; }
 .calendar-day h2 { font-size: 1.05rem; margin: 20px 0 8px; }
 .result-text .muted a { color: inherit; }
+
+/* The calendar (week view). */
+.day-heading { display: flex; align-items: center; gap: 10px; }
+.day-heading h2 { flex: 1; }
+.button.small-button { padding: 4px 10px; font-size: 0.85rem; min-height: 0; }
+.calendar-jump label { font-weight: 600; }
+.week { display: grid; gap: 14px; margin-bottom: 20px; }
+.week-day h2 { font-size: 1.05rem; margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; }
+.week-date { color: var(--muted); font-weight: 400; font-size: 0.95rem; }
+.week-day .nothing { margin: 0; }
+.week-day.is-empty h2 { color: var(--muted); }
+@media (min-width: 1100px) {
+  .week { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .week-day { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-height: 12em; }
+  .week-day h2 { flex-direction: column; gap: 0; font-size: 0.95rem; }
+  .week-day .results { border: none; background: none; }
+  .week-day .result { padding: 6px 0; flex-direction: column; gap: 4px; }
+  .week-day .badge { margin-top: 2px; }
+}

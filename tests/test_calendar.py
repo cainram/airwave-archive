@@ -78,3 +78,56 @@ def test_an_empty_month(client):
     page = client.get("/calendar?year=1937&month=1").text
     assert "Nothing in your collection aired this month" in page
     assert 'aria-current="page">Calendar' in page or 'href="/calendar" data-paths="/calendar" aria-current="page"' in page
+
+
+# ---------------------------------------------------------------- weeks
+
+def test_time_spans_including_overnight():
+    from app.db import Episode
+    from app.episodes import format_air_span
+    def show(time, zone, hours):
+        return Episode(air_year=1996, air_month=5, air_day=2, air_time=time, air_timezone=zone,
+                       files=[AudioFile(duration_seconds=hours * 3600)])
+    assert format_air_span(show("20:00", "America/New_York", 0.5)) == "8:00 PM – 8:30 PM US Eastern"
+    assert format_air_span(show("22:00", "America/Los_Angeles", 5)) == "10:00 PM – 3:00 AM (next day) US Pacific"
+    assert format_air_span(show("19:00", None, 1)) == "7:00 PM – 8:00 PM"
+    assert format_air_span(show(None, None, 1)) == "time unknown"
+
+
+def test_week_names():
+    from datetime import date
+    from app.airdates import Week, week_start
+    assert week_start(date(1938, 10, 30)) == date(1938, 10, 30)        # a Sunday
+    assert week_start(date(1938, 11, 2)) == date(1938, 10, 30)
+    assert Week(date(1938, 10, 30), []).name == "October 30th – November 5th, 1938"
+    assert Week(date(1938, 10, 2), []).name == "October 2nd – 8th, 1938"
+    assert Week(date(1939, 12, 31), []).name == "December 31st, 1939 – January 6th, 1940"
+
+
+def test_a_week(client):
+    page = client.get("/calendar/week?date=11/2/1938").text      # any day in the week, American style
+    assert "<h1>October 30th – November 5th, 1938</h1>" in page and "3 episodes aired this week" in page
+    sunday = page[page.index('id="day-1938-10-30"'):page.index('id="day-1938-10-31"')]
+    assert sunday.index(">Early<") < sunday.index(">Wotw<") < sunday.index(">Late<")
+    assert "8:00 PM – 8:00 PM US Eastern" in sunday         # 1-second test file
+    assert page.count(">Nothing<") == 6
+    assert "Sometime" not in page
+    assert "1 episode from October 1938 has no known day" in page
+    page = page.replace("&amp;", "&")
+    assert 'href="/calendar/week?date=1935-06-30">⇤ Earlier' in page   # July 4th 1935's week
+    assert 'href="/calendar/week?date=1940-01-28">Later' in page       # Feb 3rd 1940's week
+    assert 'href="/calendar?year=1938&month=11">Month view' in page
+
+
+def test_the_week_view_opens_on_the_latest_broadcast_and_explains_bad_dates(client):
+    assert "January 28th – February 3rd, 1940" in client.get("/calendar/week").text
+    bad = client.get("/calendar/week?date=1938")
+    assert bad.status_code == 400 and "at least a month" in bad.text
+    assert "doesn" in client.get("/calendar/week?date=1938-02-30").text
+    assert "September 25th – October 1st, 1938" in client.get("/calendar/week?date=1938-10").text  # the week of the 1st
+
+
+def test_the_month_links_to_its_weeks(client):
+    page = client.get("/calendar?year=1938&month=10").text
+    assert 'href="/calendar/week?date=1938-10-30">Week</a>' in page
+    assert 'href="/calendar/week?date=1938-10-30">Week view</a>' in page

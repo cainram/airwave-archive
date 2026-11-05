@@ -373,6 +373,26 @@ def format_air_time(ep: Episode) -> str:
     return f"{format_time(ep.air_time)} {zone}" if zone else format_time(ep.air_time)
 
 
+def format_air_span(ep: Episode) -> str:
+    """'10:00 PM – 1:00 AM (next day) US Pacific', '8:00 PM US Eastern'
+    (length unknown), or 'time unknown'. The end is the start plus the
+    recordings' length."""
+    if not ep.air_time:
+        return "time unknown"
+    zone = TIME_ZONES.get(ep.air_timezone or "")
+    text = format_time(ep.air_time)
+    end = air_end(ep, ep.length)
+    if end is not None:
+        end += timedelta(seconds=30)   # to the nearest minute
+        text += f" – {format_time(end.strftime('%H:%M'))}"
+        days = (end.date() - date(ep.air_year, ep.air_month, ep.air_day)).days
+        if days == 1:
+            text += " (next day)"
+        elif days > 1:
+            text += f" ({_day_words(end)})"
+    return f"{text} {zone}" if zone else text
+
+
 def day_heading(year: int, month: int, day: int) -> str:
     """'Friday, April 14th, 1939'."""
     return f"{_day_words(date(year, month, day))}, {year}"
