@@ -1,17 +1,48 @@
 {% extends layout %}
-{% block title %}{{ f.tag_title or f.name }} · Airwave Archive{% endblock %}
+{% block title %}{{ f | display_title }} · Airwave Archive{% endblock %}
 {% block content %}
+{% set ep = f.episode %}
 <p class="small"><a href="/">← Library</a></p>
+
+{% if f.missing %}
+<div class="notice warning">
+  <strong>This file is missing.</strong> It wasn't found in the library on the last scan,
+  but its details are kept because you've edited them. If the file comes back (even in
+  another folder), a rescan reconnects it. If it's gone for good, you can forget it.
+  <form method="post" action="/files/{{ f.id }}/forget"
+        hx-confirm="Forget “{{ f | display_title }}” and all its details? This can't be undone. (No files are deleted.)">
+    <button class="button" type="submit">Forget this recording</button>
+  </form>
+</div>
+{% endif %}
 
 <section class="summary">
   <div>
-    <h1>{{ f.tag_title or f.name }}</h1>
+    <h1>{{ f | display_title }}</h1>
     <p class="muted">
-      {% for part in [f.tag_artist, f.tag_album, f.tag_date] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}
+      {% for part in [ep.series if ep else None, (ep | air_date) or f.tag_date] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}
     </p>
   </div>
-  <div>{% with big = true %}{% include "_play_button.html" %}{% endwith %}</div>
+  <div class="actions">
+    {% if not f.missing %}{% with big = true %}{% include "_play_button.html" %}{% endwith %}{% endif %}
+    <a class="button" href="/files/{{ f.id }}/edit">Edit details</a>
+  </div>
 </section>
+
+<h2>Episode</h2>
+<dl class="facts">
+  <dt>Series</dt><dd>{{ ep.series if ep and ep.series else "—" }}</dd>
+  <dt>Episode number</dt><dd>{{ ep.episode_number if ep and ep.episode_number else "—" }}</dd>
+  <dt>Title</dt><dd>{{ ep.title if ep and ep.title else "—" }}</dd>
+  <dt>Aired</dt><dd>{{ (ep | air_date) or "—" }}</dd>
+  <dt>Station / network</dt><dd>{{ ep.network if ep and ep.network else "—" }}</dd>
+  <dt>Host</dt><dd>{{ ep.host if ep and ep.host else "—" }}</dd>
+  <dt>Cast</dt><dd>{{ ep.cast if ep and ep.cast else "—" }}</dd>
+  <dt>Notes</dt><dd>{{ ep.notes if ep and ep.notes else "—" }}</dd>
+</dl>
+{% if not (ep and ep.sources) %}
+<p class="muted small">No details filled in yet. Press <strong>Edit details</strong> to add them.</p>
+{% endif %}
 
 <h2>File</h2>
 <dl class="facts">

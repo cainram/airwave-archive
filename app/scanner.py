@@ -16,10 +16,10 @@ from typing import Iterator
 
 import mutagen
 from mutagen.id3 import ID3, Frame
-from sqlalchemy import Engine, delete, select
+from sqlalchemy import Engine, delete, exists, select
 from sqlalchemy.orm import Session
 
-from app.db import AudioFile, ScanRun, utcnow
+from app.db import AudioFile, Episode, ScanRun, utcnow
 
 # File endings we treat as audio.
 AUDIO_EXTENSIONS = {
@@ -183,11 +183,20 @@ def _apply(row: AudioFile, info: AudioInfo, stat: os.stat_result) -> None:
     row.last_read = utcnow()
 
 
+def _new_episode() -> Episode:
+    now = utcnow()
+    return Episode(created_at=now, updated_at=now)
+
+
 def sync_library(engine: Engine, root: Path) -> ScanRun:
     """Bring the database up to date with the library folder.
 
-    New files are added, changed files are re-read, and files that are gone
-    are removed from the database. Unchanged files aren't opened at all.
+    - New files are added, each with its own episode.
+    - Changed files are re-read. Unchanged files aren't opened at all.
+    - Files that are gone are forgotten, unless their episode has manual
+      edits: then they're kept and marked "missing".
+    - A missing file that comes back, at the same place or in another folder
+      with the same name and size, is reconnected to its episode.
     """
     started = time.monotonic()
     run = ScanRun(started_at=utcnow(), seconds=0.0, added=0, changed=0,
@@ -198,45 +207,103 @@ def sync_library(engine: Engine, root: Path) -> ScanRun:
             # Possibly a disk that isn't mounted: change nothing.
             run.library_missing = True
         else:
-            # What we knew before: path -> (id, size, modified time).
+            # What we knew before: path -> (id, size, modified time, missing).
             known = {
-                (folder, name): (row_id, size, mtime)
-                for row_id, folder, name, size, mtime in session.execute(
+                (folder, name): (row_id, size, mtime, missing)
+                for row_id, folder, name, size, mtime, missing in session.execute(
                     select(AudioFile.id, AudioFile.folder, AudioFile.name,
-                           AudioFile.size_bytes, AudioFile.mtime_ns))
+                           AudioFile.size_bytes, AudioFile.mtime_ns, AudioFile.missing))
             }
-            seen: set[tuple[str, str]] = set()
+            found = list(find_audio_files(root))
+            seen = {(folder, path.name) for path, folder, _ in found}
+            gone = {key: known[key] for key in known.keys() - seen}
+            # Files that are gone, by name and size, in case they turn up
+            # somewhere else in the library.
+            moved_from = {}
+            for (_folder, name), (row_id, size, _mtime, _missing) in gone.items():
+                moved_from.setdefault((name, size), row_id)
+            reconnected: set[int] = set()
+
             pending = 0
-            for path, folder, stat in find_audio_files(root):
-                key = (folder, path.name)
-                seen.add(key)
-                before = known.get(key)
-                if before and before[1] == stat.st_size and before[2] == stat.st_mtime_ns:
-                    run.unchanged += 1
-                    continue
-                info = read_audio(path)
+            for path, folder, stat in found:
+                before = known.get((folder, path.name))
                 if before:
-                    row = session.get(AudioFile, before[0])
+                    row_id, size, mtime, was_missing = before
+                    if size == stat.st_size and mtime == stat.st_mtime_ns and not was_missing:
+                        run.unchanged += 1
+                        continue
+                    row = session.get(AudioFile, row_id)
+                    run.changed += 1
+                elif (row_id := moved_from.pop((path.name, stat.st_size), None)) is not None:
+                    row = session.get(AudioFile, row_id)   # moved to another folder
+                    row.folder = folder
+                    reconnected.add(row_id)
                     run.changed += 1
                 else:
-                    row = AudioFile(folder=folder, name=path.name, first_seen=utcnow())
+                    row = AudioFile(folder=folder, name=path.name, first_seen=utcnow(),
+                                    episode=_new_episode())
                     session.add(row)
                     run.added += 1
-                _apply(row, info, stat)
+                _apply(row, read_audio(path), stat)
+                row.missing = False
+                row.missing_since = None
                 pending += 1
                 if pending >= BATCH_SIZE:
                     session.commit()
                     pending = 0
 
-            gone = [known[key][0] for key in known.keys() - seen]
-            for i in range(0, len(gone), BATCH_SIZE):
-                session.execute(delete(AudioFile).where(AudioFile.id.in_(gone[i:i + BATCH_SIZE])))
-            run.removed = len(gone)
+            run.removed = _handle_gone(session, [
+                row_id for row_id, _size, _mtime, was_missing in gone.values()
+                if row_id not in reconnected and not was_missing
+            ])
+            _give_files_episodes(session)
 
         run.seconds = time.monotonic() - started
         session.add(run)
         session.commit()
     return run
+
+
+def _handle_gone(session: Session, ids: list[int]) -> int:
+    """Files no longer in the library: keep the ones with edits as
+    "missing", forget the rest. Returns how many there were."""
+    forget: list[int] = []
+    for i in range(0, len(ids), BATCH_SIZE):
+        for row in session.scalars(select(AudioFile).where(AudioFile.id.in_(ids[i:i + BATCH_SIZE]))):
+            if row.episode is not None and row.episode.has_manual_edits:
+                row.missing = True
+                row.missing_since = utcnow()
+            else:
+                forget.append(row.id)
+    forget_files(session, forget)
+    return len(ids)
+
+
+def forget_files(session: Session, ids: list[int]) -> None:
+    """Remove files from the database (never from the disk), along with any
+    episode left with no files."""
+    for i in range(0, len(ids), BATCH_SIZE):
+        chunk = ids[i:i + BATCH_SIZE]
+        episode_ids = list(session.scalars(
+            select(AudioFile.episode_id).where(AudioFile.id.in_(chunk),
+                                               AudioFile.episode_id.is_not(None))))
+        session.execute(delete(AudioFile).where(AudioFile.id.in_(chunk)))
+        session.execute(delete(Episode).where(
+            Episode.id.in_(episode_ids),
+            ~exists().where(AudioFile.episode_id == Episode.id)))
+
+
+def _give_files_episodes(session: Session) -> None:
+    """Every file should belong to an episode. (Files saved by an older
+    version of the app don't yet.)"""
+    while True:
+        rows = session.scalars(
+            select(AudioFile).where(AudioFile.episode_id.is_(None)).limit(BATCH_SIZE)).all()
+        if not rows:
+            return
+        for row in rows:
+            row.episode = _new_episode()
+        session.commit()
 
 
 def format_size(num_bytes: int | None) -> str:

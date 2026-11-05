@@ -299,7 +299,7 @@ earlier ones. Phases may be split into smaller steps as we go.
 ### Phase 4 — Radio metadata
 Split into five smaller steps, done in order.
 
-#### 4a — Episode details and an edit form
+#### 4a — Episode details and an edit form ✅ *done*
 - Database fields for series, episode number, title, station/network,
   host, cast, notes, and **partial air date + time + time zone**.
 - Episodes are stored separately from files (one episode can later have
@@ -312,6 +312,9 @@ Split into five smaller steps, done in order.
   forgotten by hand.
 - **Try it:** add the cast and air date to *The Patriot*, re-scan, see the
   edits are still there.
+- Notes: the database layout is now version 2. When the app updates an
+  older database it first saves a copy (`airwave.db.before-v2`). Time
+  zones offered: US Eastern/Central/Mountain/Pacific, UK, UTC.
 
 #### 4b — Fill in from tags
 - Pre-fill episode details from the file's own tags (e.g. artist → series),

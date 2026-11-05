@@ -4,3 +4,4 @@ uvicorn==0.54.0        # the program that actually serves the web pages
 jinja2==3.1.6          # fills in the HTML page templates
 mutagen==1.48.1        # reads audio files: length, tags
 sqlalchemy==2.1.8      # talks to the SQLite database
+python-multipart==0.0.33  # reads what forms send (e.g. the edit form)

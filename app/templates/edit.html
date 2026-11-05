@@ -1,0 +1,71 @@
+{% extends layout %}
+{% block title %}Edit {{ f | display_title }} · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="/files/{{ f.id }}">← Back without saving</a></p>
+<h1>Edit episode details</h1>
+<p class="muted">{{ f.name }}</p>
+
+{% if errors %}
+<div class="notice error" role="alert">
+  Some details need fixing before they can be saved. See the notes in red below.
+</div>
+{% endif %}
+
+<form class="edit-form" method="post" action="/files/{{ f.id }}/edit">
+  {% for name, label in text_fields.items() %}
+  <label for="{{ name }}">{{ label }}</label>
+  {% if name in long_fields %}
+  <textarea id="{{ name }}" name="{{ name }}" rows="{{ 6 if name == 'cast' else 4 }}">{{ v[name] or "" }}</textarea>
+  {% else %}
+  <input id="{{ name }}" name="{{ name }}" type="text" value="{{ v[name] or '' }}">
+  {% endif %}
+  {% endfor %}
+
+  <fieldset class="air-date">
+    <legend>Original air date</legend>
+    <p class="muted small">Fill in only what you know. Leave the rest blank or "unknown".</p>
+    <div class="date-parts">
+      <div>
+        <label for="air_year">Year</label>
+        <input id="air_year" name="air_year" type="text" inputmode="numeric" size="5"
+               placeholder="e.g. 1943" value="{{ v.air_year or '' }}">
+      </div>
+      <div>
+        <label for="air_month">Month</label>
+        <select id="air_month" name="air_month">
+          <option value="">unknown</option>
+          {% for month in months %}
+          <option value="{{ loop.index }}" {% if v.air_month | string == loop.index | string %}selected{% endif %}>{{ month }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="air_day">Day</label>
+        <input id="air_day" name="air_day" type="text" inputmode="numeric" size="3"
+               value="{{ v.air_day or '' }}">
+      </div>
+      <div>
+        <label for="air_time">Time</label>
+        <input id="air_time" name="air_time" type="time" value="{{ v.air_time or '' }}">
+      </div>
+      <div>
+        <label for="air_timezone">Time zone</label>
+        <select id="air_timezone" name="air_timezone">
+          <option value="">unknown</option>
+          {% for zone, label in time_zones.items() %}
+          <option value="{{ zone }}" {% if v.air_timezone == zone %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% for part in ["air_year", "air_month", "air_day", "air_time", "air_timezone"] if errors[part] %}
+    <p class="field-error">{{ errors[part] }}</p>
+    {% endfor %}
+  </fieldset>
+
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save</button>
+    <a class="button" href="/files/{{ f.id }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

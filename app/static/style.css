@@ -49,8 +49,39 @@ code { font-size: 0.9em; color: var(--accent); }
 
 .notice {
   background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; padding: 16px;
+  border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
+.notice.warning { background: #fff8e6; border-color: #e8c66a; }
+.notice.warning form { margin-top: 10px; }
+.notice.error { background: #fdeeee; border-color: #e3a1a1; }
+
+/* A small label, e.g. "missing". */
+.badge {
+  display: inline-block; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;
+  font-weight: 600; background: #fff1cc; color: #7a5a00; vertical-align: middle;
+}
+.files tr.is-missing .title { color: var(--muted); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+a.button { display: inline-block; text-decoration: none; }
+
+/* The edit form. */
+.edit-form { display: grid; gap: 6px; max-width: 700px; }
+.edit-form label { font-weight: 600; margin-top: 10px; }
+.edit-form input, .edit-form textarea, .edit-form select {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--text); width: 100%;
+}
+.edit-form textarea { resize: vertical; }
+.air-date { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px 14px; margin-top: 18px; }
+.air-date legend { font-weight: 600; padding: 0 6px; }
+.date-parts { display: flex; flex-wrap: wrap; gap: 0 12px; }
+.date-parts > div { display: grid; gap: 4px; }
+.date-parts label { margin-top: 6px; font-weight: 400; font-size: 0.85rem; color: var(--muted); }
+.date-parts input[size="5"] { width: 6em; }
+.date-parts input[size="3"] { width: 4em; }
+.field-error { color: #b42318; margin: 8px 0 0; }
+.form-buttons { display: flex; gap: 10px; margin-top: 18px; }
 
 .table-wrap { overflow-x: auto; }
 table.files { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
