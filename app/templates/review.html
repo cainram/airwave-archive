@@ -1,0 +1,70 @@
+{% extends layout %}
+{% block title %}Review file names · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="/">← Library</a></p>
+<h1>Review file names</h1>
+
+{% if saved is not none %}
+<div class="notice success" role="status">
+  Saved {{ saved }} episode{{ "" if saved == 1 else "s" }}.
+</div>
+{% endif %}
+{% if errors %}
+<div class="notice error" role="alert">
+  Nothing was saved yet: some dates need fixing. See the notes in red below.
+</div>
+{% endif %}
+
+{% if not rows %}
+<div class="notice">
+  Nothing to review. Every file name with a date in it either matches what's
+  already saved, or there are no such file names.
+</div>
+{% else %}
+<p class="muted">
+  These details were read from file names. Check them, fix anything that's wrong, and
+  untick any file you don't want changed. Leave a box empty to keep what's there now.
+  Nothing is saved until you press <strong>Save ticked</strong>.
+</p>
+<p class="muted small">
+  Dates are written like 1939-04-14, 1939-04 (day unknown), or 1939 (only the year).
+  {% if total > rows | length %}
+  Showing {{ rows | length }} of {{ total }}. Save these and the next ones will appear.
+  {% else %}
+  {{ total }} file{{ "" if total == 1 else "s" }} to review.
+  {% endif %}
+</p>
+
+<form method="post" action="/review/filenames">
+  <input type="hidden" name="ids" value="{{ rows | map(attribute='id') | join(',') }}">
+  <div class="form-buttons"><button class="button primary" type="submit">Save ticked</button></div>
+
+  {% for row in rows %}
+  <section class="review-card{% if errors[row.id] %} has-error{% endif %}">
+    <label class="review-file">
+      <input type="checkbox" name="accept-{{ row.id }}" {% if row.checked %}checked{% endif %}>
+      <span>{{ row.name }}</span>
+      {% if row.folder %}<span class="muted small">in {{ row.folder }}</span>{% endif %}
+    </label>
+    <div class="review-fields">
+      {% for field in row.fields %}
+      <div class="review-field review-{{ field.key }}">
+        <label for="{{ field.key }}-{{ row.id }}">{{ labels[field.key] }}</label>
+        <input id="{{ field.key }}-{{ row.id }}" name="{{ field.key }}-{{ row.id }}" type="text"
+               value="{{ field.proposed }}">
+        {% if field.differs and field.current %}
+        <span class="review-now{% if field.conflict %} conflict{% endif %}">
+          now: {{ field.current }}{% if field.conflict %} (you set this){% endif %}
+        </span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% if errors[row.id] %}<p class="field-error">{{ errors[row.id] }}</p>{% endif %}
+  </section>
+  {% endfor %}
+
+  <div class="form-buttons"><button class="button primary" type="submit">Save ticked</button></div>
+</form>
+{% endif %}
+{% endblock %}

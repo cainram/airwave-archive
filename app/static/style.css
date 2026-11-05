@@ -54,6 +54,7 @@ code { font-size: 0.9em; color: var(--accent); }
 .notice.warning { background: #fff8e6; border-color: #e8c66a; }
 .notice.warning form { margin-top: 10px; }
 .notice.error { background: #fdeeee; border-color: #e3a1a1; }
+.notice.success { background: #ecf8ef; border-color: #9fd3ac; }
 
 /* A small label, e.g. "missing". */
 .badge {
@@ -81,6 +82,24 @@ a.button { display: inline-block; text-decoration: none; }
 .date-parts input[size="5"] { width: 6em; }
 .date-parts input[size="3"] { width: 4em; }
 .edit-form .hint { font-weight: 400; font-size: 0.8rem; color: var(--muted); margin-left: 6px; }
+/* The file-name review page: one card per file. */
+.review-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px 14px; margin: 12px 0;
+}
+.review-card.has-error { border-color: #e3a1a1; }
+.review-file { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-weight: 600; word-break: break-word; }
+.review-file input { width: 1.2em; height: 1.2em; }
+.review-fields { display: grid; grid-template-columns: 2fr 0.6fr 1fr 2fr; gap: 8px 12px; margin-top: 10px; }
+.review-field { display: grid; gap: 3px; align-content: start; }
+.review-field label { font-size: 0.8rem; color: var(--muted); }
+.review-field input {
+  font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--text); width: 100%;
+}
+.review-now { font-size: 0.8rem; color: var(--muted); word-break: break-word; }
+.review-now.conflict { color: #9a5b00; font-weight: 600; }
+@media (max-width: 700px) { .review-fields { grid-template-columns: 1fr 1fr; } }
 .field-error { color: #b42318; margin: 8px 0 0; }
 .form-buttons { display: flex; gap: 10px; margin-top: 18px; }
 

@@ -327,7 +327,7 @@ Split into five smaller steps, done in order.
   cast and exact dates out of comments is left for 4c, where guesses are
   confirmed first. Database version 3 fills in existing episodes once.
 
-#### 4c — Filename parser with a confirm screen
+#### 4c — Filename parser with a confirm screen ✅ *done*
 - Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's
   Brain.mp3`, `CampbellPlayhouse39-04-14ThePatriot.mp3`, partial dates like
   `1943-xx-xx`).
@@ -335,6 +335,14 @@ Split into five smaller steps, done in order.
   until confirmed.
 - **Try it:** confirm air dates for all five Campbell Playhouse episodes at
   once.
+- Notes: the reader looks for a date (`1943-05-13`, `1943.05.13`,
+  `19430513`, `43-05-13` read as 19xx, `xx` for unknown parts); text before
+  it is the series, after it the title; an episode number only when marked
+  (`#42`, `Ep 42`). The review page (`/review/filenames`) shows only files
+  offering something for a field the owner hasn't set; cards that would
+  replace the owner's own values start unticked. Confirmed values count as
+  manual. Pulling cast lists out of comments is not done (could be a later
+  idea).
 
 #### 4d — Overnight broadcasts
 - Start time + length, so a broadcast that crosses midnight is one
