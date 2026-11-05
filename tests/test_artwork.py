@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.artwork import art_path, folder_and_parents, folder_image_rank, save_picture
-from app.db import AudioFile, FolderArt, make_engine
+from app.db import SCHEMA_VERSION, AudioFile, FolderArt, SeriesArt, make_engine
 from app.scanner import sync_library
 from test_scanner import add_tags, make_wav
 
@@ -156,4 +156,78 @@ def test_an_older_database_reads_every_file_again_for_pictures(tmp_path):
     assert run.changed == 1
     with Session(engine) as session:
         assert session.scalars(select(AudioFile)).one().art_hash
-    assert (tmp_path / "data" / "airwave.db.before-v6").exists()
+    assert (tmp_path / "data" / f"airwave.db.before-v{SCHEMA_VERSION}").exists()
+
+
+# ---------------------------------------------------------------- uploading
+
+
+def upload(client, name, data, filename="picture.jpg"):
+    from urllib.parse import quote
+    return client.post(f"/series/picture?name={quote(name)}",
+                       files={"picture": (filename, data, "image/jpeg")}, follow_redirects=False)
+
+
+def series_tile(client, name) -> str:
+    page = client.get("/").text
+    return next(t for t in page.split('class="tile"')[1:] if f'tile-name">{name}<' in t)
+
+
+def test_an_uploaded_picture_wins_and_can_be_removed(client):
+    page = client.get("/series/episodes?name=Campbell%20Playhouse").text
+    assert 'href="/series/picture?name=Campbell%20Playhouse"' in page
+    assert "picture file in the series" in client.get("/series/picture?name=Campbell%20Playhouse").text
+
+    sent = upload(client, "Campbell Playhouse", picture("red"))
+    assert sent.status_code == 303
+    assert sent.headers["location"] == "/series/episodes?name=Campbell%20Playhouse"
+    assert colour_of(client, picture_urls(series_tile(client, "Campbell Playhouse"))[0])[0] > 200   # red
+    # Kept with the uploads, not with the copies a scan can make again.
+    assert len(list((client.art_dir.parent / "uploaded-artwork").rglob("*.jpg"))) == 1
+    assert "a picture you uploaded" in client.get("/series/picture?name=Campbell%20Playhouse").text
+    # Episodes without a picture of their own use it too.
+    patriot = files(client)["patriot.wav"]
+    assert colour_of(client, picture_urls(client.get(f"/files/{patriot.id}").text)[0])[0] > 200
+
+    # A rescan doesn't undo it.
+    client.post("/rescan")
+    assert colour_of(client, picture_urls(series_tile(client, "Campbell Playhouse"))[0])[0] > 200
+
+    client.post("/series/picture/remove?name=Campbell%20Playhouse")
+    assert colour_of(client, picture_urls(series_tile(client, "Campbell Playhouse"))[0])[1] > 100   # green again
+
+
+def test_an_uploaded_phone_photo_is_turned_upright(client):
+    photo = Image.new("RGB", (400, 200), "red")
+    exif = photo.getexif()
+    exif[0x0112] = 6   # "turn me a quarter turn": stored sideways, as phones do
+    data = io.BytesIO()
+    photo.save(data, "JPEG", exif=exif)
+    upload(client, "Coast to Coast AM", data.getvalue())
+    import app.main as main
+    with Session(main._engine) as session:
+        art = session.get(SeriesArt, "Coast to Coast AM").art_hash
+    with Image.open(art_path(client.art_dir.parent / "uploaded-artwork", art)) as saved:
+        assert saved.size == (200, 400)   # taller than wide, the right way up
+
+
+def test_uploading_something_that_is_not_a_picture(client):
+    sent = upload(client, "Campbell Playhouse", b"this is a letter, not a picture", "letter.jpg")
+    assert sent.status_code == 400 and "isn&#39;t a picture the app can read" in sent.text
+    sent = upload(client, "Campbell Playhouse", b"")
+    assert sent.status_code == 400 and "choose a picture first" in sent.text
+    assert client.get("/series/picture?name=Nothing%20Like%20This").status_code == 404
+    assert upload(client, "Nothing Like This", picture()).status_code == 404
+
+
+def test_renaming_a_whole_series_keeps_its_uploaded_picture(client):
+    upload(client, "Campbell Playhouse", picture("red"))
+    found = files(client)
+    for name in ("patriot.wav", "our town.wav"):
+        client.post(f"/files/{found[name].id}/edit", data={"series": "The Campbell Playhouse"})
+        # (after the first, one episode still has the old name: nothing moves yet)
+    tile = series_tile(client, "The Campbell Playhouse")
+    assert colour_of(client, picture_urls(tile)[0])[0] > 200   # red came along
+    import app.main as main
+    with Session(main._engine) as session:
+        assert session.get(SeriesArt, "Campbell Playhouse") is None

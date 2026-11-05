@@ -12,6 +12,7 @@ Tables:
   to an episode. One episode can have several files ("parts"), such as
   a long show saved as Hour 1, Hour 2, Hour 3.
 - ``folder_art``: picture files found in library folders (cover.jpg...).
+- ``series_art``: pictures the owner uploaded for a series.
 - ``scan_runs``: one row per scan, recording what changed.
 """
 
@@ -40,7 +41,8 @@ DB_FILENAME = "airwave.db"
 #   4: Phase 4e, files can be parts of one episode (part_number)
 #   5: Phase 4e, a group's notes gather all parts' descriptions (no layout change)
 #   6: Phase 5b, pictures (art_hash on files, folder_art table)
-SCHEMA_VERSION = 6
+#   7: Phase 5c, uploaded series pictures (series_art table)
+SCHEMA_VERSION = 7
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -180,6 +182,18 @@ class FolderArt(Base):
     size_bytes: Mapped[int]
     mtime_ns: Mapped[int]
     art_hash: Mapped[str | None]   # None if it couldn't be read as a picture
+
+
+class SeriesArt(Base):
+    """A picture the owner uploaded for a series. It's kept (in the data
+    folder) under the series name; renaming every episode of the series
+    moves it to the new name."""
+
+    __tablename__ = "series_art"
+
+    series: Mapped[str] = mapped_column(primary_key=True)
+    art_hash: Mapped[str]
+    uploaded_at: Mapped[datetime]   # UTC
 
 
 # Load a file's episode and all that episode's parts along with it.

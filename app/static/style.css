@@ -227,3 +227,10 @@ body.has-player { padding-bottom: 110px; }
 .view-switch a { padding: 6px 14px; text-decoration: none; color: var(--text); background: var(--panel); }
 .view-switch a + a { border-left: 1px solid var(--line); }
 .view-switch a[aria-current="page"] { background: #e6effa; color: var(--accent); font-weight: 600; }
+
+/* Uploading a picture. */
+.upload-form { display: grid; gap: 6px; max-width: 520px; margin: 8px 0 24px; }
+.upload-form label { font-weight: 600; }
+.upload-form input[type="file"] {
+  padding: 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--panel);
+}

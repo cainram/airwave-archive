@@ -1,0 +1,43 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}Picture for {{ name }} · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ name | series_url }}">← Back to {{ name }}</a></p>
+<h1>Picture for {{ name }}</h1>
+
+{% if error %}
+<div class="notice error" role="alert">{{ error }}</div>
+{% endif %}
+
+<section class="summary with-art">
+  {{ picture(totals.art, name, "large") }}
+  <div class="summary-text">
+    <p class="muted">
+      {% if totals.art_from == "upload" %}This is a picture you uploaded.
+      {% elif totals.art_from == "folder" %}This picture is from a picture file in the series' folder.
+      {% elif totals.art_from == "files" %}This picture is from inside the series' audio files.
+      {% else %}This series has no picture yet.{% endif %}
+    </p>
+    <p class="muted small">A picture you upload is used instead of any picture from the
+      library. It's kept in the app's data folder; nothing is added to your library.</p>
+  </div>
+</section>
+
+<form class="upload-form" method="post" action="/series/picture?name={{ name | urlencode }}"
+      enctype="multipart/form-data">
+  <label for="picture">{{ "Choose a different picture" if totals.art_from == "upload" else "Choose a picture" }}</label>
+  <input id="picture" name="picture" type="file" accept="image/jpeg,image/png,image/webp" required>
+  <p class="muted small">A JPEG, PNG or WebP picture. A square one looks best.</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Upload</button>
+    <a class="button" href="{{ name | series_url }}">Cancel</a>
+  </div>
+</form>
+
+{% if totals.art_from == "upload" %}
+<form method="post" action="/series/picture/remove?name={{ name | urlencode }}"
+      hx-confirm="Stop using your uploaded picture for {{ name }}? The series will go back to a picture from the library (if there is one).">
+  <button class="button" type="submit">Remove my picture</button>
+</form>
+{% endif %}
+{% endblock %}

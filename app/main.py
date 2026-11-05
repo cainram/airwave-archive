@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 5b: the library, episode details, series, and artwork.
+"""Airwave Archive web app — Phase 5c: the library, episode details, series, and artwork.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -29,8 +29,10 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app.artwork import HASH_PATTERN, art_path
-from app.series import all_series, episode_art, folder_pictures, one_series, series_files
+from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
+from app.series import (
+    all_series, episode_art, follow_rename, one_series, series_files, set_uploaded_picture,
+)
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
 APP_DIR = Path(__file__).parent
@@ -211,6 +213,12 @@ def art_dir() -> Path:
     return Path(get_engine().url.database).parent / "artwork"
 
 
+def upload_dir() -> Path:
+    """Where pictures uploaded by the owner are kept. Unlike ``artwork``,
+    a scan can't make these again, so they belong in backups."""
+    return Path(get_engine().url.database).parent / "uploaded-artwork"
+
+
 def run_scan() -> ScanRun:
     with _scan_lock:
         return sync_library(get_engine(), LIBRARY_DIR, art_dir())
@@ -280,7 +288,7 @@ def rescan(request: Request):
 def file_page(request: Request, file_id: int):
     f = get_file(file_id)
     with Session(get_engine()) as session:
-        art = episode_art(f, folder_pictures(session))
+        art = episode_art(session, f)
     return render(request, "file.html", {"f": f, "art": art})
 
 
@@ -317,7 +325,9 @@ async def save_edit(request: Request, file_id: int):
         if row.episode is None:
             now = utcnow()
             row.episode = Episode(created_at=now, updated_at=now)
+        old_series = row.episode.series
         apply_edits(row.episode, values)
+        follow_rename(session, old_series, row.episode.series)
         session.commit()
     return go_to(request, f"/files/{file_id}")
 
@@ -376,6 +386,52 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
     })
+
+
+def series_or_404(session: Session, name: str | None) -> dict:
+    totals = one_series(session, name) if name else None
+    if totals is None:
+        raise HTTPException(status_code=404, detail="No episodes in that series")
+    return totals
+
+
+@app.get("/series/picture", response_class=HTMLResponse)
+def series_picture_page(request: Request, name: str = "", error: str | None = None):
+    """Upload a picture for a series, or remove one."""
+    with Session(get_engine()) as session:
+        totals = series_or_404(session, name)
+    return render(request, "series_picture.html",
+                  {"name": name, "totals": totals, "error": error},
+                  status_code=400 if error else 200)
+
+
+@app.post("/series/picture", response_class=HTMLResponse)
+async def upload_series_picture(request: Request, name: str = ""):
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+    upload = (await request.form()).get("picture")
+    data = await upload.read(MAX_PICTURE_BYTES + 1) if hasattr(upload, "read") else b""
+    if not data:
+        error = "Please choose a picture first."
+    elif len(data) > MAX_PICTURE_BYTES:
+        error = f"That picture is too big (the limit is {MAX_PICTURE_BYTES // 1_000_000} MB)."
+    elif (art_hash := save_picture(data, upload_dir())) is None:
+        error = "That file isn't a picture the app can read. Try a JPEG, PNG or WebP picture."
+    else:
+        with Session(get_engine()) as session:
+            set_uploaded_picture(session, name, art_hash)
+            session.commit()
+        return go_to(request, series_url(name))
+    return series_picture_page(request, name, error)
+
+
+@app.post("/series/picture/remove")
+def remove_series_picture(request: Request, name: str = ""):
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+        set_uploaded_picture(session, name, None)
+        session.commit()
+    return go_to(request, series_url(name))
 
 
 # ------------------------------------------------------- parts (several files)
@@ -510,7 +566,9 @@ async def save_review(request: Request):
             row = session.get(AudioFile, file_id)
             if row is None or row.episode is None:
                 continue
+            old_series = row.episode.series
             if apply_confirmed(row.episode, values):
+                follow_rename(session, old_series, row.episode.series)
                 saved += 1
         session.commit()
     return go_to(request, f"/review/filenames?saved={saved}")
@@ -534,8 +592,11 @@ def audio(file_id: int):
 def artwork(art_hash: str):
     """A picture, from the app's own copies. Pictures never change (a new
     picture gets a new name), so browsers may keep them for a long time."""
-    path = art_path(art_dir(), art_hash) if HASH_PATTERN.match(art_hash) else None
-    if path is None or not path.is_file():
+    if not HASH_PATTERN.match(art_hash):
+        raise HTTPException(status_code=404, detail="No such picture")
+    path = next((p for p in (art_path(art_dir(), art_hash), art_path(upload_dir(), art_hash))
+                 if p.is_file()), None)
+    if path is None:
         raise HTTPException(status_code=404, detail="No such picture")
     return FileResponse(path, media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=31536000, immutable"})
