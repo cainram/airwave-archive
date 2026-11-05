@@ -283,15 +283,16 @@ def air_end(ep: Episode | None, seconds: float | None) -> datetime | None:
 
 def format_air_date(ep: Episode | None, short: bool = False,
                     length: float | None = None) -> str:
-    """Show an air date with only the parts that are known.
+    """Show an air date with only the parts that are known, the American
+    way (the owner's choice).
 
-    Long:  'Friday, 14 April 1939, 8:00 PM US Eastern'
-           '14 April 1939, time unknown' · 'April 1939, day unknown'
-           '1939, date unknown'
-    Short: '14 Apr 1939' · 'Apr 1939' · '1939'
+    Long:  'Friday, April 14th, 1939, 8:00 PM US Eastern'
+           'Friday, April 14th, 1939, time unknown'
+           'April 1939, day unknown' · '1939, date unknown'
+    Short: 'Apr 14, 1939' · 'Apr 1939' · '1939'
     With ``length`` (seconds on air) and a known time, the end is added:
            '..., 8:00 PM US Eastern, until about 8:30 PM'
-           '..., 10:00 PM US Pacific, until about 3:00 AM on Friday, 3 May'
+           '..., 10:00 PM US Pacific, until about 3:00 AM on Friday, May 3rd'
     Returns '' if nothing is known.
     """
     if ep is None or ep.air_year is None:
@@ -301,13 +302,12 @@ def format_air_date(ep: Episode | None, short: bool = False,
         if month is None:
             return str(year)
         name = calendar.month_abbr[month]
-        return f"{day} {name} {year}" if day else f"{name} {year}"
+        return f"{name} {day}, {year}" if day else f"{name} {year}"
     if month is None:
         return f"{year}, date unknown"
     if day is None:
         return f"{calendar.month_name[month]} {year}, day unknown"
-    weekday = calendar.day_name[date(year, month, day).weekday()]
-    text = f"{weekday}, {day} {calendar.month_name[month]} {year}"
+    text = f"{_day_words(date(year, month, day))}, {year}"
     if not ep.air_time:
         return f"{text}, time unknown"
     zone = TIME_ZONES.get(ep.air_timezone or "", "time zone unknown")
@@ -315,6 +315,25 @@ def format_air_date(ep: Episode | None, short: bool = False,
     end = air_end(ep, length)
     if end is None:
         return text
+    end += timedelta(seconds=30)   # to the nearest minute
+    text += f", until about {format_time(end.strftime('%H:%M'))}"
+    if end.date() != date(year, month, day):
+        text += f" on {_day_words(end)}"
+        if end.year != year:
+            text += f", {end.year}"
+    return text
+
+
+def ordinal(n: int) -> str:
+    """1 -> '1st', 2 -> '2nd', 3 -> '3rd', 11 -> '11th', 22 -> '22nd'."""
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{ {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th') }"
+
+
+def _day_words(day: date) -> str:
+    """'Friday, April 14th' (no year)."""
+    return f"{calendar.day_name[day.weekday()]}, {calendar.month_name[day.month]} {ordinal(day.day)}"
     end += timedelta(seconds=30)   # to the nearest minute
     text += f", until about {format_time(end.strftime('%H:%M'))}"
     if end.date() != date(year, month, day):

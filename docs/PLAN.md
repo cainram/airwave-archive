@@ -57,6 +57,9 @@ Real-world air dates are often incomplete. The app must be honest about that:
 Rules:
 
 - **Never invent missing parts.** No defaulting to January 1st or midnight.
+- **Dates are shown the American way** (owner's choice): "Friday, April
+  14th, 1939, 8:00 PM US Eastern"; short form "Apr 14, 1939". Typed dates
+  on the review page stay in the 1939-04-14 form, which can't be misread.
 - **Store the time zone** with any time (e.g. a broadcast at 8:00 PM US
   Eastern). Old-time radio was often aired at different local times for East
   and West coasts, so the time zone matters.
@@ -159,7 +162,7 @@ opposed to the sound itself. The app gets it from several sources:
    Other formats (FLAC, M4A, OGG) have their own tag formats and are read too.
 2. **Filename parsing.** Many collections encode information in the file
    name, e.g. `Suspense 1943-05-13 - Donovan's Brain.mp3` → series
-   *Suspense*, air date 13 May 1943, title *Donovan's Brain*. The app will
+   *Suspense*, air date May 13th, 1943, title *Donovan's Brain*. The app will
    recognize common patterns, show you what it guessed, and let you confirm
    or fix it. Partial dates like `1943-xx-xx` are supported.
 3. **CSV import.** A CSV file is a simple spreadsheet saved as plain text. You
@@ -352,7 +355,7 @@ Split into five smaller steps, done in order.
 - Notes: the episode stores only its start (date, time, zone); the length
   is the recording's length (no separate "length on air" field for now; in
   4e a grouped episode's length is the sum of its parts). The end is shown
-  as "until about 3:00 AM on Friday, 3 May", worked out in the episode's
+  as "until about 3:00 AM on Friday, May 3rd", worked out in the episode's
   time zone so nights when the clocks change come out right. The `tzdata`
   package carries the time zone rules so this also works on Windows.
 
