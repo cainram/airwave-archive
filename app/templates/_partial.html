@@ -1,6 +1,8 @@
 {#
   Used instead of base.html when htmx asks for a page: only the title and
-  the middle of the page are sent, and htmx swaps them in.
+  the middle of the page are sent, and htmx swaps them in. The menu comes
+  too ("out of band"), so it shows the right section.
 #}
 <title>{% block title %}Airwave Archive{% endblock %}</title>
+{% with oob = true %}{% include "_menu.html" %}{% endwith %}
 {% block content %}{% endblock %}

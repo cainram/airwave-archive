@@ -1,8 +1,10 @@
+{# Previous / Next links. Needs: page, pages, first_index, files, rows (how
+   many in all), and pager_url (the address to add a page number to). #}
 <nav class="pager">
-  {% if page > 1 %}<a class="button" href="/?page={{ page - 1 }}">← Previous</a>{% endif %}
+  {% if page > 1 %}<a class="button" href="{{ pager_url }}{{ page - 1 }}">← Previous</a>{% endif %}
   <span class="muted">
-    Showing {{ first_index }}–{{ first_index + files | length - 1 }} of {{ count }}
+    Showing {{ first_index }}–{{ first_index + files | length - 1 }} of {{ rows }}
     (page {{ page }} of {{ pages }})
   </span>
-  {% if page < pages %}<a class="button" href="/?page={{ page + 1 }}">Next →</a>{% endif %}
+  {% if page < pages %}<a class="button" href="{{ pager_url }}{{ page + 1 }}">Next →</a>{% endif %}
 </nav>

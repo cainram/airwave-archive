@@ -1,0 +1,56 @@
+{% extends layout %}
+{% block title %}{{ name or "No series yet" }} · Airwave Archive{% endblock %}
+{% block content %}
+<p class="small"><a href="/series">← All series</a></p>
+<section class="summary">
+  <div>
+    <h1>{{ name or "No series yet" }}</h1>
+    <p class="muted">
+      {{ totals.episodes }} episode{{ "" if totals.episodes == 1 else "s" }}
+      {% if totals.years %}· {{ totals.years }}{% endif %}
+      · {{ totals.seconds | duration }} of audio
+      · {{ totals.bytes | size }}
+    </p>
+    {% if name is none %}
+    <p class="muted small">These episodes have no Series name yet. Open one and press
+      <strong>Edit details</strong> to give it one.</p>
+    {% endif %}
+  </div>
+</section>
+
+{# The "Ep." column only when some episode on this page has a number. #}
+{% set numbered = files | selectattr("episode.episode_number") | list | length > 0 %}
+{% if pages > 1 %}{% include "_pager.html" %}{% endif %}
+<div class="table-wrap">
+  <table class="files">
+    <thead>
+      <tr>
+        <th class="play"><span class="visually-hidden">Play</span></th>
+        <th class="date">Aired</th>
+        {% if numbered %}<th class="num">Ep.</th>{% endif %}
+        <th>Title</th>
+        <th class="num">Length</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in files %}
+      {% set ep = f.episode %}
+      {% set parts = ep.parts %}
+      {% set first = parts | rejectattr("missing") | first %}
+      <tr{% if not first %} class="is-missing"{% endif %}>
+        <td class="play">{% if first %}{% with f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}</td>
+        <td class="date">{{ (ep | air_date(short=true)) or "date unknown" }}</td>
+        {% if numbered %}<td class="num">{{ ep.episode_number or "" }}</td>{% endif %}
+        <td class="name">
+          <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+          {% if not first %}<span class="badge">missing</span>{% endif %}
+          {% if parts | length > 1 %}<span class="badge parts">{{ parts | length }} parts</span>{% endif %}
+        </td>
+        <td class="num">{{ ep.length | duration }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if pages > 1 %}{% include "_pager.html" %}{% endif %}
+{% endblock %}

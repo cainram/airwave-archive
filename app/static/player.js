@@ -96,4 +96,16 @@
   // After htmx swaps in a new page, mark its buttons too.
   document.body.addEventListener("htmx:afterSettle", markButtons);
   document.body.addEventListener("htmx:historyRestore", markButtons);
+
+  // Going Back restores a page from the browser's memory, without a fresh
+  // menu, so highlight the right section of the menu here.
+  document.body.addEventListener("htmx:historyRestore", function () {
+    const path = window.location.pathname;
+    document.querySelectorAll("#menu a").forEach(function (link) {
+      const section = link.getAttribute("href");
+      const here = section === "/" ? !path.startsWith("/series") : path.startsWith(section);
+      if (here) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  });
 })();

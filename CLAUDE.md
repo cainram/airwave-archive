@@ -118,6 +118,8 @@ These come from the plan and should not be changed without the owner's OK:
   review page)
 - `app/parts.py`: episodes made of several files ("Hour 1", "Hour 2"):
   grouping, splitting, numbering the parts
+- `app/series.py`: the series list (with totals) and one series'
+  episodes in air-date order
 - `app/scanner.py`: finds audio files, reads length and tags, and keeps the
   database in step with the library
 - `app/templates/`: HTML page templates. Pages use `{% extends layout %}`:

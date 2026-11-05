@@ -23,7 +23,7 @@
     <h1>{{ f | display_title }}</h1>
     {% if grouped %}<p class="part-of">Part {{ f.part_number }} of {{ parts | length }}</p>{% endif %}
     <p class="muted">
-      {% for part in [ep.series if ep else None, (ep | air_date) or f.tag_date] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}
+      {% if ep and ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% if (ep | air_date) or f.tag_date %} · {% endif %}{% endif %}{{ (ep | air_date) or f.tag_date or "" }}
     </p>
   </div>
   <div class="actions">

@@ -1,0 +1,48 @@
+{% extends layout %}
+{% block title %}Series · Airwave Archive{% endblock %}
+{% block content %}
+<section class="summary">
+  <div>
+    <h1>Series</h1>
+    <p class="muted">
+      {{ series | length }} series
+      · {{ series | sum(attribute="episodes") }} episodes
+      · {{ series | sum(attribute="seconds") | duration }} of audio
+    </p>
+  </div>
+</section>
+
+{% if not series %}
+<div class="notice">No episodes yet. Add recordings to the library and press <strong>Rescan</strong>.</div>
+{% else %}
+<p class="muted small">A series is every episode with the same <strong>Series</strong> name.
+  To join two spellings into one, change the name on their episodes.</p>
+<div class="table-wrap">
+  <table class="files series-list">
+    <thead>
+      <tr>
+        <th>Series</th>
+        <th class="num">Episodes</th>
+        <th class="date">Years</th>
+        <th class="num">Length</th>
+        <th class="num size">Size</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in series %}
+      <tr>
+        <td class="name">
+          <a class="title" href="{{ s.name | series_url }}">{{ s.name or "No series yet" }}</a>
+          {% if s.name is none %}<div class="muted small">episodes without a Series name</div>{% endif %}
+        </td>
+        <td class="num">{{ s.episodes }}</td>
+        <td class="date">{{ s.years }}</td>
+        <td class="num">{{ s.seconds | duration }}</td>
+        <td class="num size">{{ s.bytes | size }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
