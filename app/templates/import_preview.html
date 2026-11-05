@@ -1,0 +1,88 @@
+{% extends layout %}
+{% block title %}Import preview · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/import">← Start again</a></nav>
+<h1>Import preview</h1>
+
+<p class="muted">
+  {{ row_count }} row{{ "" if row_count == 1 else "s" }}{% if row_count >= max_rows %} (only the first {{ max_rows }} are read){% endif %}:
+  <strong>{{ to_change | length }}</strong> would change an episode,
+  {{ same | length }} already match{{ "es" if same | length == 1 else "" }},
+  {{ unmatched | length }} couldn't be matched to an episode.
+  Nothing has been saved yet.
+</p>
+
+<details class="import-columns" {% if not to_change %}open{% endif %}>
+  <summary>Which column holds what</summary>
+  <form method="get" action="/import/{{ token }}">
+    <input type="hidden" name="series" value="{{ series }}">
+    <div class="table-wrap">
+      <table class="files">
+        <thead><tr><th>Column</th><th>First value</th><th>Holds</th></tr></thead>
+        <tbody>
+          {% for header in headers %}
+          {% set i = loop.index0 %}
+          <tr>
+            <td class="name">{{ header or "(no name)" }}</td>
+            <td class="muted small">{{ examples[i] | truncate(40) }}</td>
+            <td>
+              <select name="col" aria-label="What column {{ header }} holds">
+                <option value="">(not used)</option>
+                {% for key, label in fields.items() %}
+                <option value="{{ key }}" {% if columns[i] == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if series %}<p class="muted small">Series for rows without one: <strong>{{ series }}</strong></p>{% endif %}
+    <div class="form-buttons"><button class="button" type="submit">Update preview</button></div>
+  </form>
+</details>
+
+{% if to_change %}
+<form method="post" action="/import/{{ token }}">
+  <input type="hidden" name="series" value="{{ series }}">
+  {% for c in columns %}<input type="hidden" name="col" value="{{ c }}">{% endfor %}
+  <div class="form-buttons"><button class="button primary" type="submit">Save ticked</button></div>
+  {% for row in to_change %}
+  <section class="review-card{% if row.errors %} has-error{% endif %}">
+    <label class="review-file">
+      <input type="checkbox" name="row" value="{{ row.number }}"
+             {% if row.checked %}checked{% endif %} {% if row.errors %}disabled{% endif %}>
+      <span>Row {{ row.number }} → {{ titles[row.episode_id] or "(untitled episode)" }}</span>
+      <span class="muted small">matched by {{ row.matched_by }}</span>
+    </label>
+    {% if row.changes %}
+    <ul class="import-changes">
+      {% for c in row.changes %}
+      <li><strong>{{ c.label }}:</strong>
+        {% if c.now %}<span class="was{% if c.conflict %} conflict{% endif %}">{{ c.now | truncate(80) }}</span> →{% endif %}
+        <span class="new">{{ c.new | truncate(200) }}</span>
+        {% if c.conflict %}<span class="review-now conflict">(replaces what you set)</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% for error in row.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </section>
+  {% endfor %}
+  <div class="form-buttons"><button class="button primary" type="submit">Save ticked</button></div>
+</form>
+{% endif %}
+
+{% if unmatched %}
+<details class="import-unmatched" {% if not to_change %}open{% endif %}>
+  <summary>{{ unmatched | length }} row{{ "" if unmatched | length == 1 else "s" }} not matched to an episode</summary>
+  <ul>
+    {% for row in unmatched[:500] %}
+    <li>Row {{ row.number }}{% if row.values.title %} ({{ row.values.title }}){% endif %}: {{ row.problem }}
+      {% for error in row.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}

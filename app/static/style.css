@@ -379,3 +379,20 @@ mark { background: #fff1a8; color: var(--text); border-radius: 2px; padding: 0 1
 @media (pointer: coarse) {
   .search-box input, .search-page-form input { min-height: 44px; }
 }
+
+/* Importing a spreadsheet. */
+.import-columns, .import-unmatched { margin: 10px 0 16px; }
+.import-columns summary, .import-unmatched summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.import-columns select { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.import-changes { margin: 8px 0 0; padding-left: 1.4em; }
+.import-changes li { margin: 3px 0; overflow-wrap: break-word; }
+.import-changes .was { color: var(--muted); text-decoration: line-through; }
+.import-changes .was.conflict { color: #9a5b00; }
+.import-unmatched li { margin: 4px 0; }
+@media (pointer: coarse) { .import-columns select { min-height: 44px; } }
+.example-download { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 12px 0 16px; }
+.upload-form input[type="text"] {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--text); width: 100%;
+}
+@media (pointer: coarse) { .upload-form input[type="text"] { min-height: 44px; } }

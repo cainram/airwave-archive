@@ -113,7 +113,7 @@ def test_series_tiles_show_initials_without_pictures(client):
 
 def test_menu_shows_where_you_are(client):
     series = '<a href="/" data-paths="/ /series" aria-current="page">Series</a>'
-    library = '<a href="/library" data-paths="/library /files /review" aria-current="page">Library</a>'
+    library = '<a href="/library" data-paths="/library /files /review /import" aria-current="page">Library</a>'
     assert series in client.get("/").text and library not in client.get("/").text
     assert series in client.get("/series/episodes").text
     assert library in client.get("/library").text and series not in client.get("/library").text
