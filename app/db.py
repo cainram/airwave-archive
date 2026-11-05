@@ -31,10 +31,12 @@ DB_FILENAME = "airwave.db"
 # database apart and update it (see ``_migrate``).
 #   1: Phase 2, audio files and scans
 #   2: Phase 4a, episodes, and files can be marked missing
-SCHEMA_VERSION = 2
+#   3: Phase 4b, episode details filled in from tags (no layout change)
+SCHEMA_VERSION = 3
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
+TAGS = "tags"   # read from the file's own tags
 
 
 class Base(DeclarativeBase):
@@ -206,5 +208,22 @@ def make_engine(db_path: Path) -> Engine:
     Base.metadata.create_all(engine)   # creates any tables that don't exist yet
     with engine.begin() as conn:
         _migrate(conn)
+    if 0 < version < 3:
+        _fill_all_from_tags(engine)
+    with engine.begin() as conn:
         conn.exec_driver_sql(f"PRAGMA user_version={SCHEMA_VERSION}")
     return engine
+
+
+def _fill_all_from_tags(engine: Engine) -> None:
+    """Version 3: fill in details from tags for files already in the
+    database (new and changed files are filled in as they're scanned)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from app.episodes import fill_from_tags   # here, to avoid a circular import
+
+    with Session(engine) as session:
+        for f in session.scalars(select(AudioFile).where(AudioFile.episode_id.is_not(None))):
+            fill_from_tags(f.episode, f)
+        session.commit()

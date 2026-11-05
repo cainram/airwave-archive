@@ -80,6 +80,7 @@ a.button { display: inline-block; text-decoration: none; }
 .date-parts label { margin-top: 6px; font-weight: 400; font-size: 0.85rem; color: var(--muted); }
 .date-parts input[size="5"] { width: 6em; }
 .date-parts input[size="3"] { width: 4em; }
+.edit-form .hint { font-weight: 400; font-size: 0.8rem; color: var(--muted); margin-left: 6px; }
 .field-error { color: #b42318; margin: 8px 0 0; }
 .form-buttons { display: flex; gap: 10px; margin-top: 18px; }
 

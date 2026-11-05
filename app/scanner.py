@@ -20,6 +20,7 @@ from sqlalchemy import Engine, delete, exists, select
 from sqlalchemy.orm import Session
 
 from app.db import AudioFile, Episode, ScanRun, utcnow
+from app.episodes import fill_from_tags
 
 # File endings we treat as audio.
 AUDIO_EXTENSIONS = {
@@ -245,6 +246,8 @@ def sync_library(engine: Engine, root: Path) -> ScanRun:
                     session.add(row)
                     run.added += 1
                 _apply(row, read_audio(path), stat)
+                if row.episode is not None:
+                    fill_from_tags(row.episode, row)
                 row.missing = False
                 row.missing_since = None
                 pending += 1
@@ -303,6 +306,7 @@ def _give_files_episodes(session: Session) -> None:
             return
         for row in rows:
             row.episode = _new_episode()
+            fill_from_tags(row.episode, row)
         session.commit()
 
 

@@ -13,7 +13,7 @@
 
 <form class="edit-form" method="post" action="/files/{{ f.id }}/edit">
   {% for name, label in text_fields.items() %}
-  <label for="{{ name }}">{{ label }}</label>
+  <label for="{{ name }}">{{ label }}{% if sources.get(name) == "tags" %} <span class="hint">filled in from the file's tags</span>{% endif %}</label>
   {% if name in long_fields %}
   <textarea id="{{ name }}" name="{{ name }}" rows="{{ 6 if name == 'cast' else 4 }}">{{ v[name] or "" }}</textarea>
   {% else %}
@@ -22,7 +22,7 @@
   {% endfor %}
 
   <fieldset class="air-date">
-    <legend>Original air date</legend>
+    <legend>Original air date{% if sources.get("air_date") == "tags" %} <span class="hint">filled in from the file's tags</span>{% endif %}</legend>
     <p class="muted small">Fill in only what you know. Leave the rest blank or "unknown".</p>
     <div class="date-parts">
       <div>
