@@ -99,6 +99,25 @@ def _key(text: str) -> str:
     return "number" if text.strip() == "no" else re.sub(r"[^a-z0-9]", "", text)
 
 
+# An example to start from: every column the app knows, and one row. Its
+# series is made up, so importing it unchanged matches no real episode.
+EXAMPLE_HEADERS = ["File", "Series", "Episode", "Title", "Air Date", "Time", "Time Zone",
+                   "Network", "Host", "Cast", "Notes"]
+EXAMPLE_ROW = ["", "Example Series", "1", "Example Title", "4/14/1939", "8:00 PM", "US Eastern",
+               "CBS", "Host Name", "First Actor, Second Actor",
+               "Replace this row with your own. Leave a cell empty to keep what's there."]
+
+
+def example_csv() -> bytes:
+    """The example spreadsheet, as Excel likes it (with a mark at the start
+    so accented letters come out right)."""
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\r\n")
+    writer.writerow(EXAMPLE_HEADERS)
+    writer.writerow(EXAMPLE_ROW)
+    return ("\ufeff" + out.getvalue()).encode("utf-8")
+
+
 # ------------------------------------------------------------- the file
 
 

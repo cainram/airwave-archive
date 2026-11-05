@@ -172,3 +172,19 @@ def test_bad_uploads(client):
     assert page.status_code == 400
     assert client.get("/import/0123456789abcdef").status_code == 404
     assert client.get("/import/..%2F..%2Fairwave").status_code == 404
+
+
+def test_the_example_spreadsheet(client):
+    page = client.get("/import").text
+    assert 'href="/import-example.csv"' in page and 'hx-boost="false"' in page
+    sent = client.get("/import-example.csv")
+    assert sent.headers["content-type"].startswith("text/csv")
+    assert "attachment" in sent.headers["content-disposition"]
+    headers, rows = read_table(sent.content)
+    assert len(rows) == 1
+    # The app recognises every column of its own example...
+    assert "" not in guess_columns(headers)
+    # ...and importing it unchanged touches no real episode.
+    url = upload(client, sent.content.decode("utf-8-sig"))
+    page = " ".join(client.get(url).text.split())
+    assert "<strong>0</strong> would change an episode" in page

@@ -12,6 +12,13 @@
 <p class="muted">Bring in details from an episode log: a spreadsheet saved as a <strong>CSV</strong>
   file (in Excel or Numbers: File → Export / Save As → CSV). The first row should name the
   columns, for example <em>Series, Date, Title, Cast, Notes</em>.</p>
+<div class="example-download">
+  {# hx-boost="false": a download, not a page to show. #}
+  <a class="button" href="/import-example.csv" download="airwave-example.csv" hx-boost="false">⬇ Download an example spreadsheet</a>
+  <span class="muted small">Every column the app understands, with one example row to replace.
+    Open it in Excel or Numbers, fill it in, and save it as CSV again.</span>
+</div>
+
 <p class="muted small">Each row is matched to an episode in your library by its file name (if
   there's a File column), or else by its series and air date, or series and episode number.
   You'll see a preview first; nothing is saved until you say so.</p>

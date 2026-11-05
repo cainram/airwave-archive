@@ -495,6 +495,9 @@ Split into three smaller steps, done in order.
   count as manual. The uploaded file waits in `data/imports/` and is
   deleted after saving (or after a day). Built for common formats without
   a real log to test with: adjust when the owner tries one.
+- A "Download an example spreadsheet" button gives a CSV with every
+  column the app understands and one example row (a made-up series, so
+  importing it unchanged touches nothing).
 
 ### Phase 7 — Upload inbox
 - Upload files through the web page into the inbox.

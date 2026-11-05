@@ -390,3 +390,9 @@ mark { background: #fff1a8; color: var(--text); border-radius: 2px; padding: 0 1
 .import-changes .was.conflict { color: #9a5b00; }
 .import-unmatched li { margin: 4px 0; }
 @media (pointer: coarse) { .import-columns select { min-height: 44px; } }
+.example-download { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 12px 0 16px; }
+.upload-form input[type="text"] {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--text); width: 100%;
+}
+@media (pointer: coarse) { .upload-form input[type="text"] { min-height: 44px; } }

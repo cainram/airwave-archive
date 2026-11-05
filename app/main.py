@@ -406,6 +406,13 @@ def import_page(request: Request, saved: int | None = None, error: str | None = 
                   status_code=400 if error else 200)
 
 
+@app.get("/import-example.csv")
+def import_example():
+    """An example spreadsheet to start from."""
+    return Response(csvimport.example_csv(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="airwave-example.csv"'})
+
+
 @app.post("/import", response_class=HTMLResponse)
 async def import_upload(request: Request):
     form = await request.form()
