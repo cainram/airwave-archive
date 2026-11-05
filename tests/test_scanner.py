@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from mutagen.id3 import COMM, TDRC, TIT2, TPE1
+from mutagen.id3 import COMM, TDRC, TIT2, TPE1, USLT
 from mutagen.wave import WAVE
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -71,7 +71,9 @@ def test_tags_are_read(tmp_path, engine):
              artist=TPE1(encoding=3, text="The Campbell Playhouse"),
              date=TDRC(encoding=3, text="1939"),
              short=COMM(encoding=3, lang="eng", desc="ID3v1 Comment", text="www.example"),
-             main=COMM(encoding=3, lang="eng", desc="", text="Originally aired April 14, 1939"))
+             main=COMM(encoding=3, lang="eng", desc="", text="Originally aired April 14, 1939"),
+             # Lyrics hold one piece of text, not a list (Coast to Coast files use it).
+             lyrics=USLT(encoding=3, lang="eng", desc="", text="Orson Welles stars"))
 
     sync_library(engine, lib)
 
@@ -81,6 +83,7 @@ def test_tags_are_read(tmp_path, engine):
     assert f.tag_date == "1939"
     assert f.tag_comment == "Originally aired April 14, 1939"
     assert "www.example" in f.tags_json   # every tag is kept for the details view
+    assert "Orson Welles stars" in f.tags_json   # not "O; r; s; o; n..."
 
 
 def test_rescan_picks_up_new_changed_and_removed_files(tmp_path, engine):
