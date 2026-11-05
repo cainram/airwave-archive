@@ -28,6 +28,15 @@
     if (set) set.checked = true;
   });
 
+  // Uploads: show how far along a (possibly big) upload is.
+  document.addEventListener("htmx:xhr:progress", function (event) {
+    const form = event.target.closest && event.target.closest("[data-upload-progress]");
+    const bar = form && form.querySelector("progress");
+    if (!bar || !event.detail.total) return;
+    bar.hidden = false;
+    bar.value = Math.round(event.detail.loaded / event.detail.total * 100);
+  });
+
   document.addEventListener("DOMContentLoaded", countTicked);
   document.addEventListener("htmx:afterSettle", countTicked);
 })();

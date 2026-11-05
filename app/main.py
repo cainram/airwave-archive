@@ -1,5 +1,5 @@
-"""Airwave Archive web app — Phase 6c: the library, episode details, series, artwork, bulk editing, search,
-and importing episode logs.
+"""Airwave Archive web app — Phase 7a: the library, episode details, series, artwork, bulk editing, search,
+importing episode logs, and the upload inbox.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -22,15 +22,15 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db import (
-    DB_FILENAME, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, ScanRun, make_engine, utcnow,
+    DB_FILENAME, InboxItem, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, ScanRun, make_engine, utcnow,
 )
 from app.episodes import (
-    LONG_FIELDS, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
+    LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
     format_air_date, read_date_text, read_form,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import csvimport
+from app import csvimport, inbox
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -45,6 +45,8 @@ APP_DIR = Path(__file__).parent
 LIBRARY_DIR = Path(os.environ.get("AIRWAVE_LIBRARY", "/library"))
 # Where the app keeps its database. Inside Docker this is /data.
 DATA_DIR = Path(os.environ.get("AIRWAVE_DATA", "data"))
+# Where uploads wait before being added to the library. Inside Docker: /inbox.
+INBOX_DIR = Path(os.environ.get("AIRWAVE_INBOX", "inbox"))
 
 PAGE_SIZE = 200  # files shown per page
 REVIEW_LIMIT = 100  # file-name guesses shown at a time
@@ -390,6 +392,113 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
     })
+
+
+# ------------------------------------------------------------------ inbox
+
+INBOX_FIELDS = {"series": "Series", "episode_number": "Ep.", "date": "Aired", "title": "Title"}
+
+
+def render_inbox(request: Request, typed=None, errors=None, **notices):
+    with Session(get_engine()) as session:
+        items = inbox.sync_inbox(session, INBOX_DIR)
+        session.expunge_all()
+    rows = []
+    for item in items:
+        values = {"series": item.series or "", "episode_number": item.episode_number or "",
+                  "title": item.title or "",
+                  "date": date_text(item.air_year, item.air_month, item.air_day)}
+        values.update((typed or {}).get(item.id, {}))
+        rows.append({"item": item, "vals": values})
+    return render(request, "inbox.html", {
+        "rows": rows, "fields": INBOX_FIELDS, "errors": errors or {},
+        "inbox_dir": INBOX_DIR, **notices,
+    }, status_code=400 if errors else 200)
+
+
+@app.get("/inbox", response_class=HTMLResponse)
+def inbox_page(request: Request, uploaded: int | None = None, skipped: int | None = None,
+               saved: int | None = None, rejected: int | None = None):
+    return render_inbox(request, uploaded=uploaded, skipped=skipped, saved=saved,
+                        rejected=rejected)
+
+
+@app.post("/inbox/upload")
+async def inbox_upload(request: Request):
+    """Save uploaded audio files into the inbox (never into the library)."""
+    form = await request.form()
+    uploaded = skipped = 0
+    for upload in form.getlist("files"):
+        name = inbox.safe_name(getattr(upload, "filename", "") or "")
+        if name is None:
+            skipped += 1
+            continue
+        inbox.save_upload(upload.file, INBOX_DIR, name)
+        uploaded += 1
+    return go_to(request, with_query("/inbox", uploaded=str(uploaded),
+                                     skipped=str(skipped) if skipped else ""))
+
+
+@app.post("/inbox", response_class=HTMLResponse)
+async def inbox_save(request: Request):
+    """Save the details typed for the waiting files."""
+    form = await request.form()
+    typed, errors, values = {}, {}, {}
+    with Session(get_engine()) as session:
+        items = session.scalars(select(InboxItem)).all()
+        for item in items:
+            if f"title-{item.id}" not in form:
+                continue
+            row = {key: str(form.get(f"{key}-{item.id}", "")) for key in INBOX_FIELDS}
+            typed[item.id] = row
+            date, error = read_date_text(row["date"])
+            if error:
+                errors[item.id] = error
+            values[item.id] = (row, date)
+        if errors:
+            return render_inbox(request, typed, errors)
+        saved = 0
+        for item in items:
+            if item.id not in values:
+                continue
+            row, date = values[item.id]
+            new = {"series": _clean(row["series"]), "episode_number": _clean(row["episode_number"]),
+                   "title": _clean(row["title"])}
+            new.update(zip(("air_year", "air_month", "air_day"), date or (None, None, None)))
+            if any(getattr(item, key) != value for key, value in new.items()):
+                for key, value in new.items():
+                    setattr(item, key, value)
+                saved += 1
+        session.commit()
+    return go_to(request, f"/inbox?saved={saved}")
+
+
+def inbox_item_or_404(session: Session, item_id: int) -> InboxItem:
+    item = session.get(InboxItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="That file isn't in the inbox any more")
+    return item
+
+
+@app.post("/inbox/{item_id}/reject")
+def inbox_reject(request: Request, item_id: int):
+    """Delete a file from the inbox. The library is never touched."""
+    with Session(get_engine()) as session:
+        inbox.reject(session, INBOX_DIR, inbox_item_or_404(session, item_id))
+        session.commit()
+    return go_to(request, "/inbox?rejected=1")
+
+
+@app.get("/inbox/{item_id}/audio")
+def inbox_audio(item_id: int):
+    """Listen to a waiting file before adding it."""
+    with Session(get_engine()) as session:
+        item = inbox_item_or_404(session, item_id)
+        path = inbox.item_path(INBOX_DIR, item)
+    if path is None:
+        raise HTTPException(status_code=404, detail="That file isn't in the inbox any more")
+    media_type = AUDIO_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media_type)
 
 
 # ----------------------------------------------------------- CSV import

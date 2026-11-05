@@ -207,6 +207,11 @@ Then click **Library** in the menu at the top and press **Rescan**. The first sc
 file; later scans only look at files that are new or have changed, so they
 are much faster.
 
+For a few files at a time, you can also upload them in the app: click
+**Inbox** in the menu. Uploads wait in `/srv/airwave/inbox/` (separate from
+the library) until you add or reject them. Files copied into that folder
+by hand show up there too.
+
 ## Back up the data folder
 
 The app keeps its database in `/srv/airwave/data`. It's small, and it will

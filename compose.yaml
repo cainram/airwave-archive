@@ -11,6 +11,7 @@ services:
     environment:
       AIRWAVE_LIBRARY: /library
       AIRWAVE_DATA: /data
+      AIRWAVE_INBOX: /inbox
     volumes:
       # Your recordings folder, mounted READ-ONLY (":ro") so the app
       # cannot change your files. Change the left side if your
@@ -19,3 +20,6 @@ services:
       # The app's own data (its database). This one is writable, and is
       # the folder to back up: it will hold all your edits.
       - /srv/airwave/data:/data
+      # The inbox: uploads wait here until you add them to the library
+      # or reject them. Writable.
+      - /srv/airwave/inbox:/inbox

@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
 # Run as an ordinary user, not the all-powerful "root" user.
-RUN useradd --create-home --uid 1000 airwave && mkdir /data && chown airwave /data
+RUN useradd --create-home --uid 1000 airwave && mkdir /data /inbox && chown airwave /data /inbox
 USER airwave
 
 EXPOSE 8000
