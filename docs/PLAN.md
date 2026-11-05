@@ -477,10 +477,24 @@ Split into three smaller steps, done in order.
   shown as tiles above. The index (`episode_search`, database version 8)
   is updated automatically whenever episodes or files are saved.
 
-#### 6c — CSV import
+#### 6c — CSV import ✅ *done*
 - Import an episode log (a CSV spreadsheet) with a preview before
   anything is saved.
 - **Try it:** import an episode log for a series.
+- Notes: "Import spreadsheet…" on the Library page. Commas, semicolons
+  or tabs; Excel's text encodings. Columns are recognised by common names
+  (Series/Show, Date/Air Date, Ep/#, Title, Starring/Cast/Guests,
+  Description/Notes, Network/Station, Host, Time, Zone, File) and can be
+  changed on the preview. Rows match an episode by file name, else series
+  + full air date, else series + episode number; a row fitting several
+  episodes isn't matched. An optional "Series" box fills in rows without
+  one. Dates: 1939-04-14, 4/14/1939 and 4/14/39 (American order, two-digit
+  years as 19xx), April 14, 1939, 14 April 1939, April 1939, 1939. Empty
+  cells change nothing; rows replacing the owner's own values start
+  unticked; rows with unreadable values can't be saved. Imported values
+  count as manual. The uploaded file waits in `data/imports/` and is
+  deleted after saving (or after a day). Built for common formats without
+  a real log to test with: adjust when the owner tries one.
 
 ### Phase 7 — Upload inbox
 - Upload files through the web page into the inbox.

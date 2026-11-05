@@ -123,6 +123,8 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/artwork.py`: finds pictures in files and folders, and keeps small
   copies in the data folder (`artwork/`)
 - `app/bulk.py`: editing many episodes at once, and renaming a series
+- `app/csvimport.py`: importing episode logs from CSV spreadsheets
+  (reading, matching rows to episodes, preview, saving)
 - `app/search.py`: the search index (SQLite FTS5) and searching. The
   index updates itself after every save (an `after_flush` hook); changes
   made with raw SQL or bulk `delete()` must update it themselves.

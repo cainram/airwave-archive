@@ -1,4 +1,5 @@
-"""Airwave Archive web app — Phase 6b: the library, episode details, series, artwork, bulk editing, and search.
+"""Airwave Archive web app — Phase 6c: the library, episode details, series, artwork, bulk editing, search,
+and importing episode logs.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -29,6 +30,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
+from app import csvimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -388,6 +390,93 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
     })
+
+
+# ----------------------------------------------------------- CSV import
+
+
+def import_dir() -> Path:
+    """Where uploaded spreadsheets wait for the preview (tidied after a day)."""
+    return Path(get_engine().url.database).parent / "imports"
+
+
+@app.get("/import", response_class=HTMLResponse)
+def import_page(request: Request, saved: int | None = None, error: str | None = None):
+    return render(request, "import.html", {"saved": saved, "error": error},
+                  status_code=400 if error else 200)
+
+
+@app.post("/import", response_class=HTMLResponse)
+async def import_upload(request: Request):
+    form = await request.form()
+    upload = form.get("spreadsheet")
+    data = await upload.read(csvimport.MAX_BYTES + 1) if hasattr(upload, "read") else b""
+    if not data:
+        return import_page(request, error="Please choose a CSV file first.")
+    if len(data) > csvimport.MAX_BYTES:
+        return import_page(request, error="That file is too big (the limit is 10 MB).")
+    headers, rows = csvimport.read_table(data)
+    if not headers or not rows:
+        return import_page(request, error="That file doesn't look like a spreadsheet with a "
+                                          "row of column names and at least one row under it.")
+    token = csvimport.save_upload(data, import_dir())
+    series = " ".join(str(form.get("series", "")).split())
+    return go_to(request, with_query(f"/import/{token}", series=quote(series)))
+
+
+def load_import(token: str) -> bytes:
+    path = csvimport.upload_path(import_dir(), token)
+    if path is None:
+        raise HTTPException(status_code=404, detail="That import has expired. Please upload the file again.")
+    return path.read_bytes()
+
+
+@app.get("/import/{token}", response_class=HTMLResponse)
+def import_preview(request: Request, token: str, series: str = "",
+                   col: list[str] = Query(default=[])):
+    """Show what the spreadsheet would change. Nothing is saved yet."""
+    data = load_import(token)
+    columns = [c if c in csvimport.FIELDS else "" for c in col] or None
+    with Session(get_engine()) as session:
+        headers, columns, rows = csvimport.prepare(session, data, columns, series or None)
+        titles = {}   # how to name each matched episode: its title, else its file name
+        for r in rows:
+            if r.episode_id:
+                ep = session.get(Episode, r.episode_id)
+                titles[r.episode_id] = ep.title or (ep.parts[0].name if ep.files else "")
+    _h, table = csvimport.read_table(data)
+    examples = [next((r[i].strip() for r in table if i < len(r) and r[i].strip()), "")
+                for i in range(len(headers))]
+    return render(request, "import_preview.html", {
+        "token": token, "series": series, "headers": headers, "columns": columns,
+        "examples": examples, "fields": csvimport.FIELDS, "titles": titles,
+        "to_change": [r for r in rows if r.episode_id and (r.changes or r.errors)],
+        "same": [r for r in rows if r.episode_id and not r.changes and not r.errors],
+        "unmatched": [r for r in rows if not r.episode_id],
+        "row_count": len(rows), "max_rows": csvimport.MAX_ROWS,
+    })
+
+
+@app.post("/import/{token}", response_class=HTMLResponse)
+async def import_save(request: Request, token: str):
+    form = await request.form()
+    data = load_import(token)
+    columns = [c if c in csvimport.FIELDS else "" for c in form.getlist("col")]
+    ticked = {int(n) for n in form.getlist("row") if str(n).isdigit()}
+    series = str(form.get("series", "")) or None
+    saved = 0
+    with Session(get_engine()) as session:
+        _headers, _columns, rows = csvimport.prepare(session, data, columns, series)
+        for row in rows:
+            if row.number in ticked and row.episode_id and not row.errors:
+                episode = session.get(Episode, row.episode_id)
+                old_series = episode.series
+                if csvimport.apply_row(episode, row.values):
+                    saved += 1
+                follow_rename(session, old_series, episode.series)
+        session.commit()
+    csvimport.upload_path(import_dir(), token).unlink(missing_ok=True)
+    return go_to(request, f"/import?saved={saved}")
 
 
 # ------------------------------------------------------------------ search

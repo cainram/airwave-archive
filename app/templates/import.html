@@ -1,0 +1,31 @@
+{% extends layout %}
+{% block title %}Import a spreadsheet · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/library">← Library</a></nav>
+<h1>Import a spreadsheet</h1>
+
+{% if saved is not none %}
+<div class="notice success" role="status">Saved {{ saved }} episode{{ "" if saved == 1 else "s" }}.</div>
+{% endif %}
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+
+<p class="muted">Bring in details from an episode log: a spreadsheet saved as a <strong>CSV</strong>
+  file (in Excel or Numbers: File → Export / Save As → CSV). The first row should name the
+  columns, for example <em>Series, Date, Title, Cast, Notes</em>.</p>
+<p class="muted small">Each row is matched to an episode in your library by its file name (if
+  there's a File column), or else by its series and air date, or series and episode number.
+  You'll see a preview first; nothing is saved until you say so.</p>
+
+<form class="upload-form" method="post" action="/import" enctype="multipart/form-data">
+  <label for="spreadsheet">Spreadsheet (CSV file)</label>
+  <input id="spreadsheet" name="spreadsheet" type="file" accept=".csv,.txt,.tsv,text/csv" required>
+  <label for="series">Series <span class="hint">(optional)</span></label>
+  <input id="series" name="series" type="text" placeholder="e.g. The Campbell Playhouse">
+  <p class="muted small">If the spreadsheet has no Series column (a log for one show often
+    doesn't), type the series here and it's used for every row.</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Show preview</button>
+    <a class="button" href="/library">Cancel</a>
+  </div>
+</form>
+{% endblock %}
