@@ -548,6 +548,14 @@ overwrites, renames or deletes library files.
 
 ### Phase 9 — The calendar
 - Month view, then week view, then day view.
+- 9a (month view) ✅ *done*: "Calendar" in the menu; a month grid (weeks
+  start on Sunday) with the number of episodes each day (titles on wide
+  screens), then the month's episodes day by day in time order (unknown
+  times last), then "Sometime in <month>" for those with no day. Episodes
+  with only a year are counted, never placed. ← / → for the next month;
+  "Earlier/Later recordings" jump over empty months; a month + year box
+  jumps anywhere. Opens on the most recent month with recordings. Code in
+  `app/airdates.py`.
 - Correct handling of partial dates, "time unknown", time zones, and
   overnight shows.
 - **Try it:** open the week of a famous broadcast and see everything you own

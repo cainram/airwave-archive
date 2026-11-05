@@ -131,6 +131,8 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/listening.py`: continue listening (where playback stopped in each
   episode, the front page's "Continue listening" row) and played / not
   played
+- `app/airdates.py`: the calendar (episodes by air date: a month's grid
+  and days, nearest months with recordings)
 - `app/search.py`: the search index (SQLite FTS5) and searching. The
   index updates itself after every save (an `after_flush` hook); changes
   made with raw SQL or bulk `delete()` must update it themselves.

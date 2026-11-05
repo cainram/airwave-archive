@@ -1,0 +1,102 @@
+{% extends layout %}
+{% block title %}{{ view.name }} · Calendar · Airwave Archive{% endblock %}
+{% block content %}
+{% macro month_link(ym) %}/calendar?year={{ ym[0] }}&month={{ ym[1] }}{% endmacro %}
+<section class="summary">
+  <div>
+    <h1>{{ view.name }}</h1>
+    <p class="muted">
+      {% if view.count %}{{ view.count }} episode{{ "" if view.count == 1 else "s" }} aired this month{% else %}Nothing in your collection aired this month{% endif %}
+    </p>
+  </div>
+</section>
+
+<nav class="calendar-nav" aria-label="Other months">
+  <a class="button" href="{{ month_link(before) }}" aria-label="Previous month">←</a>
+  <a class="button" href="{{ month_link(after) }}" aria-label="Next month">→</a>
+  {% if earlier %}<a class="button" href="{{ month_link(earlier) }}">⇤ Earlier recordings</a>{% endif %}
+  {% if later %}<a class="button" href="{{ month_link(later) }}">Later recordings ⇥</a>{% endif %}
+</nav>
+
+<form class="calendar-jump" method="get" action="/calendar">
+  <label for="jump-month" class="visually-hidden">Month</label>
+  <select id="jump-month" name="month">
+    {% for name in month_names %}<option value="{{ loop.index }}"{% if loop.index == view.month %} selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select>
+  <label for="jump-year" class="visually-hidden">Year</label>
+  <input id="jump-year" name="year" type="number" inputmode="numeric" min="1" max="9999"
+         value="{{ view.year }}" list="calendar-years">
+  <datalist id="calendar-years">{% for y in years %}<option value="{{ y }}">{% endfor %}</datalist>
+  <button class="button" type="submit">Go</button>
+</form>
+
+<table class="month-grid">
+  <thead>
+    <tr>{% for name in day_names %}<th scope="col"><abbr title="{{ name }}">{{ name[:3] }}</abbr></th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+    {% for week in view.weeks %}
+    <tr>
+      {% for day in week %}
+      {% set files = view.days.get(day, []) if day else [] %}
+      <td class="{% if not day %}outside{% elif files %}has-episodes{% endif %}">
+        {% if day %}
+        {% if files %}
+        <a class="day-link" href="#day-{{ day }}" aria-label="{{ day_heading(view.year, view.month, day) }}: {{ files | length }} episode{{ '' if files | length == 1 else 's' }}">
+          <span class="day-number">{{ day }}</span>
+          <span class="day-count">{{ files | length }}</span>
+        </a>
+        <ul class="day-titles">
+          {% for f in files[:3] %}<li><a href="/files/{{ f.id }}">{{ f | display_title }}</a></li>{% endfor %}
+          {% if files | length > 3 %}<li><a class="muted" href="#day-{{ day }}">+{{ files | length - 3 }} more</a></li>{% endif %}
+        </ul>
+        {% else %}
+        <span class="day-number">{{ day }}</span>
+        {% endif %}
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% macro episode_row(f) %}
+{% set ep = f.episode %}
+{% set first = ep.parts | rejectattr("missing") | first %}
+<li class="result">
+  <div class="result-play">{% if first %}{% with f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}</div>
+  <div class="result-text">
+    <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+    <div class="muted small">
+      {% if ep.air_day %}{{ ep | air_time }}{% if ep.series %} · {% endif %}{% endif %}{% if ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% endif %}
+      {% if ep.parts | length > 1 %}<span class="badge parts">{{ ep.parts | length }} parts</span>{% endif %}
+      {% if not first %}<span class="badge">missing</span>{% endif %}
+      {% include "_listened.html" %}
+    </div>
+  </div>
+</li>
+{% endmacro %}
+
+{% for day, files in view.days | dictsort %}
+<section class="calendar-day" id="day-{{ day }}">
+  <h2>{{ day_heading(view.year, view.month, day) }}</h2>
+  <ul class="results">{% for f in files %}{{ episode_row(f) }}{% endfor %}</ul>
+</section>
+{% endfor %}
+
+{% if view.sometime %}
+<section class="calendar-day">
+  <h2>Sometime in {{ view.name }}</h2>
+  <p class="muted small">The day these aired isn't known.</p>
+  <ul class="results">{% for f in view.sometime %}{{ episode_row(f) }}{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if view.year_only %}
+{% set one = view.year_only == 1 %}
+<p class="muted small">
+  {{ view.year_only }} episode{{ "" if one else "s" }} from {{ view.year }} {{ "has" if one else "have" }} only the year known, so {{ "it isn't" if one else "they aren't" }} on the calendar.
+</p>
+{% endif %}
+{% endblock %}

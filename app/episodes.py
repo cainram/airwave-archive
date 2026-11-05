@@ -365,6 +365,19 @@ def format_air_date(ep: Episode | None, short: bool = False,
     return text
 
 
+def format_air_time(ep: Episode) -> str:
+    """'8:00 PM US Eastern', '8:00 PM' (zone unknown) or 'time unknown'."""
+    if not ep.air_time:
+        return "time unknown"
+    zone = TIME_ZONES.get(ep.air_timezone or "")
+    return f"{format_time(ep.air_time)} {zone}" if zone else format_time(ep.air_time)
+
+
+def day_heading(year: int, month: int, day: int) -> str:
+    """'Friday, April 14th, 1939'."""
+    return f"{_day_words(date(year, month, day))}, {year}"
+
+
 def ordinal(n: int) -> str:
     """1 -> '1st', 2 -> '2nd', 3 -> '3rd', 11 -> '11th', 22 -> '22nd'."""
     if 11 <= n % 100 <= 13:
@@ -375,10 +388,3 @@ def ordinal(n: int) -> str:
 def _day_words(day: date) -> str:
     """'Friday, April 14th' (no year)."""
     return f"{calendar.day_name[day.weekday()]}, {calendar.month_name[day.month]} {ordinal(day.day)}"
-    end += timedelta(seconds=30)   # to the nearest minute
-    text += f", until about {format_time(end.strftime('%H:%M'))}"
-    if end.date() != date(year, month, day):
-        text += f" on {calendar.day_name[end.weekday()]}, {end.day} {calendar.month_name[end.month]}"
-        if end.year != year:
-            text += f" {end.year}"
-    return text
