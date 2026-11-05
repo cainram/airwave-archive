@@ -13,7 +13,9 @@ from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.artwork import folder_art
-from app.db import FIRST_PARTS, WITH_PARTS, AudioFile, Episode, FolderArt, natural_key
+from app.db import (
+    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, FolderArt, SeriesArt, natural_key, utcnow,
+)
 
 # Words ignored at the start of a name when sorting, so "The Shadow" is
 # listed under S.
@@ -62,10 +64,17 @@ def folder_pictures(session: Session) -> dict[str, str]:
     return {folder: art for folder, art in rows}
 
 
+def uploaded_pictures(session: Session) -> dict[str, str]:
+    """Series name -> fingerprint of the picture uploaded for it."""
+    return {name: art for name, art in session.execute(
+        select(SeriesArt.series, SeriesArt.art_hash))}
+
+
 def _add_art(session: Session, found: list[dict], where=None) -> None:
-    """Give each series a picture: the folder picture of the folder most of
-    its files are in (or one above it), else a picture from inside its
-    files."""
+    """Give each series a picture ("art") and say where it's from
+    ("art_from": "upload", "folder" or "files"): an uploaded picture, else
+    the folder picture of the folder most of its files are in (or one
+    above it), else a picture from inside its files."""
     query = (select(Episode.series, AudioFile.folder, func.count(),
                     func.max(AudioFile.art_hash))
              .join(AudioFile, AudioFile.episode_id == Episode.id)
@@ -76,11 +85,17 @@ def _add_art(session: Session, found: list[dict], where=None) -> None:
     for name, folder, count, inside in session.execute(query):
         folders.setdefault(name, []).append((count, folder, inside))
     pictures = folder_pictures(session)
+    uploads = uploaded_pictures(session)
     for series in found:
         places = sorted(folders.get(series["name"], []), key=lambda p: (-p[0], p[1]))
-        series["art"] = (
-            next((art for _c, folder, _i in places if (art := folder_art(pictures, folder))), None)
-            or next((inside for _c, _f, inside in places if inside), None))
+        choices = [
+            ("upload", uploads.get(series["name"])),
+            ("folder", next((art for _c, folder, _i in places
+                             if (art := folder_art(pictures, folder))), None)),
+            ("files", next((inside for _c, _f, inside in places if inside), None)),
+        ]
+        series["art_from"], series["art"] = next(
+            ((where, art) for where, art in choices if art), (None, None))
 
 
 def all_series(session: Session) -> list[dict]:
@@ -99,12 +114,44 @@ def one_series(session: Session, name: str | None) -> dict | None:
     return found[0] if found else None
 
 
-def episode_art(f: AudioFile, pictures: dict[str, str]) -> str | None:
+def episode_art(session: Session, f: AudioFile) -> str | None:
     """An episode's picture: from inside its files (first part first), else
-    its folder's."""
+    the one uploaded for its series, else its folder's."""
     parts = f.episode.parts if f.episode else [f]
+    series = f.episode.series if f.episode else None
+    uploaded = session.get(SeriesArt, series) if series else None
     return (next((p.art_hash for p in parts if p.art_hash), None)
-            or folder_art(pictures, f.folder))
+            or (uploaded.art_hash if uploaded else None)
+            or folder_art(folder_pictures(session), f.folder))
+
+
+def set_uploaded_picture(session: Session, name: str, art_hash: str | None) -> None:
+    """Use an uploaded picture for a series, or (None) stop using one."""
+    row = session.get(SeriesArt, name)
+    if art_hash is None:
+        if row is not None:
+            session.delete(row)
+        return
+    if row is None:
+        row = SeriesArt(series=name)
+        session.add(row)
+    row.art_hash, row.uploaded_at = art_hash, utcnow()
+
+
+def follow_rename(session: Session, old: str | None, new: str | None) -> None:
+    """After an episode's series name changed: if no episode is left with
+    the old name, its uploaded picture moves to the new name (unless that
+    already has one of its own)."""
+    if not old or not new or old == new:
+        return
+    session.flush()
+    picture = session.get(SeriesArt, old)
+    if picture is None or session.get(SeriesArt, new) is not None:
+        return
+    if session.scalar(select(func.count(Episode.id)).where(Episode.series == old)):
+        return   # other episodes still use the old name
+    set_uploaded_picture(session, new, picture.art_hash)
+    session.delete(picture)
 
 
 def series_files(session: Session, name: str | None, page: int, page_size: int):

@@ -10,10 +10,16 @@ The app keeps its own smaller copy of each picture in the data folder
 after a fingerprint of the picture (a "hash"), so a picture shared by many
 files, like a show's logo, is stored only once.
 
+Pictures can also be uploaded for a series. Those are kept in the data
+folder (``uploaded-artwork/``), never in the library, and can't be made
+again by a scan, so they belong in backups.
+
 Which picture is shown:
 
-- for an episode: the one inside its (first) file, else its folder's;
-- for a series: its folder's, else one from inside its files.
+- for a series: an uploaded one, else its folder's, else one from inside
+  its files;
+- for an episode: the one inside its (first) file, else its series'
+  uploaded one, else its folder's.
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ import logging
 import re
 from pathlib import Path, PurePosixPath
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +106,9 @@ def save_picture(data: bytes | None, art_dir: Path) -> str | None:
     try:
         with Image.open(io.BytesIO(data)) as image:
             image.draft("RGB", (ART_SIZE, ART_SIZE))   # quicker for big JPEGs
-            image = image.convert("RGBA")
+            # Phone photos are often stored sideways, with a note saying
+            # which way is up: turn them the right way round.
+            image = ImageOps.exif_transpose(image).convert("RGBA")
             image.thumbnail((ART_SIZE, ART_SIZE))
             # JPEG has no see-through parts: put the picture on white.
             flat = Image.new("RGB", image.size, "white")

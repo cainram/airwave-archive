@@ -420,10 +420,18 @@ Split into four smaller steps, done in order.
 - Owner's choice: the Series tiles are the front page (`/`); the file
   list moved to `/library`. The menu reads Series · Library.
 
-#### 5c — Uploading artwork
+#### 5c — Uploading artwork ✅ *done*
 - Upload your own picture for a series (kept in the data folder, never
   in the library).
 - **Try it:** give a series without a picture one of your own.
+- Notes: "Change picture…" on a series page. JPEG, PNG or WebP, up to
+  30 MB; the app keeps a 600-pixel copy in `data/uploaded-artwork/`
+  (needs backing up, unlike `data/artwork/`). Phone photos are turned the
+  right way up. An uploaded picture wins over the library's, for the
+  series and for its episodes without a picture of their own. Renaming
+  every episode of a series carries its picture to the new name. Database
+  version 7 adds the `series_art` table. Pictures for single episodes
+  aren't offered (could be added later).
 
 #### 5d — Phone-friendly layout
 - Check every page on a phone, and fix what doesn't fit.

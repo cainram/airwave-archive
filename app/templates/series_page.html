@@ -18,6 +18,11 @@
       <strong>Edit details</strong> to give it one.</p>
     {% endif %}
   </div>
+  {% if name is not none %}
+  <div class="actions">
+    <a class="button" href="/series/picture?name={{ name | urlencode }}">Change picture…</a>
+  </div>
+  {% endif %}
 </section>
 
 {# The "Ep." column only when some episode on this page has a number. #}
