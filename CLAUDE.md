@@ -109,7 +109,10 @@ These come from the plan and should not be changed without the owner's OK:
 
 - `app/main.py`: the web app (pages and routes)
 - `app/db.py`: the database tables (SQLite file `airwave.db` in the data
-  folder, `AIRWAVE_DATA`)
+  folder, `AIRWAVE_DATA`). Changing the layout means bumping
+  `SCHEMA_VERSION` and adding a step to `_migrate` (a backup copy is made
+  automatically). Never just delete the owner's database: it holds edits.
+- `app/episodes.py`: episode fields, edit-form checks, air-date display
 - `app/scanner.py`: finds audio files, reads length and tags, and keeps the
   database in step with the library
 - `app/templates/`: HTML page templates. Pages use `{% extends layout %}`:
@@ -124,6 +127,11 @@ These come from the plan and should not be changed without the owner's OK:
 - `Dockerfile`, `compose.yaml`: how the app is packaged and started
 - `docs/INSTALL.md`: owner-facing install guide. Keep it accurate when
   setup steps change.
+
+**Browser checks against the owner's running app** must not save anything
+into their real database (it holds their edits, and test values could be
+invented dates). Use a throwaway copy of the app with its own data folder
+instead, or only look and click without saving.
 
 **Testing Docker builds in a cloud session:** the sandbox's network proxy
 breaks `pip install` inside `docker build`. Don't change the real Dockerfile

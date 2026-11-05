@@ -8,6 +8,7 @@
       · {{ total_bytes | size }}
       · {{ total_seconds | duration }} of audio
       {% if unreadable %}· {{ unreadable }} with unknown length{% endif %}
+      {% if missing %}· <span class="badge">{{ missing }} missing</span>{% endif %}
     </p>
     <p class="muted small">
       Folder: <code>{{ library_dir }}</code>
@@ -46,24 +47,24 @@
         <tr>
           <th class="play"><span class="visually-hidden">Play</span></th>
           <th>Title / file</th>
-          <th class="artist">Artist · album</th>
-          <th class="date">Date</th>
+          <th class="artist">Series</th>
+          <th class="date">Aired</th>
           <th class="num">Length</th>
           <th class="num size">Size</th>
         </tr>
       </thead>
       <tbody>
         {% for f in files %}
-        <tr>
-          <td class="play">{% include "_play_button.html" %}</td>
+        {% set ep = f.episode %}
+        <tr{% if f.missing %} class="is-missing"{% endif %}>
+          <td class="play">{% if not f.missing %}{% include "_play_button.html" %}{% endif %}</td>
           <td class="name">
-            <a class="title" href="/files/{{ f.id }}">{{ f.tag_title or f.name }}</a>
-            {% if f.tag_title %}<div class="muted small">{{ f.name }}</div>{% endif %}
+            <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+            {% if f.missing %}<span class="badge">missing</span>{% endif %}
+            {% if (f | display_title) != f.name %}<div class="muted small">{{ f.name }}</div>{% endif %}
           </td>
-          <td class="artist">
-            {{ f.tag_artist or "" }}{% if f.tag_artist and f.tag_album %} · {% endif %}{{ f.tag_album or "" }}
-          </td>
-          <td class="date">{{ f.tag_date or "" }}</td>
+          <td class="artist">{{ (ep.series if ep else None) or f.tag_artist or "" }}</td>
+          <td class="date">{{ (ep | air_date(short=true)) or f.tag_date or "" }}</td>
           <td class="num">{{ f.duration_seconds | duration }}</td>
           <td class="num size">{{ f.size_bytes | size }}</td>
         </tr>

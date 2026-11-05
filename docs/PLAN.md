@@ -297,14 +297,49 @@ earlier ones. Phases may be split into smaller steps as we go.
   show a message in the player bar.
 
 ### Phase 4 — Radio metadata
-- Database fields for series, episode number, station/network, host, cast,
-  notes, and **partial air date + time + time zone**.
-- Filename parser with a preview/confirm screen.
-- Overnight broadcasts (start time + length) and grouping multi-file
-  broadcasts ("Hour 1", "Hour 2") into one episode.
-- Edit form on the episode page.
-- **Try it:** scan files named like `Suspense 1943-05-13 - …`, confirm the
-  guesses, edit a cast list.
+Split into five smaller steps, done in order.
+
+#### 4a — Episode details and an edit form ✅ *done*
+- Database fields for series, episode number, title, station/network,
+  host, cast, notes, and **partial air date + time + time zone**.
+- Episodes are stored separately from files (one episode can later have
+  several files, for 4e). Every file gets an episode automatically.
+- Edit form for the episode details. Manual edits are recorded as manual,
+  and a re-scan never overwrites them.
+- Files that disappear but carry edits are marked **missing** instead of
+  being forgotten; if they come back (or turn up in another folder with
+  the same name and size), they're reconnected. Missing files can be
+  forgotten by hand.
+- **Try it:** add the cast and air date to *The Patriot*, re-scan, see the
+  edits are still there.
+- Notes: the database layout is now version 2. When the app updates an
+  older database it first saves a copy (`airwave.db.before-v2`). Time
+  zones offered: US Eastern/Central/Mountain/Pacific, UK, UTC.
+
+#### 4b — Fill in from tags
+- Pre-fill episode details from the file's own tags (e.g. artist → series),
+  marked as automatic. Manual edits always win.
+- **Try it:** Campbell Playhouse files show series and title with no typing.
+
+#### 4c — Filename parser with a confirm screen
+- Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's
+  Brain.mp3`, `CampbellPlayhouse39-04-14ThePatriot.mp3`, partial dates like
+  `1943-xx-xx`).
+- Review screen showing each guess; accept, fix, or skip. Nothing is saved
+  until confirmed.
+- **Try it:** confirm air dates for all five Campbell Playhouse episodes at
+  once.
+
+#### 4d — Overnight broadcasts
+- Start time + length, so a broadcast that crosses midnight is one
+  broadcast, shown with its end on the next day.
+- **Try it:** set a start time on a long file and see the end time on the
+  next day.
+
+#### 4e — Multi-part broadcasts
+- Group files ("Hour 1", "Hour 2", …) into one episode that plays straight
+  through, while still remembering each file.
+- **Try it:** group three files and play them as one.
 
 ### Phase 5 — Browse like Plex
 - Series grid with artwork (from embedded art, a folder image, or upload).
