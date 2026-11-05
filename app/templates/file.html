@@ -39,7 +39,7 @@
   {{ fact("Series", ep.series if ep else None, sources.get("series")) }}
   {{ fact("Episode number", ep.episode_number if ep else None, sources.get("episode_number")) }}
   {{ fact("Title", ep.title if ep else None, sources.get("title")) }}
-  {{ fact("Aired", ep | air_date, sources.get("air_date")) }}
+  {{ fact("Aired", ep | air_date(length=f.duration_seconds), sources.get("air_date")) }}
   {{ fact("Station / network", ep.network if ep else None, sources.get("network")) }}
   {{ fact("Host", ep.host if ep else None, sources.get("host")) }}
   {{ fact("Cast", ep.cast if ep else None, sources.get("cast")) }}
