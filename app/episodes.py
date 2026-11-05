@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import calendar
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.db import MANUAL, TAGS, AudioFile, Episode, utcnow
 
@@ -263,13 +264,34 @@ def format_time(hhmm: str) -> str:
     return f"{hours % 12 or 12}:{minutes:02d} {suffix}"
 
 
-def format_air_date(ep: Episode | None, short: bool = False) -> str:
+def air_end(ep: Episode | None, seconds: float | None) -> datetime | None:
+    """When a broadcast ended: its start plus ``seconds``, as a clock time
+    in the same time zone (so a night when the clocks change is right).
+    None unless the full date, the time, and the length are all known."""
+    if ep is None or not (ep.air_day and ep.air_time and seconds):
+        return None
+    hours, minutes = (int(part) for part in ep.air_time.split(":"))
+    start = datetime(ep.air_year, ep.air_month, ep.air_day, hours, minutes)
+    if ep.air_timezone not in TIME_ZONES:
+        return start + timedelta(seconds=seconds)   # no zone: plain clock time
+    zone = ZoneInfo(ep.air_timezone)
+    # Adding to a zoned time adds wall-clock time; go through UTC for real time.
+    end = (start.replace(tzinfo=zone).astimezone(ZoneInfo("UTC"))
+           + timedelta(seconds=seconds)).astimezone(zone)
+    return end.replace(tzinfo=None)
+
+
+def format_air_date(ep: Episode | None, short: bool = False,
+                    length: float | None = None) -> str:
     """Show an air date with only the parts that are known.
 
     Long:  'Friday, 14 April 1939, 8:00 PM US Eastern'
            '14 April 1939, time unknown' · 'April 1939, day unknown'
            '1939, date unknown'
     Short: '14 Apr 1939' · 'Apr 1939' · '1939'
+    With ``length`` (seconds on air) and a known time, the end is added:
+           '..., 8:00 PM US Eastern, until about 8:30 PM'
+           '..., 10:00 PM US Pacific, until about 3:00 AM on Friday, 3 May'
     Returns '' if nothing is known.
     """
     if ep is None or ep.air_year is None:
@@ -289,4 +311,14 @@ def format_air_date(ep: Episode | None, short: bool = False) -> str:
     if not ep.air_time:
         return f"{text}, time unknown"
     zone = TIME_ZONES.get(ep.air_timezone or "", "time zone unknown")
-    return f"{text}, {format_time(ep.air_time)} {zone}"
+    text = f"{text}, {format_time(ep.air_time)} {zone}"
+    end = air_end(ep, length)
+    if end is None:
+        return text
+    end += timedelta(seconds=30)   # to the nearest minute
+    text += f", until about {format_time(end.strftime('%H:%M'))}"
+    if end.date() != date(year, month, day):
+        text += f" on {calendar.day_name[end.weekday()]}, {end.day} {calendar.month_name[end.month]}"
+        if end.year != year:
+            text += f" {end.year}"
+    return text

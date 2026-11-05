@@ -344,11 +344,17 @@ Split into five smaller steps, done in order.
   manual. Pulling cast lists out of comments is not done (could be a later
   idea).
 
-#### 4d — Overnight broadcasts
+#### 4d — Overnight broadcasts ✅ *done*
 - Start time + length, so a broadcast that crosses midnight is one
   broadcast, shown with its end on the next day.
 - **Try it:** set a start time on a long file and see the end time on the
   next day.
+- Notes: the episode stores only its start (date, time, zone); the length
+  is the recording's length (no separate "length on air" field for now; in
+  4e a grouped episode's length is the sum of its parts). The end is shown
+  as "until about 3:00 AM on Friday, 3 May", worked out in the episode's
+  time zone so nights when the clocks change come out right. The `tzdata`
+  package carries the time zone rules so this also works on Windows.
 
 #### 4e — Multi-part broadcasts
 - Group files ("Hour 1", "Hour 2", …) into one episode that plays straight

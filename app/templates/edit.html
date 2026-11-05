@@ -23,7 +23,9 @@
 
   <fieldset class="air-date">
     <legend>Original air date{% if sources.get("air_date") == "tags" %} <span class="hint">filled in from the file's tags</span>{% endif %}</legend>
-    <p class="muted small">Fill in only what you know. Leave the rest blank or "unknown".</p>
+    <p class="muted small">Fill in only what you know. Leave the rest blank or "unknown".
+      For a show that ran past midnight, enter the day and time it <em>started</em>: the end
+      is worked out from the recording's length.</p>
     <div class="date-parts">
       <div>
         <label for="air_year">Year</label>
