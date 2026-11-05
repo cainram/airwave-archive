@@ -191,8 +191,8 @@ item 4 and use `git clone https://github.com/cainram/airwave-archive.git`.)
    Replace `<server-address>` with the server's IP address, or its Tailscale
    name if you use Tailscale. To find the IP, run `hostname -I` on the server.
 
-   You should see the **Library** page. It will say no audio files were found
-   until you add some.
+   You should see the **Series** page. It will say there are no episodes
+   until you add some recordings.
 
 ## Step 4 — Add some recordings
 
@@ -203,7 +203,7 @@ like. For example, from another Linux or Mac computer:
 scp -r "/path/to/Suspense" youruser@<server-address>:/srv/airwave/library/
 ```
 
-Then press **Rescan** on the Library page. The first scan reads every
+Then click **Library** in the menu at the top and press **Rescan**. The first scan reads every
 file; later scans only look at files that are new or have changed, so they
 are much faster.
 

@@ -60,7 +60,7 @@ def test_file_page_shows_details_and_play_button(client):
 
 
 def test_library_rows_link_to_file_page_and_play(client):
-    page = client.get("/")
+    page = client.get("/library")
     assert 'href="/files/1"' in page.text
     assert 'data-src="/audio/1"' in page.text
 
@@ -82,7 +82,7 @@ def test_htmx_gets_only_the_middle_of_the_page(client):
 def test_rescan_from_htmx_reloads_just_the_middle(client):
     response = client.post("/rescan", headers=HTMX, follow_redirects=False)
     assert response.status_code == 200
-    assert '"path": "/"' in response.headers["HX-Location"]
+    assert '"path": "/library"' in response.headers["HX-Location"]
 
 
 def test_tag_codes_get_plain_names(client):
@@ -105,7 +105,7 @@ def test_stylesheet_and_scripts_carry_the_version(client):
 
 def test_a_tab_from_before_an_update_is_asked_to_reload(client):
     import app.main as main
-    old = client.get("/series?view=list", headers={"HX-Request": "true", "X-Airwave-Version": "old"})
-    assert old.headers.get("HX-Redirect") == "/series?view=list" and old.text == ""
+    old = client.get("/?view=list", headers={"HX-Request": "true", "X-Airwave-Version": "old"})
+    assert old.headers.get("HX-Redirect") == "/?view=list" and old.text == ""
     current = client.get("/series", headers={"HX-Request": "true", "X-Airwave-Version": main.VERSION})
     assert "HX-Refresh" not in current.headers and "Series" in current.text

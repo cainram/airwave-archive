@@ -2,7 +2,7 @@
 {% from "_art.html" import picture %}
 {% block title %}{{ name or "No series yet" }} · Airwave Archive{% endblock %}
 {% block content %}
-<p class="small"><a href="/series">← All series</a></p>
+<p class="small"><a href="/">← All series</a></p>
 <section class="summary with-art">
   {{ picture(totals.art, name or "?", "large") }}
   <div class="summary-text">

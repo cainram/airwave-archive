@@ -417,6 +417,8 @@ Split into four smaller steps, done in order.
   tiles looked broken in Chrome. Now the stylesheet and scripts carry a
   version in their address, and a tab from before an update reloads the
   page it's going to by itself.
+- Owner's choice: the Series tiles are the front page (`/`); the file
+  list moved to `/library`. The menu reads Series · Library.
 
 #### 5c — Uploading artwork
 - Upload your own picture for a series (kept in the data folder, never

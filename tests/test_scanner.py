@@ -162,7 +162,7 @@ def test_library_page_lists_files_and_tags(tmp_path, client):
     make_wav(path, 1)
     add_tags(path, artist=TPE1(encoding=3, text="Suspense"))
 
-    page = client.get("/")   # first visit scans automatically
+    page = client.get("/library")   # first visit scans automatically
     assert page.status_code == 200
     assert "Donovan&#39;s Brain" in page.text
     assert "Suspense" in page.text
@@ -171,7 +171,7 @@ def test_library_page_lists_files_and_tags(tmp_path, client):
 
     make_wav(lib / "second.wav", 1)
     assert client.post("/rescan", follow_redirects=False).status_code == 303
-    page = client.get("/")
+    page = client.get("/library")
     assert "2 audio files" in page.text
     assert "1 new, 0 changed, 0 removed, 1 unchanged" in page.text
 
@@ -182,8 +182,8 @@ def test_library_page_is_split_into_pages(tmp_path, client, monkeypatch):
     for name in ("a", "b", "c"):
         make_wav(tmp_path / "library" / f"{name}.wav", 1)
 
-    first = client.get("/")
+    first = client.get("/library")
     assert "a.wav" in first.text and "c.wav" not in first.text
     assert "page 1 of 2" in first.text
-    second = client.get("/?page=2")
+    second = client.get("/library?page=2")
     assert "c.wav" in second.text and "a.wav" not in second.text

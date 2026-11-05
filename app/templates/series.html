@@ -13,8 +13,8 @@
   </div>
   {% if series %}
   <nav class="view-switch" aria-label="Show as">
-    <a href="/series"{% if view == "tiles" %} aria-current="page"{% endif %}>Tiles</a>
-    <a href="/series?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
+    <a href="/"{% if view == "tiles" %} aria-current="page"{% endif %}>Tiles</a>
+    <a href="/?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
   </nav>
   {% endif %}
 </section>

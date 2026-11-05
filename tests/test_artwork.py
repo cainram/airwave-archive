@@ -103,7 +103,7 @@ def test_pictures_inside_files_are_found_and_shared(client):
 
 
 def test_series_tiles_use_the_folder_picture_first(client):
-    page = client.get("/series").text
+    page = client.get("/").text
     tiles = page.split('class="tile"')[1:]
     by_name = {t.split('tile-name">')[1].split("<")[0]: t for t in tiles}
     assert colour_of(client, picture_urls(by_name["Campbell Playhouse"])[0])[1] > 100   # green

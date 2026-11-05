@@ -216,13 +216,19 @@ def run_scan() -> ScanRun:
         return sync_library(get_engine(), LIBRARY_DIR, art_dir())
 
 
-@app.get("/", response_class=HTMLResponse)
-def library_page(request: Request, page: int = 1):
-    engine = get_engine()
-    with Session(engine) as session:
+def last_scan_or_scan() -> ScanRun:
+    """The latest scan. On the very first visit there's none yet: scan
+    straight away, so the first page you open isn't empty."""
+    with Session(get_engine()) as session:
         last_scan = session.scalars(select(ScanRun).order_by(ScanRun.id.desc()).limit(1)).first()
-    if last_scan is None:
-        last_scan = run_scan()  # very first visit: scan straight away
+    return last_scan or run_scan()
+
+
+@app.get("/library", response_class=HTMLResponse)
+def library_page(request: Request, page: int = 1):
+    """Every file, in folder order."""
+    engine = get_engine()
+    last_scan = last_scan_or_scan()
 
     with Session(engine) as session:
         present = AudioFile.missing.is_(False)
@@ -250,7 +256,7 @@ def library_page(request: Request, page: int = 1):
         "files": files,
         "count": count,
         "rows": rows,
-        "pager_url": "/?page=",
+        "pager_url": "/library?page=",
         "missing": missing,
         "total_bytes": total_bytes or 0,
         "total_seconds": total_seconds or 0,
@@ -267,7 +273,7 @@ def library_page(request: Request, page: int = 1):
 @app.post("/rescan")
 def rescan(request: Request):
     run_scan()
-    return go_to(request, "/")
+    return go_to(request, "/library")
 
 
 @app.get("/files/{file_id}", response_class=HTMLResponse)
@@ -330,19 +336,27 @@ def forget(request: Request, file_id: int):
         if episode_id is not None and (episode := session.get(Episode, episode_id)):
             renumber(episode)   # the other parts, if it was one of several
         session.commit()
-    return go_to(request, "/")
+    return go_to(request, "/library")
 
 
 # ------------------------------------------------------------------ series
 
 
-@app.get("/series", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 def series_list(request: Request, view: str = "tiles"):
-    """All series, as picture tiles or (view=list) as a table."""
+    """The front page: all series, as picture tiles or (view=list) as a
+    table."""
+    last_scan_or_scan()
     with Session(get_engine()) as session:
         found = all_series(session)
     return render(request, "series.html",
                   {"series": found, "view": "list" if view == "list" else "tiles"})
+
+
+@app.get("/series")
+def old_series_address(request: Request):
+    """The series list used to be here; it's the front page now."""
+    return RedirectResponse("/" + (f"?{request.url.query}" if request.url.query else ""), 303)
 
 
 @app.get("/series/episodes", response_class=HTMLResponse)

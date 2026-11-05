@@ -102,8 +102,9 @@
   document.body.addEventListener("htmx:historyRestore", function () {
     const path = window.location.pathname;
     document.querySelectorAll("#menu a").forEach(function (link) {
-      const section = link.getAttribute("href");
-      const here = section === "/" ? !path.startsWith("/series") : path.startsWith(section);
+      const here = link.dataset.paths.split(" ").some(function (start) {
+        return path === start || (start !== "/" && path.startsWith(start));
+      });
       if (here) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
     });
