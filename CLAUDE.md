@@ -112,7 +112,10 @@ These come from the plan and should not be changed without the owner's OK:
   folder, `AIRWAVE_DATA`). Changing the layout means bumping
   `SCHEMA_VERSION` and adding a step to `_migrate` (a backup copy is made
   automatically). Never just delete the owner's database: it holds edits.
-- `app/episodes.py`: episode fields, edit-form checks, air-date display
+- `app/episodes.py`: episode fields, edit-form checks, air-date display,
+  filling in from tags, saving confirmed guesses
+- `app/filenames.py`: guesses series/date/title from file names (for the
+  review page)
 - `app/scanner.py`: finds audio files, reads length and tags, and keeps the
   database in step with the library
 - `app/templates/`: HTML page templates. Pages use `{% extends layout %}`:

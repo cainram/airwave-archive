@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 4a: episode details and editing.
+"""Airwave Archive web app — Phase 4c: episode details, editing, and file-name review.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -18,10 +18,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db import DB_FILENAME, AudioFile, Episode, ScanRun, make_engine, utcnow
+from app.db import DB_FILENAME, MANUAL, AudioFile, Episode, ScanRun, make_engine, utcnow
 from app.episodes import (
-    LONG_FIELDS, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_edits, format_air_date, read_form,
+    LONG_FIELDS, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
+    format_air_date, read_date_text, read_form,
 )
+from app.filenames import date_text, parse_filename
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
 APP_DIR = Path(__file__).parent
@@ -32,6 +34,7 @@ LIBRARY_DIR = Path(os.environ.get("AIRWAVE_LIBRARY", "/library"))
 DATA_DIR = Path(os.environ.get("AIRWAVE_DATA", "data"))
 
 PAGE_SIZE = 200  # files shown per page
+REVIEW_LIMIT = 100  # file-name guesses shown at a time
 
 # What kind of audio each file ending holds, so the browser knows how to play it.
 AUDIO_TYPES = {
@@ -252,6 +255,112 @@ def forget(request: Request, file_id: int):
         forget_files(session, [file_id])
         session.commit()
     return go_to(request, "/")
+
+
+# ------------------------------------------------------- file-name review
+
+REVIEW_FIELDS = {"series": "Series", "episode_number": "Ep.", "date": "Aired", "title": "Title"}
+
+
+def review_rows(session: Session) -> tuple[list[dict], int]:
+    """Files whose names suggest something new. Returns (first rows, total)."""
+    # (This reads every file name each time. Fine for tens of thousands of
+    # files; if it ever gets slow, remember which files were reviewed.)
+    rows: list[dict] = []
+    total = 0
+    query = (
+        select(AudioFile.id, AudioFile.folder, AudioFile.name, Episode.series,
+               Episode.episode_number, Episode.title, Episode.air_year, Episode.air_month,
+               Episode.air_day, Episode.sources_json)
+        .join(Episode, AudioFile.episode_id == Episode.id)
+        .where(AudioFile.missing.is_(False))
+        .order_by(AudioFile.folder, AudioFile.name)
+    )
+    for (file_id, folder, name, series, number, title,
+         year, month, day, sources_json) in session.execute(query):
+        guess = parse_filename(name)
+        if guess is None:
+            continue
+        sources = json.loads(sources_json) if sources_json else {}
+        current = {"series": series, "episode_number": number, "title": title,
+                   "date": date_text(year, month, day)}
+        proposed = {"series": guess.series, "episode_number": guess.episode_number,
+                    "title": guess.title, "date": guess.date_text}
+        fields = []
+        for key in REVIEW_FIELDS:
+            source = sources.get("air_date" if key == "date" else key)
+            differs = bool(proposed[key]) and proposed[key] != current[key]
+            fields.append({
+                "key": key, "proposed": proposed[key] or "", "current": current[key] or "",
+                "differs": differs,
+                # Would replace something the owner typed or confirmed.
+                "conflict": differs and bool(current[key]) and source == MANUAL,
+            })
+        # Only files offering something for a field the owner hasn't set
+        # themselves. (Once a card is saved, it doesn't come back.)
+        if not any(field["differs"] and not field["conflict"] for field in fields):
+            continue
+        total += 1
+        if len(rows) < REVIEW_LIMIT:
+            rows.append({"id": file_id, "folder": folder, "name": name, "fields": fields,
+                         "checked": not any(field["conflict"] for field in fields)})
+    return rows, total
+
+
+def render_review(request: Request, rows, total, saved=None, typed=None, errors=None):
+    typed = typed or {}
+    for row in rows:   # show what was typed, if the form came back with a problem
+        if row["id"] in typed:
+            row["checked"] = typed[row["id"]]["accept"]
+            for field in row["fields"]:
+                field["proposed"] = typed[row["id"]][field["key"]]
+    return render(request, "review.html", {
+        "rows": rows, "total": total, "saved": saved, "errors": errors or {},
+        "labels": REVIEW_FIELDS, "limit": REVIEW_LIMIT,
+    })
+
+
+@app.get("/review/filenames", response_class=HTMLResponse)
+def review_page(request: Request, saved: int | None = None):
+    with Session(get_engine()) as session:
+        rows, total = review_rows(session)
+    return render_review(request, rows, total, saved=saved)
+
+
+@app.post("/review/filenames", response_class=HTMLResponse)
+async def save_review(request: Request):
+    form = await request.form()
+    ids = [int(i) for i in str(form.get("ids", "")).split(",") if i.strip().isdigit()]
+    typed: dict[int, dict] = {}
+    errors: dict[int, str] = {}
+    accepted: dict[int, dict] = {}
+    for file_id in ids:
+        entry = {key: str(form.get(f"{key}-{file_id}", "")).strip() for key in REVIEW_FIELDS}
+        entry["accept"] = form.get(f"accept-{file_id}") is not None
+        typed[file_id] = entry
+        if not entry["accept"]:
+            continue
+        date, problem = read_date_text(entry["date"])
+        if problem:
+            errors[file_id] = problem
+            continue
+        accepted[file_id] = {"series": entry["series"], "episode_number": entry["episode_number"],
+                             "title": entry["title"], "date": date}
+
+    with Session(get_engine()) as session:
+        if errors:
+            # Save nothing; show the page again with what was typed.
+            rows, total = review_rows(session)
+            return render_review(request, rows, total, typed=typed, errors=errors)
+        saved = 0
+        for file_id, values in accepted.items():
+            row = session.get(AudioFile, file_id)
+            if row is None or row.episode is None:
+                continue
+            if apply_confirmed(row.episode, values):
+                saved += 1
+        session.commit()
+    return go_to(request, f"/review/filenames?saved={saved}")
 
 
 @app.get("/audio/{file_id}")

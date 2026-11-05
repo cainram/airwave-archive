@@ -18,9 +18,12 @@
       {% endif %}
     </p>
   </div>
-  <form method="post" action="/rescan">
-    <button class="button primary" type="submit">Rescan</button>
-  </form>
+  <div class="actions">
+    <a class="button" href="/review/filenames">Review file names</a>
+    <form method="post" action="/rescan">
+      <button class="button primary" type="submit">Rescan</button>
+    </form>
+  </div>
 </section>
 
 {% if not library_exists %}

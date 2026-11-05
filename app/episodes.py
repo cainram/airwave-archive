@@ -198,6 +198,64 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
     return changed
 
 
+DATE_TEXT_PATTERN = re.compile(r"^(\d{4})(?:-(\d{1,2}|xx)(?:-(\d{1,2}|xx))?)?$", re.I)
+
+
+def read_date_text(text: str | None):
+    """Read a date typed as '1939-04-14', '1939-04', '1939', or with 'xx'
+    for unknown parts. Returns ((year, month, day), None), or
+    (None, message) if it can't be right. Empty text gives (None, None)."""
+    text = (text or "").strip()
+    if not text:
+        return None, None
+    match = DATE_TEXT_PATTERN.match(text)
+    if not match:
+        return None, "Write the date like 1939-04-14, 1939-04, or 1939."
+    year = int(match[1])
+    month = int(match[2]) if match[2] and match[2].lower() != "xx" else None
+    day = int(match[3]) if match[3] and match[3].lower() != "xx" and month else None
+    if not EARLIEST_YEAR <= year <= LATEST_YEAR:
+        return None, f"The year should be between {EARLIEST_YEAR} and {LATEST_YEAR}."
+    if month is not None and not 1 <= month <= 12:
+        return None, "The month should be 01 to 12."
+    if day is not None and not 1 <= day <= calendar.monthrange(year, month)[1]:
+        return None, f"{MONTHS[month - 1]} {year} doesn't have a day {day}."
+    return (year, month, day), None
+
+
+def apply_confirmed(episode: Episode, values: dict) -> list[str]:
+    """Save values the owner confirmed (e.g. on the file-name review page).
+
+    ``values`` may hold series, episode_number, title (text) and date (a
+    (year, month, day) tuple). Empty or missing values leave a field as it
+    is. Confirmed values count as manual. Returns the fields changed.
+    """
+    sources = episode.sources
+    changed = []
+    for name in ("series", "episode_number", "title"):
+        value = _clean(values.get(name))
+        if value is None:
+            continue
+        if getattr(episode, name) != value or sources.get(name) != MANUAL:
+            setattr(episode, name, value)
+            sources[name] = MANUAL
+            changed.append(name)
+    date = values.get("date")
+    if date is not None:
+        if date != (episode.air_year, episode.air_month, episode.air_day):
+            episode.air_year, episode.air_month, episode.air_day = date
+            # A time belongs to a particular day; a different day drops it.
+            episode.air_time = episode.air_timezone = None
+            changed.append("air_date")
+        elif sources.get("air_date") != MANUAL:
+            changed.append("air_date")
+        sources["air_date"] = MANUAL
+    if changed:
+        episode.sources = sources
+        episode.updated_at = utcnow()
+    return changed
+
+
 def format_time(hhmm: str) -> str:
     """'20:00' -> '8:00 PM'."""
     hours, minutes = (int(part) for part in hhmm.split(":"))
