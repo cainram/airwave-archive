@@ -210,13 +210,18 @@ are much faster.
 For a few files at a time, you can also upload them in the app: click
 **Inbox** in the menu. Uploads wait in `/srv/airwave/inbox/` (separate from
 the library) until you add or reject them. Files copied into that folder
-by hand show up there too.
+by hand show up there too. **Add to library** moves a file next to the
+other recordings of its series (or into a new folder named after the
+series, or `Unsorted` if it has none). A file with the same name is never
+replaced: a number is added instead.
 
 ## Back up the data folder
 
 The app keeps its database in `/srv/airwave/data`. It's small, and it will
-hold all the information you add, so include it in your backups. (Your
-recordings in `/srv/airwave/library` are never changed by the app.)
+hold all the information you add, so include it in your backups. (The app
+never changes, renames or deletes the recordings in `/srv/airwave/library`;
+it only adds the files you approve in the inbox. Back up your recordings
+too.)
 
 The `artwork` folder inside it holds the app's small copies of pictures
 from your library. It doesn't need backing up: a scan makes the copies

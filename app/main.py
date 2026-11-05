@@ -10,7 +10,7 @@ import hashlib
 import json
 import os
 import threading
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from datetime import datetime
 from pathlib import Path
 
@@ -418,9 +418,17 @@ def render_inbox(request: Request, typed=None, errors=None, **notices):
 
 @app.get("/inbox", response_class=HTMLResponse)
 def inbox_page(request: Request, uploaded: int | None = None, skipped: int | None = None,
-               saved: int | None = None, rejected: int | None = None):
+               saved: int | None = None, rejected: int | None = None,
+               added: int | None = None, added_all: int | None = None,
+               folder: list[str] = Query(default=[])):
+    added_file = None
+    if added is not None:
+        with Session(get_engine()) as session:
+            added_file = session.get(AudioFile, added)
+            session.expunge_all()
     return render_inbox(request, uploaded=uploaded, skipped=skipped, saved=saved,
-                        rejected=rejected)
+                        rejected=rejected, added=added_file, added_all=added_all,
+                        folders=folder)
 
 
 @app.post("/inbox/upload")
@@ -439,10 +447,9 @@ async def inbox_upload(request: Request):
                                      skipped=str(skipped) if skipped else ""))
 
 
-@app.post("/inbox", response_class=HTMLResponse)
-async def inbox_save(request: Request):
-    """Save the details typed for the waiting files."""
-    form = await request.form()
+def save_inbox_details(form) -> tuple[dict, dict, int]:
+    """Save the details typed for the waiting files. Returns (typed,
+    errors, how many changed); if there are errors nothing is saved."""
     typed, errors, values = {}, {}, {}
     with Session(get_engine()) as session:
         items = session.scalars(select(InboxItem)).all()
@@ -456,7 +463,7 @@ async def inbox_save(request: Request):
                 errors[item.id] = error
             values[item.id] = (row, date)
         if errors:
-            return render_inbox(request, typed, errors)
+            return typed, errors, 0
         saved = 0
         for item in items:
             if item.id not in values:
@@ -470,7 +477,56 @@ async def inbox_save(request: Request):
                     setattr(item, key, value)
                 saved += 1
         session.commit()
+    return typed, errors, saved
+
+
+@app.post("/inbox", response_class=HTMLResponse)
+async def inbox_save(request: Request):
+    """Save the details typed for the waiting files."""
+    typed, errors, saved = save_inbox_details(await request.form())
+    if errors:
+        return render_inbox(request, typed, errors)
     return go_to(request, f"/inbox?saved={saved}")
+
+
+@app.post("/inbox/add-all", response_class=HTMLResponse)
+async def inbox_add_all(request: Request):
+    """Save what was typed, then add every waiting file to the library."""
+    typed, errors, _saved = save_inbox_details(await request.form())
+    if errors:
+        return render_inbox(request, typed, errors)
+    added, folders = 0, []
+    with Session(get_engine()) as session:
+        for item in session.scalars(select(InboxItem).order_by(InboxItem.name)).all():
+            row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+            if row is None:            # gone from the inbox meanwhile
+                session.delete(item)
+            else:
+                added += 1
+                if row.folder not in folders:
+                    folders.append(row.folder)
+            session.commit()            # one at a time: each one done stays done
+    return go_to(request, "/inbox?" + urlencode(
+        [("added_all", added), *(("folder", folder) for folder in folders)]))
+
+
+@app.post("/inbox/{item_id}/add", response_class=HTMLResponse)
+async def inbox_add(request: Request, item_id: int):
+    """Save what was typed, then move this file into the library and add
+    it, with its details, as an episode."""
+    typed, errors, _saved = save_inbox_details(await request.form())
+    if errors:
+        return render_inbox(request, typed, errors)
+    with Session(get_engine()) as session:
+        item = inbox_item_or_404(session, item_id)
+        row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+        if row is None:
+            session.delete(item)
+            session.commit()
+            raise HTTPException(status_code=404, detail="That file isn't in the inbox any more")
+        session.commit()
+        added = row.id
+    return go_to(request, f"/inbox?added={added}")
 
 
 def inbox_item_or_404(session: Session, item_id: int) -> InboxItem:

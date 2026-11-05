@@ -7,26 +7,32 @@ inbox folder). The inbox page shows what the app worked out for each one
 add the file to the library or reject it (which deletes it from the
 inbox). Nothing in the library is touched until a file is added.
 
-Uploads never overwrite anything: if a name is taken, a number is added.
+Adding a file moves it into the library: next to the series' other
+recordings if there are any, otherwise into a new folder named after the
+series. Its details are saved on its episode as if typed by hand.
+
+Nothing is ever overwritten: if a name is taken, a number is added.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import secrets
 import shutil
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import InboxItem, utcnow
-from app.episodes import _clean, date_from_tag
+from app.db import AudioFile, Episode, InboxItem, utcnow
+from app.episodes import _clean, apply_confirmed, date_from_tag
 from app.filenames import parse_filename
-from app.scanner import AUDIO_EXTENSIONS, read_audio
+from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
 
 UNSAFE = re.compile(r'[\x00-\x1f/\\:*?"<>|]')
 MAX_NAME = 180
+NO_SERIES_FOLDER = "Unsorted"
 
 
 def is_audio(name: str) -> bool:
@@ -131,3 +137,69 @@ def reject(session: Session, folder: Path, item: InboxItem) -> None:
     if path is not None:
         path.unlink()
     session.delete(item)
+
+
+# ------------------------------------------------------- adding to the library
+
+def folder_name(series: str | None) -> str:
+    """A folder name made from a series name ("Unsorted" if there's none)."""
+    name = UNSAFE.sub("_", series or "").strip().strip(".").strip()
+    return name[:MAX_NAME] or NO_SERIES_FOLDER
+
+
+def target_folder(session: Session, series: str | None) -> str:
+    """Where in the library a file of this series goes (relative to the
+    library): the folder holding most of the series' recordings, or else a
+    folder named after the series."""
+    if series:
+        folder = session.scalar(
+            select(AudioFile.folder).join(Episode)
+            .where(Episode.series == series, AudioFile.missing.is_(False))
+            .group_by(AudioFile.folder).order_by(func.count().desc(), AudioFile.folder)
+            .limit(1))
+        if folder is not None:
+            return folder
+    return folder_name(series)
+
+
+def move_into(source: Path, folder: Path) -> Path:
+    """Move a file into ``folder`` under a free name (never replacing
+    anything). Across disks it's copied under a hidden name first, so a
+    half-copied file never looks like a real recording."""
+    folder.mkdir(parents=True, exist_ok=True)
+    final = folder / free_name(folder, source.name)
+    try:
+        os.rename(source, final)                    # same disk: instant
+        return final
+    except OSError:
+        pass
+    temporary = folder / f".adding-{secrets.token_hex(6)}"
+    try:
+        shutil.copyfile(source, temporary)
+        final = folder / free_name(folder, source.name)
+        temporary.rename(final)
+    finally:
+        temporary.unlink(missing_ok=True)
+    source.unlink()
+    return final
+
+
+def add_to_library(session: Session, inbox_folder: Path, library: Path,
+                   item: InboxItem, art_dir: Path | None = None) -> AudioFile | None:
+    """Move an inbox file into the library and add it, with the details
+    confirmed in the inbox. None if the file isn't in the inbox any more."""
+    source = item_path(inbox_folder, item)
+    if source is None:
+        return None
+    folder = library / target_folder(session, item.series)
+    if library.resolve() not in (folder.resolve(), *folder.resolve().parents):
+        raise ValueError("That folder isn't inside the library")
+    path = move_into(source, folder)
+    row = add_one_file(session, library, path, art_dir)
+    date = (item.air_year, item.air_month, item.air_day)
+    apply_confirmed(row.episode, {
+        "series": item.series, "episode_number": item.episode_number, "title": item.title,
+        "date": date if item.air_year is not None else None,
+    })
+    session.delete(item)
+    return row
