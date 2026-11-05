@@ -8,7 +8,7 @@ import re
 
 import pytest
 from fastapi.testclient import TestClient
-from mutagen.id3 import TIT2, TPE1
+from mutagen.id3 import COMM, TIT2, TPE1
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -24,7 +24,7 @@ def client(tmp_path, monkeypatch):
     lib = tmp_path / "library"
     for hour in (1, 2, 3):
         make_wav(lib / SHOW.format(hour), hour)       # 1, 2 and 3 seconds long
-        add_tags(lib / SHOW.format(hour), title=TIT2(encoding=3, text=f"Hour {hour}"),
+        add_tags(lib / SHOW.format(hour), title=TIT2(encoding=3, text=f"Art Bell - May 2 1996 - Hour {hour}"),
                  artist=TPE1(encoding=3, text="Coast to Coast AM"))
     make_wav(lib / "Other Show.wav", 1)
     monkeypatch.setattr(main, "LIBRARY_DIR", lib)
@@ -83,7 +83,7 @@ def test_grouping_makes_one_episode_that_plays_straight_through(client):
     assert len({p.episode_id for p in parts}) == 1
     assert episode_count(client) == 2          # the empty ones are gone
     assert parts[0].episode.sources["parts"] == MANUAL
-    assert parts[0].episode.title == "Hour 1"  # details from the first part's tags
+    assert parts[0].episode.title == "Art Bell - May 2 1996"  # first part's tag, less "Hour 1"
 
     # The library shows the broadcast once, with its total length.
     library = client.get("/").text
@@ -113,7 +113,7 @@ def test_later_parts_tags_are_not_used(client):
     make_wav(path, 2.5)
     add_tags(path, title=TIT2(encoding=3, text="Hour 2 (new)"))
     client.post("/rescan")
-    assert by_name(client)[SHOW.format(2)].episode.title == "Hour 1"
+    assert by_name(client)[SHOW.format(2)].episode.title == "Art Bell - May 2 1996"
 
 
 def test_splitting_gives_each_file_its_own_details_again(client):
@@ -123,7 +123,7 @@ def test_splitting_gives_each_file_its_own_details_again(client):
     files = by_name(client)
     assert [files[SHOW.format(h)].part_number for h in (1, 2, 3)] == [None, None, None]
     assert files[SHOW.format(1)].episode.title == "Kept on the first"
-    assert files[SHOW.format(2)].episode.title == "Hour 2"      # from its tags
+    assert files[SHOW.format(2)].episode.title == "Art Bell - May 2 1996 - Hour 2"   # its own tag
     assert episode_count(client) == 4
     assert "3 parts" not in client.get("/").text
 
@@ -178,3 +178,53 @@ def test_review_page_ignores_later_parts(client):
     page = client.get("/review/filenames").text
     assert SHOW.format(1) in page
     assert SHOW.format(2) not in page and SHOW.format(3) not in page
+
+
+def describe(client, hour, text):
+    """Set a part's description (its comment tag)."""
+    from mutagen.wave import WAVE
+    audio = WAVE(client.lib / SHOW.format(hour))
+    audio.tags.delall("COMM")
+    audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=text))
+    audio.save()
+
+
+def test_notes_gather_the_descriptions_of_all_parts(client):
+    describe(client, 1, "Catherine Austin Fitts on the Postal Service.")
+    describe(client, 2, "Russell Targ on remote viewing.")
+    describe(client, 3, "Russell Targ on remote viewing.")
+    client.post("/rescan")
+    group(client, 1, 1, 2, 3)
+    notes = by_name(client)[SHOW.format(1)].episode.notes
+    assert notes == ("Part 1: Catherine Austin Fitts on the Postal Service.\n\n"
+                     "Parts 2 and 3: Russell Targ on remote viewing.")
+
+    # A part's description changes: the notes follow on the next scan.
+    describe(client, 3, "Open lines.")
+    client.post("/rescan")
+    assert by_name(client)[SHOW.format(1)].episode.notes.endswith(
+        "Part 2: Russell Targ on remote viewing.\n\nPart 3: Open lines.")
+
+    # Split up again: each file has only its own description.
+    client.post(f"/files/{file_id(client, 1)}/parts", data={"part": [str(file_id(client, 1))]})
+    files = by_name(client)
+    assert files[SHOW.format(1)].episode.notes == "Catherine Austin Fitts on the Postal Service."
+    assert files[SHOW.format(3)].episode.notes == "Open lines."
+
+
+def test_the_same_description_on_every_part_is_shown_once(client):
+    for hour in (1, 2, 3):
+        describe(client, hour, "Michael Cremo on forbidden archaeology.")
+    client.post("/rescan")
+    group(client, 1, 1, 2, 3)
+    assert by_name(client)[SHOW.format(2)].episode.notes == "Michael Cremo on forbidden archaeology."
+
+
+def test_notes_typed_by_hand_are_left_alone(client):
+    describe(client, 2, "Russell Targ on remote viewing.")
+    client.post("/rescan")
+    group(client, 1, 1, 2, 3)
+    client.post(f"/files/{file_id(client, 1)}/edit", data={"notes": "My own notes"})
+    describe(client, 3, "Open lines.")
+    client.post("/rescan")
+    assert by_name(client)[SHOW.format(1)].episode.notes == "My own notes"

@@ -6,6 +6,7 @@ Many collections put the details in the file name, for example:
     CampbellPlayhouse39-04-14ThePatriot.mp3
     Suspense_1943-xx-xx_Unknown.mp3          ("xx" = not known)
     1943-05-13 Suspense - Donovan's Brain.mp3
+    Coast to Coast - Mar 01 2010 - Hour 1.mp3   (month names work too)
 
 The reader looks for a date. What comes before it is taken as the series,
 and what comes after it as the title. These are only guesses: they're shown
@@ -19,7 +20,17 @@ import re
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from app.episodes import EARLIEST_YEAR, LATEST_YEAR
+from app.episodes import EARLIEST_YEAR, LATEST_YEAR, PART_PATTERN
+
+# Month names and short forms: "Mar", "March", "Sept"...
+MONTH_NAMES = {name: number for number, names in enumerate([
+    (), ("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"),
+    ("may",), ("jun", "june"), ("jul", "july"), ("aug", "august"),
+    ("sep", "sept", "september"), ("oct", "october"), ("nov", "november"),
+    ("dec", "december")]) for name in names}
+_MONTH = r"(?P<mon>" + "|".join(sorted(MONTH_NAMES, key=len, reverse=True)) + r")\.?"
+_DAY = r"(?P<d>[0-3]?\d)(?:st|nd|rd|th)?"
+_YEAR = r"(?P<y>(?:18|19|20)\d\d)"
 
 # Dates in file names. "xx" (or "XX") marks an unknown month or day.
 DATE_PATTERNS = [
@@ -29,6 +40,10 @@ DATE_PATTERNS = [
     re.compile(r"(?<!\d)(?P<y>(?:18|19|20)\d\d)(?P<m>0[1-9]|1[0-2])(?P<d>0[1-9]|[12]\d|3[01])(?!\d)"),
     # 43-05-13: a two-digit year is read as 19xx (old-time radio)
     re.compile(r"(?<!\d)(?P<yy>\d\d)-(?P<m>\d\d|xx)-(?P<d>\d\d|xx)(?!\d)", re.I),
+    # Mar 01 2010, March 1, 2010, Mar_1st_2010
+    re.compile(r"(?<![a-z])" + _MONTH + r"[ _-]+" + _DAY + r",?[ _-]+" + _YEAR + r"(?!\d)", re.I),
+    # 1 March 2010, 01-Mar-2010
+    re.compile(r"(?<!\d)" + _DAY + r"[ _-]+" + _MONTH + r",?[ _-]+" + _YEAR + r"(?!\d)", re.I),
 ]
 # An episode number, only when clearly marked: "#42", "Ep 42", "Episode 42", "e42".
 EPISODE_PATTERN = re.compile(r"^(?:#\s*|ep(?:isode)?\.?\s*|e)(\d+)\b\s*", re.I)
@@ -83,7 +98,10 @@ def _find_date(stem: str):
         for match in pattern.finditer(stem):
             parts = match.groupdict()
             year = int(parts["y"]) if parts.get("y") else 1900 + int(parts["yy"])
-            month = None if parts["m"].lower() == "xx" else int(parts["m"])
+            if parts.get("mon"):
+                month = MONTH_NAMES[parts["mon"].lower()]
+            else:
+                month = None if parts["m"].lower() == "xx" else int(parts["m"])
             day = None if parts["d"].lower() == "xx" else int(parts["d"])
             if not EARLIEST_YEAR <= year <= LATEST_YEAR:
                 continue
@@ -91,7 +109,7 @@ def _find_date(stem: str):
                 continue
             if month is None:
                 day = None   # a day without a month means nothing
-            if day is not None and day > calendar.monthrange(year, month)[1]:
+            if day is not None and not 1 <= day <= calendar.monthrange(year, month)[1]:
                 continue
             return match, year, month, day
     return None
@@ -107,7 +125,8 @@ def parse_filename(name: str) -> Guess | None:
     before, after = stem[:match.start()], stem[match.end():]
     guess = Guess(year=year, month=month, day=day)
 
-    after = after.strip(EDGE_JUNK)
+    # "Hour 1" names a part of a broadcast, not its title.
+    after = PART_PATTERN.sub("", after).strip(EDGE_JUNK)
     number = EPISODE_PATTERN.match(after)
     if number:
         guess.episode_number = number[1]

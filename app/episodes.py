@@ -47,6 +47,8 @@ TIME_ZONES = {
 MONTHS = list(calendar.month_name)[1:]   # "January" ... "December"
 EARLIEST_YEAR, LATEST_YEAR = 1890, 2100
 TIME_PATTERN = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
+# A part marker at the end of a name: "Hour 1", "Part 2", "Hr 3", "pt. 4".
+PART_PATTERN = re.compile(r"[\s_,(-]*\b(?:hour|hr|part|pt)\.?[\s_]*\d+\)?$", re.I)
 
 
 def _clean(text: str | None) -> str | None:
@@ -158,17 +160,26 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
     are updated (or cleared) to match the tags now. Returns True if
     anything changed.
 
-    For an episode made of several files, only the first part's tags are
-    used (the others are often just "Hour 2" and so on).
+    For an episode made of several files (any of which can be passed in),
+    the series, title, and date come from the first part (the others are
+    often just "Hour 2" and so on). Notes gather the descriptions of all
+    the parts.
     """
-    if f.part_number not in (None, 1):
-        return False
+    title = _clean(f.tag_title)
+    if f.part_number is not None and episode.files:
+        parts = episode.parts
+        f = parts[0]
+        # "Coast To Coast AM - Mar 01 2010 - Hour 1" -> "... - Mar 01 2010"
+        title = _clean(PART_PATTERN.sub("", f.tag_title or "").strip(" -_,"))
+        notes = combined_notes(parts)
+    else:
+        notes = _clean(f.tag_comment)
     sources = episode.sources
     changed = False
     found = {
         "series": _clean(f.tag_artist) or _clean(f.tag_album),
-        "title": _clean(f.tag_title),
-        "notes": _clean(f.tag_comment),
+        "title": title,
+        "notes": notes,
     }
     for name, value in found.items():
         source = sources.get(name)
@@ -202,6 +213,31 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
     if changed:
         episode.updated_at = utcnow()
     return changed
+
+
+def combined_notes(parts: list[AudioFile]) -> str | None:
+    """The descriptions of all parts, each different one once, saying which
+    parts it's from when they differ:
+
+        Part 1: Catherine Austin Fitts on the Postal Service.
+
+        Parts 2 and 3: Russell Targ on remote viewing.
+    """
+    found: dict[str, list[int]] = {}   # description -> its part numbers
+    for number, part in enumerate(parts, start=1):
+        text = _clean(part.tag_comment)
+        if text:
+            found.setdefault(text, []).append(part.part_number or number)
+    if len(found) <= 1:
+        return next(iter(found), None)
+    blocks = []
+    for text, numbers in found.items():
+        if len(numbers) == 1:
+            label = f"Part {numbers[0]}"
+        else:
+            label = "Parts " + ", ".join(map(str, numbers[:-1])) + f" and {numbers[-1]}"
+        blocks.append(f"{label}: {text}")
+    return "\n\n".join(blocks)
 
 
 DATE_TEXT_PATTERN = re.compile(r"^(\d{4})(?:-(\d{1,2}|xx)(?:-(\d{1,2}|xx))?)?$", re.I)

@@ -35,7 +35,8 @@ DB_FILENAME = "airwave.db"
 #   2: Phase 4a, episodes, and files can be marked missing
 #   3: Phase 4b, episode details filled in from tags (no layout change)
 #   4: Phase 4e, files can be parts of one episode (part_number)
-SCHEMA_VERSION = 4
+#   5: Phase 4e, a group's notes gather all parts' descriptions (no layout change)
+SCHEMA_VERSION = 5
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -234,7 +235,7 @@ def make_engine(db_path: Path) -> Engine:
     Base.metadata.create_all(engine)   # creates any tables that don't exist yet
     with engine.begin() as conn:
         _migrate(conn)
-    if 0 < version < 3:
+    if 0 < version < 5:
         _fill_all_from_tags(engine)
     with engine.begin() as conn:
         conn.exec_driver_sql(f"PRAGMA user_version={SCHEMA_VERSION}")
@@ -242,8 +243,10 @@ def make_engine(db_path: Path) -> Engine:
 
 
 def _fill_all_from_tags(engine: Engine) -> None:
-    """Version 3: fill in details from tags for files already in the
-    database (new and changed files are filled in as they're scanned)."""
+    """Fill in details from tags for files already in the database, when
+    the way that's done has changed (versions 3 and 5). New and changed
+    files are filled in as they're scanned. Typed details are never
+    touched."""
     from sqlalchemy import select
     from sqlalchemy.orm import Session
 
