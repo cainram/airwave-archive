@@ -1,5 +1,4 @@
-"""Airwave Archive web app — Phase 4e: episode details, editing, file-name review,
-overnight shows, and episodes made of several files.
+"""Airwave Archive web app — Phase 5a: the library, episode details, and series.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -9,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+from urllib.parse import quote
 from datetime import datetime
 from pathlib import Path
 
@@ -16,16 +16,19 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import Engine, func, or_, select
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import Engine, func, select
+from sqlalchemy.orm import Session
 
-from app.db import DB_FILENAME, MANUAL, AudioFile, Episode, ScanRun, make_engine, utcnow
+from app.db import (
+    DB_FILENAME, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, ScanRun, make_engine, utcnow,
+)
 from app.episodes import (
     LONG_FIELDS, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
     format_air_date, read_date_text, read_form,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
+from app.series import all_series, one_series, series_files
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
 APP_DIR = Path(__file__).parent
@@ -107,6 +110,14 @@ def display_title(f: AudioFile) -> str:
 
 
 templates.env.filters["display_title"] = display_title
+
+
+def series_url(name: str | None) -> str:
+    """The page of a series (no name: episodes without a series)."""
+    return "/series/episodes" + (f"?name={quote(name, safe='')}" if name else "")
+
+
+templates.env.filters["series_url"] = series_url
 templates.env.filters["fromjson"] = lambda text: json.loads(text) if text else []
 
 _engine: Engine | None = None
@@ -131,12 +142,6 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
     # Tell browsers the full and partial versions are different pages.
     response.headers["Vary"] = "HX-Request, HX-History-Restore-Request"
     return response
-
-
-# Load a file's episode and all that episode's parts along with it.
-WITH_PARTS = joinedload(AudioFile.episode).selectinload(Episode.files)
-# Files shown in lists: whole episodes, and the first part of grouped ones.
-FIRST_PARTS = or_(AudioFile.part_number.is_(None), AudioFile.part_number == 1)
 
 
 def get_file(file_id: int) -> AudioFile:
@@ -194,6 +199,8 @@ def library_page(request: Request, page: int = 1):
     return render(request, "library.html", {
         "files": files,
         "count": count,
+        "rows": rows,
+        "pager_url": "/?page=",
         "missing": missing,
         "total_bytes": total_bytes or 0,
         "total_seconds": total_seconds or 0,
@@ -271,6 +278,35 @@ def forget(request: Request, file_id: int):
             renumber(episode)   # the other parts, if it was one of several
         session.commit()
     return go_to(request, "/")
+
+
+# ------------------------------------------------------------------ series
+
+
+@app.get("/series", response_class=HTMLResponse)
+def series_list(request: Request):
+    with Session(get_engine()) as session:
+        found = all_series(session)
+    return render(request, "series.html", {"series": found})
+
+
+@app.get("/series/episodes", response_class=HTMLResponse)
+def series_page(request: Request, name: str | None = None, page: int = 1):
+    """One series' episodes in air-date order. Without a name: the
+    episodes that have no series yet."""
+    name = name or None
+    with Session(get_engine()) as session:
+        totals = one_series(session, name)
+        if totals is None:
+            raise HTTPException(status_code=404, detail="No episodes in that series")
+        pages = max(1, -(-totals["episodes"] // PAGE_SIZE))   # round up
+        page = min(max(1, page), pages)
+        files, rows = series_files(session, name, page, PAGE_SIZE)
+    return render(request, "series_page.html", {
+        "name": name, "totals": totals, "files": files, "rows": rows,
+        "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
+        "pager_url": series_url(name) + ("&" if name else "?") + "page=",
+    })
 
 
 # ------------------------------------------------------- parts (several files)

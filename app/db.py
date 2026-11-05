@@ -22,8 +22,10 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import Engine, ForeignKey, Index, UniqueConstraint, create_engine, event
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import Engine, ForeignKey, Index, UniqueConstraint, create_engine, event, or_
+from sqlalchemy.orm import (
+    DeclarativeBase, Mapped, joinedload, mapped_column, relationship, selectinload,
+)
 
 log = logging.getLogger(__name__)
 
@@ -159,6 +161,12 @@ class AudioFile(Base):
 
     # Each path appears once. This also creates an index (fast lookup by path).
     __table_args__ = (UniqueConstraint("folder", "name", name="uq_audio_files_path"),)
+
+
+# Load a file's episode and all that episode's parts along with it.
+WITH_PARTS = joinedload(AudioFile.episode).selectinload(Episode.files)
+# Files shown in lists: whole episodes, and the first part of grouped ones.
+FIRST_PARTS = or_(AudioFile.part_number.is_(None), AudioFile.part_number == 1)
 
 
 class ScanRun(Base):

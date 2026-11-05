@@ -380,10 +380,35 @@ Split into five smaller steps, done in order.
   automatically from file names (could be added to the review page later).
 
 ### Phase 5 — Browse like Plex
-- Series grid with artwork (from embedded art, a folder image, or upload).
-- Series totals (episodes, duration, size).
-- Series page with episodes in air-date order; episode detail page.
-- Mobile-friendly layout.
+Split into four smaller steps, done in order.
+
+#### 5a — Series list and series pages ✅ *done*
+- A list of series with totals (episodes, listening time, size, years).
+- Series page with its episodes in air-date order (each links to its
+  episode page, which already exists).
+- **Try it:** open the Series list, pick a series, and see its episodes
+  in the order they aired.
+- Notes: a series is every episode with the same Series name, exactly
+  as typed (joining two spellings means renaming; bulk renaming is Phase
+  6). Names sort ignoring "The/A/An". Episodes without a series are
+  listed last as "No series yet". Within a series: full dates in order,
+  then within each year those known only to the month or year, then
+  undated ones by episode number (as a number) and title. A menu (Library
+  · Series) is in the top bar; series names in the library and on
+  episode pages link to the series.
+
+#### 5b — Artwork from the files and folders
+- Pictures stored inside the audio files, or an image in the folder
+  (`cover.jpg`, `folder.jpg`...), shown as tiles in a series grid.
+- **Try it:** see the series grid with pictures.
+
+#### 5c — Uploading artwork
+- Upload your own picture for a series (kept in the data folder, never
+  in the library).
+- **Try it:** give a series without a picture one of your own.
+
+#### 5d — Phone-friendly layout
+- Check every page on a phone, and fix what doesn't fit.
 - **Try it:** browse your collection on your phone.
 
 ### Phase 6 — Bulk editing, search, CSV import

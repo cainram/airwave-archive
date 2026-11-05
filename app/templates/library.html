@@ -68,7 +68,7 @@
             {% if parts | length > 1 %}<span class="badge parts">{{ parts | length }} parts</span>{% endif %}
             {% if (f | display_title) != f.name %}<div class="muted small">{{ f.name }}</div>{% endif %}
           </td>
-          <td class="artist">{{ (ep.series if ep else None) or f.tag_artist or "" }}</td>
+          <td class="artist">{% if ep and ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% else %}{{ f.tag_artist or "" }}{% endif %}</td>
           <td class="date">{{ (ep | air_date(short=true)) or f.tag_date or "" }}</td>
           <td class="num">{{ (ep.length if parts | length > 1 else f.duration_seconds) | duration }}</td>
           <td class="num size">{{ parts | sum(attribute="size_bytes") | size }}</td>
