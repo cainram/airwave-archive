@@ -234,3 +234,38 @@ body.has-player { padding-bottom: 110px; }
 .upload-form input[type="file"] {
   padding: 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--panel);
 }
+
+/* The show's picture in the player bar. */
+.player-art { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; flex: none; }
+.player-art[hidden] { display: none; }
+
+/* ---- Phones and tablets ------------------------------------------------- */
+
+/* Touch screens: everything you tap is at least 44 pixels (about a
+   fingertip), as Apple and Google recommend. */
+@media (pointer: coarse) {
+  .menu a, .view-switch a { min-height: 44px; display: inline-flex; align-items: center; }
+  .button, a.button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .play-button { width: 44px; height: 44px; font-size: 1rem; }
+  .play-button.button { width: auto; height: auto; }
+  input[type="checkbox"] { width: 22px; height: 22px; }
+  .part-choices label, .review-file { min-height: 44px; }
+  .edit-form input, .edit-form select, .review-field input { min-height: 44px; }
+  .pager a { min-height: 44px; }
+}
+
+@media (max-width: 600px) {
+  /* Text boxes of at least 16 pixels: smaller ones make iPhones zoom the
+     whole page in when you tap them. */
+  input, select, textarea { font-size: 16px; }
+  /* Series list: leave the names room, so they don't break mid-word. */
+  .series-list .date { display: none; }
+  .files .title { overflow-wrap: break-word; word-break: normal; }
+  /* A bit less empty space around the page. */
+  .content { padding: 16px 12px; }
+  .summary h1 { font-size: 1.5rem; }
+  .art-large { width: 120px; }
+  .art-large.art-none { font-size: 2rem; }
+  .tiles { gap: 14px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .player { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+}

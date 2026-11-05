@@ -13,6 +13,10 @@
   const audio = document.getElementById("player-audio");
   const title = document.getElementById("player-title");
   const subtitle = document.getElementById("player-subtitle");
+  const art = document.getElementById("player-art");
+  // A picture that can't be found (no artwork) just isn't shown.
+  art.addEventListener("error", function () { art.hidden = true; });
+  art.addEventListener("load", function () { art.hidden = false; });
   let current = null; // the Play button's recording (first in its queue)
   let queue = [];      // web addresses still to play, in order
   let numbers = [];    // their part numbers
@@ -42,7 +46,10 @@
       title: button.dataset.title,
       href: button.dataset.href,
       subtitle: button.dataset.subtitle || "",
+      art: button.dataset.art || "",
     };
+    art.hidden = true;
+    if (info.art) art.src = info.art; else art.removeAttribute("src");
     show(0);
     bar.hidden = false;
     document.body.classList.add("has-player");
@@ -62,7 +69,12 @@
     subtitle.textContent = sub;
     // Lets phones show the title on the lock screen.
     if ("mediaSession" in navigator && window.MediaMetadata) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: info.title, artist: sub });
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: info.title,
+        artist: sub,
+        // The show's picture on the lock screen (if it has one).
+        artwork: info.art ? [{ src: new URL(info.art, location.href).href, type: "image/jpeg" }] : [],
+      });
     }
   }
 

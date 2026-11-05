@@ -1,4 +1,4 @@
-"""Airwave Archive web app — Phase 5c: the library, episode details, series, and artwork.
+"""Airwave Archive web app — Phase 5d: the library, episode details, series, and artwork.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -600,6 +600,18 @@ def artwork(art_hash: str):
         raise HTTPException(status_code=404, detail="No such picture")
     return FileResponse(path, media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.get("/files/{file_id}/art")
+def file_art(file_id: int):
+    """The picture for a file's episode (for the player bar and a phone's
+    lock screen), or "not found" if it has none."""
+    f = get_file(file_id)
+    with Session(get_engine()) as session:
+        art = episode_art(session, f)
+    if art is None:
+        raise HTTPException(status_code=404, detail="No picture")
+    return RedirectResponse(f"/art/{art}.jpg", status_code=307)
 
 
 @app.get("/health")

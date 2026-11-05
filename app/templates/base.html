@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Airwave Archive{% endblock %}</title>
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   <script src="{{ static_url('htmx.min.js') }}" defer></script>
@@ -28,6 +28,7 @@
   </footer>
 
   <div id="player" class="player" hidden>
+    <img id="player-art" class="player-art" alt="" hidden>
     <div class="player-info">
       <a id="player-title" class="player-title" href="/"></a>
       <span id="player-subtitle" class="muted small"></span>

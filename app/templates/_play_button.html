@@ -5,6 +5,7 @@
 <button class="play-button{% if big %} button primary{% endif %}" type="button"
         aria-label="Play {{ f | display_title }}"
         data-play data-src="/audio/{{ f.id }}" data-href="/files/{{ f.id }}"
+        data-art="/files/{{ f.id }}/art"
         {% if parts | length > 1 %}
         data-queue="{% for p in queue %}/audio/{{ p.id }} {% endfor %}"
         data-numbers="{% for p in queue %}{{ p.part_number }} {% endfor %}"
