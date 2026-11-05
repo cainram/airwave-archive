@@ -316,10 +316,16 @@ Split into five smaller steps, done in order.
   older database it first saves a copy (`airwave.db.before-v2`). Time
   zones offered: US Eastern/Central/Mountain/Pacific, UK, UTC.
 
-#### 4b — Fill in from tags
+#### 4b — Fill in from tags ✅ *done*
 - Pre-fill episode details from the file's own tags (e.g. artist → series),
   marked as automatic. Manual edits always win.
 - **Try it:** Campbell Playhouse files show series and title with no typing.
+- Notes: series comes from the artist tag (or album if there's no artist),
+  title from the title tag, the air date from the date tag (only clear
+  forms: `1939`, `1939-04`, `1939-04-14`; any time is ignored as it has no
+  zone), and the whole comment goes into Notes (owner's choice). Pulling
+  cast and exact dates out of comments is left for 4c, where guesses are
+  confirmed first. Database version 3 fills in existing episodes once.
 
 #### 4c — Filename parser with a confirm screen
 - Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's

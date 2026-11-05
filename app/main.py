@@ -206,6 +206,7 @@ def file_page(request: Request, file_id: int):
 def render_edit_form(request: Request, f: AudioFile, values: dict, errors: dict | None = None):
     return render(request, "edit.html", {
         "f": f, "v": values, "errors": errors or {},
+        "sources": f.episode.sources if f.episode else {},
         "text_fields": TEXT_FIELDS, "long_fields": LONG_FIELDS,
         "months": MONTHS, "time_zones": TIME_ZONES,
     })

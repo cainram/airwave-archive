@@ -4,6 +4,9 @@ edit form, and showing air dates in plain words.
 Air dates follow the plan's rule: never invent missing parts. A date can be
 just a year, a year and month, a full date, or a full date with a time and
 time zone.
+
+Details can also be filled in automatically from a file's own tags. Those
+are marked as coming from tags, and never replace anything typed by hand.
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ import calendar
 import re
 from datetime import date
 
-from app.db import MANUAL, Episode, utcnow
+from app.db import MANUAL, TAGS, AudioFile, Episode, utcnow
 
 # The plain text fields, in the order they appear on the form.
 TEXT_FIELDS = {
@@ -46,8 +49,8 @@ TIME_PATTERN = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 
 def _clean(text: str | None) -> str | None:
-    """Trim spaces; empty means "not known"."""
-    text = (text or "").strip().replace("\r\n", "\n")
+    """Trim spaces and use one kind of line ending; empty means "not known"."""
+    text = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     return text or None
 
 
@@ -122,6 +125,75 @@ def apply_edits(episode: Episode, values: dict) -> list[str]:
         changed.append("air_date")
     if changed:
         episode.sources = sources
+        episode.updated_at = utcnow()
+    return changed
+
+
+# Dates in tags: "1939", "1939-04", or "1939-04-14" (anything after the
+# day, such as a time, is ignored because it has no time zone).
+TAG_DATE_PATTERN = re.compile(r"^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:[T ].*)?$")
+
+
+def date_from_tag(text: str | None) -> tuple[int | None, int | None, int | None]:
+    """'1939' -> (1939, None, None); '1939-04-14' -> (1939, 4, 14).
+    Anything unclear gives (None, None, None): better unknown than wrong."""
+    match = TAG_DATE_PATTERN.match((text or "").strip())
+    if not match:
+        return None, None, None
+    year, month, day = (int(part) if part else None for part in match.groups())
+    if not EARLIEST_YEAR <= year <= LATEST_YEAR:
+        return None, None, None
+    if month is not None and not 1 <= month <= 12:
+        return year, None, None
+    if day is not None and not 1 <= day <= calendar.monthrange(year, month)[1]:
+        return year, month, None
+    return year, month, day
+
+
+def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
+    """Fill in episode details from a file's tags.
+
+    Anything typed by hand is left alone. Values that came from tags before
+    are updated (or cleared) to match the tags now. Returns True if
+    anything changed.
+    """
+    sources = episode.sources
+    changed = False
+    found = {
+        "series": _clean(f.tag_artist) or _clean(f.tag_album),
+        "title": _clean(f.tag_title),
+        "notes": _clean(f.tag_comment),
+    }
+    for name, value in found.items():
+        source = sources.get(name)
+        if source == MANUAL or (value is None and source != TAGS):
+            continue
+        if getattr(episode, name) != value:
+            setattr(episode, name, value)
+            changed = True
+        if value is None:
+            sources.pop(name, None)
+        else:
+            sources[name] = TAGS
+
+    source = sources.get("air_date")
+    year, month, day = date_from_tag(f.tag_date)
+    if source != MANUAL and (year is not None or source == TAGS):
+        new = {"air_year": year, "air_month": month, "air_day": day,
+               "air_time": None, "air_timezone": None}
+        if any(getattr(episode, part) != value for part, value in new.items()):
+            for part, value in new.items():
+                setattr(episode, part, value)
+            changed = True
+        if year is None:
+            sources.pop("air_date", None)
+        else:
+            sources["air_date"] = TAGS
+
+    if sources != episode.sources:
+        episode.sources = sources
+        changed = True
+    if changed:
         episode.updated_at = utcnow()
     return changed
 

@@ -1,5 +1,6 @@
 """Tests for episode details, editing, and missing files. Run with:  pytest"""
 
+import os
 import sqlite3
 from datetime import datetime
 
@@ -264,3 +265,123 @@ def test_missing_file_is_shown_and_can_be_forgotten(client, tmp_path):
 
 def test_files_still_present_cannot_be_forgotten(client):
     assert client.post("/files/1/forget").status_code == 400
+
+
+# ------------------------------------------------------ filling in from tags
+
+from mutagen.id3 import COMM, TDRC, TIT2, TPE1  # noqa: E402
+
+from app.db import TAGS  # noqa: E402
+from app.episodes import date_from_tag  # noqa: E402
+from test_scanner import add_tags  # noqa: E402
+
+
+def test_dates_from_tags_keep_only_known_parts():
+    assert date_from_tag("1939") == (1939, None, None)
+    assert date_from_tag("1939-04") == (1939, 4, None)
+    assert date_from_tag("1939-04-14") == (1939, 4, 14)
+    assert date_from_tag("1939-04-14T20:00:00") == (1939, 4, 14)   # time ignored: no zone
+    assert date_from_tag("1939-04-31") == (1939, 4, None)          # no such day
+    assert date_from_tag("April 14, 1939") == (None, None, None)   # unclear: unknown
+    assert date_from_tag("39") == (None, None, None)
+    assert date_from_tag(None) == (None, None, None)
+
+
+def tagged_wav(path, title="The Patriot", artist="The Campbell Playhouse", date="1939",
+               comment="Originally aired April 14, 1939\nCast: Orson Welles"):
+    make_wav(path, 1)
+    add_tags(path, title=TIT2(encoding=3, text=title), artist=TPE1(encoding=3, text=artist),
+             date=TDRC(encoding=3, text=date),
+             comment=COMM(encoding=3, lang="eng", desc="", text=comment))
+
+
+def test_scan_fills_in_details_from_tags(tmp_path, engine):
+    lib = tmp_path / "library"
+    tagged_wav(lib / "patriot.wav")
+    sync_library(engine, lib)
+    ep = files(engine)["patriot.wav"].episode
+    assert ep.series == "The Campbell Playhouse"
+    assert ep.title == "The Patriot"
+    assert (ep.air_year, ep.air_month, ep.air_day) == (1939, None, None)
+    assert ep.notes.startswith("Originally aired April 14, 1939")
+    assert ep.sources == {"series": TAGS, "title": TAGS, "air_date": TAGS, "notes": TAGS}
+    assert not ep.has_manual_edits
+
+
+def test_manual_edits_win_over_tags(tmp_path, engine):
+    lib = tmp_path / "library"
+    tagged_wav(lib / "patriot.wav")
+    sync_library(engine, lib)
+    edit(engine, "patriot.wav", series="Campbell Playhouse", title="The Patriot",
+         notes="", air_year="1939", air_month="4", air_day="14")
+
+    tagged_wav(lib / "patriot.wav", title="Retitled in the tags")
+    os.utime(lib / "patriot.wav", ns=(1, 1))
+    sync_library(engine, lib)
+
+    ep = files(engine)["patriot.wav"].episode
+    assert ep.series == "Campbell Playhouse"             # typed by hand: kept
+    assert ep.notes is None                              # cleared by hand: stays cleared
+    assert (ep.air_month, ep.air_day) == (4, 14)
+    assert ep.title == "Retitled in the tags"            # not edited (same value), so follows tags
+
+
+def test_details_from_tags_follow_tag_changes(tmp_path, engine):
+    lib = tmp_path / "library"
+    tagged_wav(lib / "show.wav", date="1939")
+    sync_library(engine, lib)
+    make_wav(lib / "show.wav", 2)                        # same file, tags gone
+    sync_library(engine, lib)
+    ep = files(engine)["show.wav"].episode
+    assert ep.series is None and ep.title is None and ep.air_year is None
+    assert ep.sources == {}
+
+
+def test_upgrade_fills_in_existing_episodes(tmp_path):
+    db = tmp_path / "data" / "airwave.db"
+    lib = tmp_path / "library"
+    tagged_wav(lib / "patriot.wav")
+    engine = make_engine(db)
+    sync_library(engine, lib)
+    # Make it look like a version 2 database, before filling in from tags.
+    with engine.begin() as conn:
+        conn.exec_driver_sql("UPDATE episodes SET series=NULL, title=NULL, notes=NULL, "
+                             "air_year=NULL, sources_json=NULL")
+        conn.exec_driver_sql("PRAGMA user_version=2")
+    engine.dispose()
+
+    engine = make_engine(db)
+    ep = files(engine)["patriot.wav"].episode
+    assert ep.series == "The Campbell Playhouse" and ep.air_year == 1939
+
+
+def test_pages_say_what_came_from_tags(tmp_path, monkeypatch):
+    import app.main as main
+    lib = tmp_path / "library"
+    tagged_wav(lib / "patriot.wav")
+    monkeypatch.setattr(main, "LIBRARY_DIR", lib)
+    monkeypatch.setattr(main, "_engine", make_engine(tmp_path / "data" / "airwave.db"))
+    client = TestClient(main.app)
+    client.get("/")
+    page = client.get("/files/1")
+    assert "from file tags" in page.text
+    assert "1939, date unknown" in page.text
+    assert "filled in from the file's tags" in client.get("/files/1/edit").text
+
+
+def test_saving_the_form_unchanged_keeps_tag_values_automatic(tmp_path, monkeypatch):
+    import app.main as main
+    lib = tmp_path / "library"
+    tagged_wav(lib / "patriot.wav", comment="Originally aired April 14, 1939\r\n\r\nCast:\r\nOrson Welles")
+    monkeypatch.setattr(main, "LIBRARY_DIR", lib)
+    monkeypatch.setattr(main, "_engine", make_engine(tmp_path / "data" / "airwave.db"))
+    client = TestClient(main.app)
+    client.get("/")
+    ep = files(main._engine)["patriot.wav"].episode
+    # What a browser sends back when Save is pressed without changing anything
+    # (browsers send line endings in textareas as \r\n).
+    unchanged = {"series": ep.series, "title": ep.title, "notes": ep.notes.replace("\n", "\r\n"),
+                 "air_year": "1939"}
+    client.post("/files/1/edit", data=unchanged)
+    assert files(main._engine)["patriot.wav"].episode.sources == {
+        "series": TAGS, "title": TAGS, "notes": TAGS, "air_date": TAGS}

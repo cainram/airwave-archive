@@ -29,16 +29,21 @@
   </div>
 </section>
 
+{% set sources = ep.sources if ep else {} %}
+{% macro fact(label, value, source) %}
+  <dt>{{ label }}{% if value and source == "tags" %} <span class="tag-code">from file tags</span>{% endif %}</dt>
+  <dd>{{ value or "—" }}</dd>
+{% endmacro %}
 <h2>Episode</h2>
 <dl class="facts">
-  <dt>Series</dt><dd>{{ ep.series if ep and ep.series else "—" }}</dd>
-  <dt>Episode number</dt><dd>{{ ep.episode_number if ep and ep.episode_number else "—" }}</dd>
-  <dt>Title</dt><dd>{{ ep.title if ep and ep.title else "—" }}</dd>
-  <dt>Aired</dt><dd>{{ (ep | air_date) or "—" }}</dd>
-  <dt>Station / network</dt><dd>{{ ep.network if ep and ep.network else "—" }}</dd>
-  <dt>Host</dt><dd>{{ ep.host if ep and ep.host else "—" }}</dd>
-  <dt>Cast</dt><dd>{{ ep.cast if ep and ep.cast else "—" }}</dd>
-  <dt>Notes</dt><dd>{{ ep.notes if ep and ep.notes else "—" }}</dd>
+  {{ fact("Series", ep.series if ep else None, sources.get("series")) }}
+  {{ fact("Episode number", ep.episode_number if ep else None, sources.get("episode_number")) }}
+  {{ fact("Title", ep.title if ep else None, sources.get("title")) }}
+  {{ fact("Aired", ep | air_date, sources.get("air_date")) }}
+  {{ fact("Station / network", ep.network if ep else None, sources.get("network")) }}
+  {{ fact("Host", ep.host if ep else None, sources.get("host")) }}
+  {{ fact("Cast", ep.cast if ep else None, sources.get("cast")) }}
+  {{ fact("Notes", ep.notes if ep else None, sources.get("notes")) }}
 </dl>
 {% if not (ep and ep.sources) %}
 <p class="muted small">No details filled in yet. Press <strong>Edit details</strong> to add them.</p>
