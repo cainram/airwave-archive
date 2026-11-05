@@ -341,7 +341,9 @@ Split into five smaller steps, done in order.
 - Notes: the reader looks for a date (`1943-05-13`, `1943.05.13`,
   `19430513`, `43-05-13` read as 19xx, `xx` for unknown parts); text before
   it is the series, after it the title; an episode number only when marked
-  (`#42`, `Ep 42`). The review page (`/review/filenames`) shows only files
+  (`#42`, `Ep 42`). Month names work too (`Mar 01 2010`, `March 2nd,
+  1996`, `01-Mar-2010`, added in 4e), and a part marker at the end
+  (`Hour 1`, `Part 2`) isn't taken as a title. The review page (`/review/filenames`) shows only files
   offering something for a field the owner hasn't set; cards that would
   replace the owner's own values start unticked. Confirmed values count as
   manual. Pulling cast lists out of comments is not done (could be a later
@@ -359,10 +361,23 @@ Split into five smaller steps, done in order.
   time zone so nights when the clocks change come out right. The `tzdata`
   package carries the time zone rules so this also works on Windows.
 
-#### 4e — Multi-part broadcasts
+#### 4e — Multi-part broadcasts ✅ *done*
 - Group files ("Hour 1", "Hour 2", …) into one episode that plays straight
   through, while still remembering each file.
 - **Try it:** group three files and play them as one.
+- Notes: grouping is by hand, from a file's page ("Group with other
+  files…"), choosing among nearby files in the same folder. Parts play in
+  file-name order ("Hour 2" before "Hour 10"); each file gets a
+  `part_number` (database version 4). The group keeps the details of the
+  episode it was made from; series, title and date from tags come from
+  part 1, and Notes gather the descriptions of all parts (each different
+  one once, labelled "Part 1:", "Parts 2 and 3:"; owner's choice). The
+  library shows a group as one row with its total length; the overnight end
+  time uses the total too (owner's choice: the recordings' length decides
+  the end time, even if commercials were cut; no separate "length on
+  air"). Grouping counts as a manual edit, so a missing
+  part is kept (and skipped when playing). Not done: guessing groups
+  automatically from file names (could be added to the review page later).
 
 ### Phase 5 — Browse like Plex
 - Series grid with artwork (from embedded art, a folder image, or upload).

@@ -9,7 +9,8 @@ Tables:
 - ``episodes``: one row per broadcast, with its radio details (series,
   title, air date, cast...). Like an index card for each broadcast.
 - ``audio_files``: one row per audio file in the library. Each file belongs
-  to an episode. (Later, one episode can have several files.)
+  to an episode. One episode can have several files ("parts"), such as
+  a long show saved as Hour 1, Hour 2, Hour 3.
 - ``scan_runs``: one row per scan, recording what changed.
 """
 
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,7 +34,9 @@ DB_FILENAME = "airwave.db"
 #   1: Phase 2, audio files and scans
 #   2: Phase 4a, episodes, and files can be marked missing
 #   3: Phase 4b, episode details filled in from tags (no layout change)
-SCHEMA_VERSION = 3
+#   4: Phase 4e, files can be parts of one episode (part_number)
+#   5: Phase 4e, a group's notes gather all parts' descriptions (no layout change)
+SCHEMA_VERSION = 5
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -90,6 +94,23 @@ class Episode(Base):
     def has_manual_edits(self) -> bool:
         return MANUAL in self.sources.values()
 
+    @property
+    def parts(self) -> list[AudioFile]:
+        """This episode's files in playing order (just one for most)."""
+        return sorted(self.files, key=lambda f: (f.part_number or 0, natural_key(f.name)))
+
+    @property
+    def length(self) -> float | None:
+        """Total length of all parts, in seconds; None if any is unknown."""
+        lengths = [f.duration_seconds for f in self.files]
+        return None if None in lengths or not lengths else sum(lengths)
+
+
+def natural_key(name: str) -> list:
+    """Sort file names the way people expect: 'Hour 2' before 'Hour 10'."""
+    return [int(piece) if piece.isdigit() else piece.lower()
+            for piece in re.split(r"(\d+)", name)]
+
 
 class AudioFile(Base):
     """One audio file in the library, as last seen by a scan."""
@@ -127,6 +148,9 @@ class AudioFile(Base):
     # The episode this file belongs to.
     episode_id: Mapped[int | None] = mapped_column(ForeignKey("episodes.id"), index=True)
     episode: Mapped[Episode | None] = relationship(back_populates="files", lazy="joined")
+    # For an episode made of several files: 1, 2, 3... in playing order.
+    # None for a file that is a whole episode by itself.
+    part_number: Mapped[int | None]
 
     # True if the file wasn't found by the last scan but is kept because its
     # episode has edits.
@@ -178,6 +202,9 @@ def _migrate(conn) -> None:
     conn.exec_driver_sql(
         "CREATE INDEX IF NOT EXISTS ix_audio_files_episode_id ON audio_files (episode_id)")
     # (Files without an episode get one at the end of the next scan.)
+    # Version 4: files can be parts of one episode.
+    if "part_number" not in columns:
+        conn.exec_driver_sql("ALTER TABLE audio_files ADD COLUMN part_number INTEGER")
 
 
 def make_engine(db_path: Path) -> Engine:
@@ -208,7 +235,7 @@ def make_engine(db_path: Path) -> Engine:
     Base.metadata.create_all(engine)   # creates any tables that don't exist yet
     with engine.begin() as conn:
         _migrate(conn)
-    if 0 < version < 3:
+    if 0 < version < 5:
         _fill_all_from_tags(engine)
     with engine.begin() as conn:
         conn.exec_driver_sql(f"PRAGMA user_version={SCHEMA_VERSION}")
@@ -216,8 +243,10 @@ def make_engine(db_path: Path) -> Engine:
 
 
 def _fill_all_from_tags(engine: Engine) -> None:
-    """Version 3: fill in details from tags for files already in the
-    database (new and changed files are filled in as they're scanned)."""
+    """Fill in details from tags for files already in the database, when
+    the way that's done has changed (versions 3 and 5). New and changed
+    files are filled in as they're scanned. Typed details are never
+    touched."""
     from sqlalchemy import select
     from sqlalchemy.orm import Session
 

@@ -80,7 +80,7 @@ def _text(value) -> str:
     if isinstance(value, list):
         return "; ".join(t for t in (_text(v) for v in value) if t)
     if isinstance(value, Frame) and hasattr(value, "text"):   # ID3 text frames
-        return _text(list(value.text))
+        return _text(value.text)   # a list, or one piece of text (lyrics)
     if isinstance(value, Frame) and hasattr(value, "url"):    # ID3 link frames
         return str(value.url)
     if hasattr(value, "value"):         # WMA attributes

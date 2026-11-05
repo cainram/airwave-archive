@@ -1,4 +1,5 @@
-"""Airwave Archive web app — Phase 4d: episode details, editing, file-name review, overnight shows.
+"""Airwave Archive web app — Phase 4e: episode details, editing, file-name review,
+overnight shows, and episodes made of several files.
 
 Run locally with:   uvicorn app.main:app --reload
 """
@@ -15,8 +16,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import Engine, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, func, or_, select
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import DB_FILENAME, MANUAL, AudioFile, Episode, ScanRun, make_engine, utcnow
 from app.episodes import (
@@ -24,6 +25,7 @@ from app.episodes import (
     format_air_date, read_date_text, read_form,
 )
 from app.filenames import date_text, parse_filename
+from app.parts import nearby_files, renumber, set_parts
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
 APP_DIR = Path(__file__).parent
@@ -131,9 +133,15 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
     return response
 
 
+# Load a file's episode and all that episode's parts along with it.
+WITH_PARTS = joinedload(AudioFile.episode).selectinload(Episode.files)
+# Files shown in lists: whole episodes, and the first part of grouped ones.
+FIRST_PARTS = or_(AudioFile.part_number.is_(None), AudioFile.part_number == 1)
+
+
 def get_file(file_id: int) -> AudioFile:
     with Session(get_engine()) as session:
-        row = session.get(AudioFile, file_id)
+        row = session.get(AudioFile, file_id, options=[WITH_PARTS])
     if row is None:
         raise HTTPException(status_code=404, detail="No such file in the library")
     return row
@@ -170,10 +178,14 @@ def library_page(request: Request, page: int = 1):
             func.count(AudioFile.id).filter(present, AudioFile.duration_seconds.is_(None)),
             func.count(AudioFile.id).filter(AudioFile.missing.is_(True)),
         )).one()
-        pages = max(1, -(-count // PAGE_SIZE))   # round up
+        # Episodes made of several files take one row.
+        rows = session.scalar(select(func.count(AudioFile.id)).where(FIRST_PARTS))
+        pages = max(1, -(-rows // PAGE_SIZE))   # round up
         page = min(max(1, page), pages)
         files = session.scalars(
             select(AudioFile)
+            .where(FIRST_PARTS)
+            .options(WITH_PARTS)
             .order_by(AudioFile.folder, AudioFile.name)
             .offset((page - 1) * PAGE_SIZE)
             .limit(PAGE_SIZE)
@@ -252,9 +264,45 @@ def forget(request: Request, file_id: int):
     if not f.missing:
         raise HTTPException(status_code=400, detail="Only missing files can be forgotten")
     with Session(get_engine()) as session:
+        episode_id = session.get(AudioFile, file_id).episode_id
         forget_files(session, [file_id])
+        session.expire_all()
+        if episode_id is not None and (episode := session.get(Episode, episode_id)):
+            renumber(episode)   # the other parts, if it was one of several
         session.commit()
     return go_to(request, "/")
+
+
+# ------------------------------------------------------- parts (several files)
+
+
+@app.get("/files/{file_id}/parts", response_class=HTMLResponse)
+def parts_page(request: Request, file_id: int, error: str | None = None):
+    """Choose which files are parts of the same broadcast as this one."""
+    f = get_file(file_id)
+    with Session(get_engine()) as session:
+        candidates = nearby_files(session, session.get(AudioFile, file_id, options=[WITH_PARTS]))
+        for row in candidates:   # load each one's episode while the database is open
+            if row.episode is not None:
+                row.episode.files
+    return render(request, "parts.html", {"f": f, "candidates": candidates, "error": error})
+
+
+@app.post("/files/{file_id}/parts")
+async def save_parts(request: Request, file_id: int):
+    f = get_file(file_id)
+    ids = [int(value) for value in (await request.form()).getlist("part") if value.isdigit()]
+    if not ids:
+        return go_to(request, f"/files/{file_id}/parts?error=none")
+    with Session(get_engine()) as session:
+        episode = session.get(AudioFile, file_id).episode
+        chosen = session.scalars(select(AudioFile).where(AudioFile.id.in_(ids))).all()
+        if episode is None or not chosen:
+            raise HTTPException(status_code=400, detail="Nothing to group")
+        set_parts(session, episode, list(chosen))
+        session.commit()
+        first = episode.parts[0].id
+    return go_to(request, f"/files/{first}")
 
 
 # ------------------------------------------------------- file-name review
@@ -273,7 +321,7 @@ def review_rows(session: Session) -> tuple[list[dict], int]:
                Episode.episode_number, Episode.title, Episode.air_year, Episode.air_month,
                Episode.air_day, Episode.sources_json)
         .join(Episode, AudioFile.episode_id == Episode.id)
-        .where(AudioFile.missing.is_(False))
+        .where(AudioFile.missing.is_(False), FIRST_PARTS)
         .order_by(AudioFile.folder, AudioFile.name)
     )
     for (file_id, folder, name, series, number, title,

@@ -2,6 +2,8 @@
 {% block title %}{{ f | display_title }} · Airwave Archive{% endblock %}
 {% block content %}
 {% set ep = f.episode %}
+{% set parts = ep.parts if ep else [f] %}
+{% set grouped = parts | length > 1 %}
 <p class="small"><a href="/">← Library</a></p>
 
 {% if f.missing %}
@@ -19,13 +21,16 @@
 <section class="summary">
   <div>
     <h1>{{ f | display_title }}</h1>
+    {% if grouped %}<p class="part-of">Part {{ f.part_number }} of {{ parts | length }}</p>{% endif %}
     <p class="muted">
       {% for part in [ep.series if ep else None, (ep | air_date) or f.tag_date] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}
     </p>
   </div>
   <div class="actions">
-    {% if not f.missing %}{% with big = true %}{% include "_play_button.html" %}{% endwith %}{% endif %}
+    {% set first = (parts | rejectattr("missing") | first) %}
+    {% if first %}{% with big = true, f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}
     <a class="button" href="/files/{{ f.id }}/edit">Edit details</a>
+    <a class="button" href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
   </div>
 </section>
 
@@ -39,7 +44,7 @@
   {{ fact("Series", ep.series if ep else None, sources.get("series")) }}
   {{ fact("Episode number", ep.episode_number if ep else None, sources.get("episode_number")) }}
   {{ fact("Title", ep.title if ep else None, sources.get("title")) }}
-  {{ fact("Aired", ep | air_date(length=f.duration_seconds), sources.get("air_date")) }}
+  {{ fact("Aired", ep | air_date(length=ep.length if ep else f.duration_seconds), sources.get("air_date")) }}
   {{ fact("Station / network", ep.network if ep else None, sources.get("network")) }}
   {{ fact("Host", ep.host if ep else None, sources.get("host")) }}
   {{ fact("Cast", ep.cast if ep else None, sources.get("cast")) }}
@@ -49,7 +54,28 @@
 <p class="muted small">No details filled in yet. Press <strong>Edit details</strong> to add them.</p>
 {% endif %}
 
-<h2>File</h2>
+{% if grouped %}
+<h2>Parts</h2>
+<p class="muted small">This broadcast is made of {{ parts | length }} files, played one after another
+  ({{ ep.length | duration }} in all). The details above belong to all of them.</p>
+<ol class="parts">
+  {% for p in parts %}
+  <li{% if p.id == f.id %} class="is-current"{% endif %}>
+    {% if not p.missing %}{% with f = p %}{% include "_play_button.html" %}{% endwith %}{% endif %}
+    {% if p.id == f.id %}<strong>{{ p.name }}</strong>{% else %}<a href="/files/{{ p.id }}">{{ p.name }}</a>{% endif %}
+    <span class="muted small">{{ p.duration_seconds | duration }}</span>
+    {% if p.missing %}<span class="badge">missing</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+<form method="post" action="/files/{{ f.id }}/parts"
+      hx-confirm="Split this broadcast back into {{ parts | length }} separate files? The details above stay with {{ parts[0].name }}; the other files get their own again (from their tags).">
+  <input type="hidden" name="part" value="{{ parts[0].id }}">
+  <button class="button" type="submit">Split into separate files</button>
+</form>
+{% endif %}
+
+<h2>File{% if grouped %} (this part){% endif %}</h2>
 <dl class="facts">
   <dt>File name</dt><dd>{{ f.name }}</dd>
   <dt>Folder</dt><dd>{{ f.folder or "(top level)" }}</dd>

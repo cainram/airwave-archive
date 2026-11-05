@@ -176,3 +176,16 @@ body.has-player { padding-bottom: 110px; }
 }
 
 .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 16px; }
+
+/* Episodes made of several files ("parts"). */
+.badge.parts { background: #e6effa; color: #1f4f8a; }
+.part-of { margin: 0 0 4px; font-weight: 600; color: var(--muted); }
+.parts { padding-left: 1.6em; }
+.parts li { margin: 6px 0; }
+.parts li > * { vertical-align: middle; margin-right: 6px; }
+.part-choices { list-style: none; padding: 0; max-width: 700px; }
+.part-choices li { padding: 8px 0; border-bottom: 1px solid #eee; }
+.part-choices label { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; cursor: pointer; }
+.part-choices p { margin: 4px 0 0 28px; }
+.is-current { font-weight: 700; }
+.warning-text { color: #9a5b00; }

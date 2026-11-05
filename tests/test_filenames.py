@@ -21,6 +21,11 @@ from test_scanner import add_tags, make_wav
     ("Suspense.1943.05.13.Donovans.Brain.mp3", "Suspense", None, "Donovans Brain", (1943, 5, 13)),
     ("Suspense 19430513 #42 - Donovan's Brain.flac", "Suspense", "42", "Donovan's Brain", (1943, 5, 13)),
     ("Shadow 37-09-26 Ep 3 - The Death House Rescue.mp3", "Shadow", "3", "The Death House Rescue", (1937, 9, 26)),
+    # Month names, and "Hour 1" / "Part 2" isn't taken as a title.
+    ("Coast to Coast - Mar 01 2010 - Hour 1.mp3", "Coast to Coast", None, None, (2010, 3, 1)),
+    ("Art Bell March 2nd, 1996 Part 3.mp3", "Art Bell", None, None, (1996, 3, 2)),
+    ("C2C 01-Mar-2010 hr2.mp3", "C2C", None, None, (2010, 3, 1)),
+    ("Art Bell Sept 9 1997 - Area 51 Caller (Hour 2).mp3", "Art Bell", None, "Area 51 Caller", (1997, 9, 9)),
 ])
 def test_names_are_read(name, series, number, title, date):
     guess = parse_filename(name)
@@ -33,6 +38,9 @@ def test_names_are_read(name, series, number, title, date):
     "Show 1943-02-30.mp3",          # no such day
     "Show 1943-13-01.mp3",          # no such month
     "Escape - Three Skeleton Key.mp3",
+    "Marvel 12 2010.mp3",           # "Mar" inside a word
+    "Show 00 Mar 2010.mp3",         # no day 0
+    "Show Feb 30 1943.mp3",
 ])
 def test_names_without_a_real_date_give_no_guess(name):
     assert parse_filename(name) is None
