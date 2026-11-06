@@ -5,6 +5,7 @@
 <form id="pick" class="pick-toolbar" method="get" action="/episodes/edit">
   <input type="hidden" name="back" value="{{ back }}">
   <button class="button" type="submit">Edit ticked…</button>
+  <button class="button" type="submit" formaction="/export">Export ticked…</button>
   <button class="button" type="submit" formmethod="post" formaction="/episodes/played"
           name="played" value="1">Mark played</button>
   <button class="button" type="submit" formmethod="post" formaction="/episodes/played"

@@ -15,7 +15,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine, func, select
@@ -30,7 +30,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, csvimport, inbox, listening
+from app import airdates, csvimport, export, inbox, listening
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -863,6 +863,52 @@ async def save_listening_place(request: Request, episode_id: int):
         listening.save_place(session, episode, file_id, seconds, form.get("finished") == "1")
         session.commit()
     return Response(status_code=204)
+
+
+def picture_file(art_hash: str) -> Path | None:
+    """The file of one of the app's pictures (from a scan, or uploaded)."""
+    if not HASH_PATTERN.match(art_hash or ""):
+        return None
+    return next((p for p in (art_path(art_dir(), art_hash), art_path(upload_dir(), art_hash))
+                 if p.is_file()), None)
+
+
+def export_plan(session: Session, ids: list[int], whole_series: str):
+    episodes = chosen_episodes(session, ids, whole_series)
+    export.give_ids(episodes)
+    session.commit()
+    return export.make_plan(session, episodes, LIBRARY_DIR, picture_file)
+
+
+@app.get("/export", response_class=HTMLResponse)
+def export_page(request: Request, ids: list[int] = Query(default=[]),
+                whole_series: str = "", back: str = "/"):
+    """What an export will hold, with the button to download it."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        plan = export_plan(session, ids, whole_series)
+    query = urlencode([("whole_series", whole_series)] if whole_series
+                      else [("ids", e.id) for e in plan.episodes])
+    return render(request, "export.html", {
+        "plan": plan, "series": whole_series, "back": safe_back(back),
+        "download": f"/export/download?{query}",
+        "file_name": export.zip_name(whole_series or None, len(plan.episodes)),
+    })
+
+
+@app.get("/export/download")
+def export_download(ids: list[int] = Query(default=[]), whole_series: str = ""):
+    """The zip itself, made while it downloads."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        plan = export_plan(session, ids, whole_series)
+        for episode in plan.episodes:       # everything the zip needs, loaded now
+            episode.parts
+        session.expunge_all()
+    if not plan.items:
+        raise HTTPException(status_code=404, detail="Nothing to export")
+    name = export.zip_name(whole_series or None, len(plan.episodes))
+    work_dir = Path(get_engine().url.database).parent / "export-temp"
+    return StreamingResponse(export.stream_zip(plan, work_dir), media_type="application/zip",
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
 
 
 @app.get("/series/rename", response_class=HTMLResponse)

@@ -133,6 +133,10 @@ These come from the plan and should not be changed without the owner's OK:
   played
 - `app/airdates.py`: the calendar (episodes by air date: a month's grid
   and days, nearest months with recordings)
+- `app/tagging.py`: writes episode details into tags of **copies** only
+  (standard tags plus `AIRWAVE_*` tags), and reads Airwave tags back
+- `app/export.py`: export zips (tagged copies, manifest, pictures), made
+  while they download
 - `app/search.py`: the search index (SQLite FTS5) and searching. The
   index updates itself after every save (an `after_flush` hook); changes
   made with raw SQL or bulk `delete()` must update it themselves.
