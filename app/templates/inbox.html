@@ -3,7 +3,11 @@
 {% block content %}
 <h1>Inbox</h1>
 
-{% if uploaded is not none %}
+{% for problem in problems %}<div class="notice error" role="alert">{{ problem }}</div>{% endfor %}
+{% if unpacked %}
+<div class="notice success" role="status">Unpacked {{ "the zip" if unpacked == 1 else unpacked ~ " zips" }}: {{ uploaded }} recording{{ "" if uploaded == 1 else "s" }} {{ "is" if uploaded == 1 else "are" }} waiting below.
+  {% if with_details %}{{ "It" if uploaded == 1 else ("All of them" if with_details == uploaded else with_details) }} came with {{ "its" if uploaded == 1 else "their" }} details from Airwave Archive.{% endif %}</div>
+{% elif uploaded is not none %}
 <div class="notice success" role="status">Uploaded {{ uploaded }} file{{ "" if uploaded == 1 else "s" }}.
   {% if skipped %}{{ skipped }} {{ "wasn't an audio file" if skipped == 1 else "weren't audio files" }}, so
   {{ "it was" if skipped == 1 else "they were" }} left out.{% endif %}</div>
@@ -15,8 +19,9 @@
 {% if added_all is not none %}<div class="notice success" role="status">
   Added {{ added_all }} file{{ "" if added_all == 1 else "s" }} to your library{% if folders %}, in
   {{ "the folder" if folders | length == 1 else "the folders" }}
-  {% for f in folders %}<strong>{{ f or "(top of the library)" }}</strong>{{ ", " if not loop.last }}{% endfor %}{% endif %}.</div>{% endif %}
-{% if rejected %}<div class="notice" role="status">The file was deleted from the inbox.</div>{% endif %}
+  {% for f in folders %}<strong>{{ f or "(top of the library)" }}</strong>{{ ", " if not loop.last }}{% endfor %}{% endif %}.
+  {% if skipped_have %}{{ skipped_have }} {{ "was" if skipped_have == 1 else "were" }} left in the inbox because you already have {{ "that episode" if skipped_have == 1 else "those episodes" }}.{% endif %}</div>{% endif %}
+{% if rejected %}<div class="notice" role="status">{{ "The file was" if rejected == 1 else rejected ~ " files were" }} deleted from the inbox.</div>{% endif %}
 {% if errors %}<div class="notice error" role="alert">Nothing was saved yet: some dates need fixing. See the notes in red below.</div>{% endif %}
 
 <p class="muted">New recordings wait here until you add them to your library. Check the details
@@ -28,22 +33,52 @@
       enctype="multipart/form-data" data-upload-progress>
   <label for="files">Upload recordings</label>
   <input id="files" name="files" type="file" multiple required
-         accept="audio/*,.mp3,.m4a,.m4b,.aac,.flac,.ogg,.oga,.opus,.wav,.wma,.aiff,.aif">
-  <p class="muted small">Choose one or more audio files. Big files take a while: keep this page
-    open until the upload finishes. (For a whole collection, copying files onto the server is faster.)</p>
+         accept="audio/*,.mp3,.m4a,.m4b,.aac,.flac,.ogg,.oga,.opus,.wav,.wma,.aiff,.aif,.zip,application/zip">
+  <p class="muted small">Choose one or more audio files, or a zip of them, such as an export from
+    another Airwave Archive (its episodes arrive with all their details). Big files take a while:
+    keep this page open until the upload finishes. (For a whole collection or a very big zip,
+    copying it onto the server's inbox folder is faster.)</p>
   <progress hidden max="100" value="0"></progress>
   <div class="form-buttons"><button class="button primary" type="submit">Upload</button></div>
 </form>
 
+{% if zips %}
+<h2>Zips to unpack ({{ zips | length }})</h2>
+<p class="muted small">These zips were put in the inbox folder. Unpacking puts their recordings
+  in the inbox below (nothing goes into your library yet), then deletes the zip.</p>
+<ul class="zip-list">
+  {% for z in zips %}
+  <li>
+    <span>{{ z.name }} <span class="muted small">{{ z.stat().st_size | size }}</span></span>
+    <form method="post" action="/inbox/unpack">
+      <input type="hidden" name="name" value="{{ z.name }}">
+      <button class="button primary" type="submit">Unpack</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
 {% if not rows %}
-<div class="notice">The inbox is empty.</div>
+{% if not zips %}<div class="notice">The inbox is empty.</div>{% endif %}
 {% else %}
 <h2>Waiting ({{ rows | length }})</h2>
+{% set addable = rows | length - duplicates %}
+{% if duplicates %}
+<div class="notice warning" role="status">
+  You already have {{ "the episode of 1 file" if duplicates == 1 else "the episodes of " ~ duplicates ~ " files" }} below
+  (marked “Already in your library”). Adding all skips {{ "it" if duplicates == 1 else "them" }}.
+  <form method="post" action="/inbox/reject-duplicates"
+        hx-confirm="Delete the {{ duplicates }} file{{ '' if duplicates == 1 else 's' }} you already have from the inbox? Your library isn't affected.">
+    <button class="button" type="submit">Delete {{ "it" if duplicates == 1 else "these " ~ duplicates }} from the inbox</button>
+  </form>
+</div>
+{% endif %}
 <p class="muted small">Dates are written like 1939-04-14, 1939-04 (day unknown), or 1939 (only the year).</p>
 <form method="post" action="/inbox">
   <div class="form-buttons">
     <button class="button primary" type="submit">Save details</button>
-    <button class="button primary" type="submit" formaction="/inbox/add-all">Add all {{ rows | length }} to library</button>
+    {% if addable %}<button class="button primary" type="submit" formaction="/inbox/add-all">{{ "Add all " ~ addable if addable > 1 else "Add it" if rows | length == 1 else "Add the 1 new one" }} to library</button>{% endif %}
   </div>
   {% for row in rows %}
   {% set item = row.item %}
@@ -65,9 +100,25 @@
       </div>
       {% endfor %}
     </div>
+    {% set x = row.extra %}
+    {% if x %}
+    <p class="inbox-extra muted small">
+      {% if x.part %}<span>Part {{ x.part }} of {{ x.parts }}</span>{% endif %}
+      {% if x.air_time %}<span>Aired at {{ x.air_time | clock }}{% if x.time_zone %} {{ zone_names[x.time_zone] }}{% endif %}{% if x.air_date != row.vals.date %} (on {{ x.air_date }}; kept only if the date stays the same){% endif %}</span>{% endif %}
+      {% if x.network %}<span>Station: {{ x.network }}</span>{% endif %}
+      {% if x.host %}<span>Host: {{ x.host }}</span>{% endif %}
+      {% if x.cast %}<span>Cast: {{ x.cast | truncate(120) }}</span>{% endif %}
+      {% if x.notes %}<span>Notes: {{ x.notes | truncate(160) }}</span>{% endif %}
+      {% if x.picture %}<span>Series picture</span>{% endif %}
+    </p>
+    {% endif %}
     {% if errors[item.id] %}<p class="field-error">{{ errors[item.id] }}</p>{% endif %}
+    {% if row.have %}
+    <p class="inbox-have"><strong>Already in your library:</strong>
+      <a href="/files/{{ row.have.id }}">{{ row.have.title }}</a>. This is another copy of that episode.</p>
+    {% endif %}
     <div class="form-buttons">
-      <button class="button primary" type="submit" formaction="/inbox/{{ item.id }}/add">Add to library</button>
+      {% if not row.have %}<button class="button primary" type="submit" formaction="/inbox/{{ item.id }}/add">Add to library</button>{% endif %}
       {# Belongs to its own small form below (forms can't be inside each other). #}
       <button class="button" type="submit" form="reject-{{ item.id }}">Reject (delete)</button>
     </div>
@@ -75,7 +126,7 @@
   {% endfor %}
   <div class="form-buttons">
     <button class="button primary" type="submit">Save details</button>
-    <button class="button primary" type="submit" formaction="/inbox/add-all">Add all {{ rows | length }} to library</button>
+    {% if addable %}<button class="button primary" type="submit" formaction="/inbox/add-all">{{ "Add all " ~ addable if addable > 1 else "Add it" if rows | length == 1 else "Add the 1 new one" }} to library</button>{% endif %}
   </div>
 </form>
 {% for row in rows %}

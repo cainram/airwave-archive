@@ -215,6 +215,12 @@ other recordings of its series (or into a new folder named after the
 series, or `Unsorted` if it has none). A file with the same name is never
 replaced: a number is added instead.
 
+The inbox also takes **zips**: an export from another Airwave Archive (its
+episodes arrive with all their details) or any zip of recordings. An
+uploaded zip is unpacked straight away; a zip copied into the inbox folder
+by hand gets an **Unpack** button (faster for very big zips). Unpacking
+needs free disk space for the recordings, as well as the zip itself.
+
 ## Back up the data folder
 
 The app keeps its database in `/srv/airwave/data`. It's small, and it will

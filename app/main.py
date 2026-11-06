@@ -26,11 +26,12 @@ from app.db import (
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
-    day_heading, format_air_date, format_air_span, format_air_time, read_date_text, read_form,
+    day_heading, format_air_date, format_air_span, format_air_time, format_time, read_date_text,
+    read_form,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, csvimport, export, inbox, listening
+from app import airdates, csvimport, export, inbox, listening, zipimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -158,6 +159,7 @@ templates.env.filters["listened_at"] = listening.listened_at
 templates.env.filters["time_left"] = listening.time_left
 templates.env.filters["air_time"] = format_air_time
 templates.env.filters["air_span"] = format_air_span
+templates.env.filters["clock"] = format_time
 templates.env.globals["day_heading"] = day_heading
 
 
@@ -482,28 +484,33 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
 INBOX_FIELDS = {"series": "Series", "episode_number": "Ep.", "date": "Aired", "title": "Title"}
 
 
-def render_inbox(request: Request, typed=None, errors=None, **notices):
+def render_inbox(request: Request, typed=None, errors=None, problems=(), **notices):
     with Session(get_engine()) as session:
         items = inbox.sync_inbox(session, INBOX_DIR)
+        rows = []
+        for item in items:
+            values = {"series": item.series or "", "episode_number": item.episode_number or "",
+                      "title": item.title or "",
+                      "date": date_text(item.air_year, item.air_month, item.air_day)}
+            values.update((typed or {}).get(item.id, {}))
+            have = inbox.already_have(session, item)
+            rows.append({"item": item, "vals": values, "extra": item.extra,
+                         "have": have and {"id": have.id, "title": display_title(have)}})
         session.expunge_all()
-    rows = []
-    for item in items:
-        values = {"series": item.series or "", "episode_number": item.episode_number or "",
-                  "title": item.title or "",
-                  "date": date_text(item.air_year, item.air_month, item.air_day)}
-        values.update((typed or {}).get(item.id, {}))
-        rows.append({"item": item, "vals": values})
     return render(request, "inbox.html", {
         "rows": rows, "fields": INBOX_FIELDS, "errors": errors or {},
-        "inbox_dir": INBOX_DIR, **notices,
-    }, status_code=400 if errors else 200)
+        "duplicates": sum(1 for row in rows if row["have"]),
+        "zips": zipimport.inbox_zips(INBOX_DIR), "problems": list(problems),
+        "zone_names": TIME_ZONES, "inbox_dir": INBOX_DIR, **notices,
+    }, status_code=400 if errors or problems else 200)
 
 
 @app.get("/inbox", response_class=HTMLResponse)
 def inbox_page(request: Request, uploaded: int | None = None, skipped: int | None = None,
                saved: int | None = None, rejected: int | None = None,
                added: int | None = None, added_all: int | None = None,
-               folder: list[str] = Query(default=[])):
+               skipped_have: int | None = None, unpacked: int | None = None,
+               with_details: int | None = None, folder: list[str] = Query(default=[])):
     added_file = None
     if added is not None:
         with Session(get_engine()) as session:
@@ -511,23 +518,65 @@ def inbox_page(request: Request, uploaded: int | None = None, skipped: int | Non
             session.expunge_all()
     return render_inbox(request, uploaded=uploaded, skipped=skipped, saved=saved,
                         rejected=rejected, added=added_file, added_all=added_all,
-                        folders=folder)
+                        skipped_have=skipped_have, unpacked=unpacked,
+                        with_details=with_details, folders=folder)
 
 
-@app.post("/inbox/upload")
+@app.post("/inbox/upload", response_class=HTMLResponse)
 async def inbox_upload(request: Request):
-    """Save uploaded audio files into the inbox (never into the library)."""
+    """Save uploaded audio files into the inbox (never into the library).
+    Zips are unpacked into the inbox straight away."""
     form = await request.form()
-    uploaded = skipped = 0
+    uploaded = skipped = unpacked = with_details = 0
+    problems = []
     for upload in form.getlist("files"):
-        name = inbox.safe_name(getattr(upload, "filename", "") or "")
+        filename = getattr(upload, "filename", "") or ""
+        if zip_name := zipimport.safe_zip_name(filename):
+            saved = INBOX_DIR / inbox.save_upload(upload.file, INBOX_DIR, "." + zip_name)
+            try:
+                result = unpack_zip(saved)
+            except zipimport.ZipProblem as problem:
+                problems.append(str(problem).replace(saved.name, zip_name))
+                continue
+            finally:
+                saved.unlink(missing_ok=True)
+            uploaded += result.files
+            with_details += result.with_details
+            unpacked += 1
+            continue
+        name = inbox.safe_name(filename)
         if name is None:
             skipped += 1
             continue
         inbox.save_upload(upload.file, INBOX_DIR, name)
         uploaded += 1
+    if problems:
+        return render_inbox(request, problems=problems, uploaded=uploaded, skipped=skipped,
+                            unpacked=unpacked, with_details=with_details)
     return go_to(request, with_query("/inbox", uploaded=str(uploaded),
-                                     skipped=str(skipped) if skipped else ""))
+                                     skipped=str(skipped) if skipped else "",
+                                     unpacked=str(unpacked) if unpacked else "",
+                                     with_details=str(with_details) if unpacked else ""))
+
+
+def unpack_zip(path: Path) -> zipimport.Unpacked:
+    with Session(get_engine()) as session:
+        return zipimport.unpack(session, path, INBOX_DIR, upload_dir())
+
+
+@app.post("/inbox/unpack", response_class=HTMLResponse)
+async def inbox_unpack(request: Request):
+    """Unpack a zip that was copied into the inbox folder."""
+    name = str((await request.form()).get("name", ""))
+    path = next((p for p in zipimport.inbox_zips(INBOX_DIR) if p.name == name), None)
+    if path is None:
+        raise HTTPException(status_code=404, detail="That zip isn't in the inbox any more")
+    try:
+        result = unpack_zip(path)
+    except zipimport.ZipProblem as problem:
+        return render_inbox(request, problems=[str(problem)])
+    return go_to(request, with_query("/inbox", uploaded=str(result.files), unpacked="1",
+                                     with_details=str(result.with_details)))
 
 
 def save_inbox_details(form) -> tuple[dict, dict, int]:
@@ -578,10 +627,14 @@ async def inbox_add_all(request: Request):
     typed, errors, _saved = save_inbox_details(await request.form())
     if errors:
         return render_inbox(request, typed, errors)
-    added, folders = 0, []
+    added, have, folders = 0, 0, []
     with Session(get_engine()) as session:
         for item in session.scalars(select(InboxItem).order_by(InboxItem.name)).all():
-            row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+            try:
+                row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+            except inbox.AlreadyHave:   # left in the inbox, marked
+                have += 1
+                continue
             if row is None:            # gone from the inbox meanwhile
                 session.delete(item)
             else:
@@ -590,7 +643,8 @@ async def inbox_add_all(request: Request):
                     folders.append(row.folder)
             session.commit()            # one at a time: each one done stays done
     return go_to(request, "/inbox?" + urlencode(
-        [("added_all", added), *(("folder", folder) for folder in folders)]))
+        [("added_all", added), *([("skipped_have", have)] if have else []),
+         *(("folder", folder) for folder in folders)]))
 
 
 @app.post("/inbox/{item_id}/add", response_class=HTMLResponse)
@@ -602,7 +656,11 @@ async def inbox_add(request: Request, item_id: int):
         return render_inbox(request, typed, errors)
     with Session(get_engine()) as session:
         item = inbox_item_or_404(session, item_id)
-        row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+        try:
+            row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
+        except inbox.AlreadyHave:
+            return render_inbox(request, problems=[
+                f"“{item.name}” wasn't added: you already have that episode."])
         if row is None:
             session.delete(item)
             session.commit()
@@ -626,6 +684,19 @@ def inbox_reject(request: Request, item_id: int):
         inbox.reject(session, INBOX_DIR, inbox_item_or_404(session, item_id))
         session.commit()
     return go_to(request, "/inbox?rejected=1")
+
+
+@app.post("/inbox/reject-duplicates")
+def inbox_reject_duplicates(request: Request):
+    """Delete every inbox file whose episode is already in the library."""
+    rejected = 0
+    with Session(get_engine()) as session:
+        for item in session.scalars(select(InboxItem)).all():
+            if inbox.already_have(session, item) is not None:
+                inbox.reject(session, INBOX_DIR, item)
+                rejected += 1
+        session.commit()
+    return go_to(request, f"/inbox?rejected={rejected}")
 
 
 @app.get("/inbox/{item_id}/audio")
