@@ -143,6 +143,10 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 - **Persistent player bar** — a player at the bottom of the screen that keeps
   playing while you browse to other pages.
 - **Calendar** — day / week / month (section 2).
+- **Light and dark themes** — a switch in the top bar, left of the search
+  box. Each browser remembers its choice; until one is made, it follows
+  the device's own light/dark setting. All colours are listed once at the
+  top of `style.css` (light, then dark).
 
 Design goals:
 

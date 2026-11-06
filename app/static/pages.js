@@ -37,6 +37,21 @@
     bar.value = Math.round(event.detail.loaded / event.detail.total * 100);
   });
 
+  // The light / dark switch in the top bar. The choice is kept in this
+  // browser (base.html applies it before the page is drawn).
+  function showTheme() {
+    const button = document.getElementById("theme-switch");
+    if (button) button.setAttribute("aria-checked", String(document.documentElement.dataset.theme === "dark"));
+  }
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest || !event.target.closest("#theme-switch")) return;
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    try { localStorage.setItem("airwave-theme", dark ? "dark" : "light"); } catch (e) {}
+    showTheme();
+  });
+  document.addEventListener("DOMContentLoaded", showTheme);
+
   document.addEventListener("DOMContentLoaded", countTicked);
   document.addEventListener("htmx:afterSettle", countTicked);
 })();
