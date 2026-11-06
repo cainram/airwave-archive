@@ -24,6 +24,7 @@
     <a class="button" href="/series/picture?name={{ name | urlencode }}">Change picture…</a>
     <a class="button" href="/series/rename?name={{ name | urlencode }}">Rename…</a>
     <a class="button" href="/episodes/edit?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Edit all {{ totals.episodes }}…</a>
+    <a class="button" href="/export?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Export…</a>
   </div>
   {% endif %}
 </section>

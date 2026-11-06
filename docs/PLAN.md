@@ -583,6 +583,15 @@ overwrites, renames or deletes library files.
   new info.
 
 ### Phase 11 — Export and import
+- 11a (export) ✅ *done*: "Export…" on a series page and "Export ticked…"
+  in the tick-box toolbar open a summary (episodes, recordings, size);
+  "Download zip" streams the zip while it's made: each recording is copied
+  to `export-temp/` in the data folder, tagged (`app/tagging.py`), stored
+  (no compression), and deleted. Zip: `<Series>/<file>`, `manifest.json`
+  (format "airwave-archive-export", version 1), `pictures/`, `README.txt`.
+  Episodes get a permanent ID (`episodes.uid`, database version 11) the
+  first time they're exported. Phase 10 is on hold (owner's choice,
+  2026-11-06).
 - Export selected episodes or series as a zip of tagged copies + manifest.
 - Import an Airwave zip through the inbox, with duplicates detected.
 - **Try it:** export a series, import it on a second test server (or a

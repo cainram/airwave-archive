@@ -46,7 +46,8 @@ DB_FILENAME = "airwave.db"
 #   8: Phase 6b, search index (episode_search, a full-text search table)
 #   9: Phase 7a, the upload inbox (inbox_items table)
 #  10: Phase 8, where you stopped listening, and what's played (listening table)
-SCHEMA_VERSION = 10
+#  11: Phase 11, a permanent ID for each episode (episodes.uid), for exports
+SCHEMA_VERSION = 11
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -81,6 +82,11 @@ class Episode(Base):
 
     # Where each detail came from, as JSON: {"cast": "manual", ...}.
     sources_json: Mapped[str | None]
+
+    # A permanent ID that stays the same on any Airwave server (given the
+    # first time the episode is exported; kept when it's imported), so a
+    # server can tell it already has an episode.
+    uid: Mapped[str | None]   # (unique: see ix_episodes_uid in _migrate)
 
     created_at: Mapped[datetime]   # UTC
     updated_at: Mapped[datetime]   # UTC
@@ -295,6 +301,10 @@ def _migrate(conn) -> None:
         # Files were read before pictures were looked for: the next scan
         # reads every file again, once.
         conn.exec_driver_sql("UPDATE audio_files SET mtime_ns = 0")
+    # Version 11: a permanent ID for each episode.
+    if "uid" not in _columns(conn, "episodes"):
+        conn.exec_driver_sql("ALTER TABLE episodes ADD COLUMN uid VARCHAR")
+    conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_episodes_uid ON episodes (uid)")
 
 
 def make_engine(db_path: Path) -> Engine:

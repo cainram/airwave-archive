@@ -1,0 +1,27 @@
+{% extends layout %}
+{% block title %}Export · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
+<h1>Export{% if series %} “{{ series }}”{% endif %}</h1>
+
+{% if not plan.items %}
+<div class="notice">There's nothing to export: {% if plan.episodes %}their recordings are missing from the library{% else %}no episodes were ticked{% endif %}.</div>
+{% else %}
+<p>{{ plan.episodes | length }} episode{{ "" if plan.episodes | length == 1 else "s" }},
+  {{ plan.items | length }} recording{{ "" if plan.items | length == 1 else "s" }},
+  about <strong>{{ plan.size | size }}</strong>.</p>
+{% if plan.missing %}<div class="notice warning">{{ plan.missing }} recording{{ " is" if plan.missing == 1 else "s are" }} missing from the library and won't be included.</div>{% endif %}
+
+<p class="muted">The zip holds <strong>copies</strong> of the recordings with their details written into the
+  tags, so most players show them, plus a list of every episode's details (for another Airwave Archive to
+  import) and the series pictures. Your library's files aren't changed.</p>
+<p class="muted small">The zip is made while it downloads, so the download doesn't say how big it is
+  or how long it will take. A big export takes a while: keep this window open until it's done.</p>
+
+<div class="form-buttons">
+  {# A plain link (not swapped in by htmx), so the browser downloads it. #}
+  <a class="button primary" href="{{ download }}" hx-boost="false" download="{{ file_name }}">Download zip</a>
+</div>
+<p class="muted small">It will be called <code>{{ file_name }}</code>.</p>
+{% endif %}
+{% endblock %}
