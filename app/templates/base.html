@@ -7,6 +7,16 @@
   {# htmx normally ignores replies with an error code. A form with a mistake
      comes back as 400 ("please fix this") with notes in red: show it. #}
   <meta name="htmx-config" content='{"responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "400", "swap": true}, {"code": "[45]..", "swap": false, "error": true}]}'>
+  {# Light or dark: the choice saved in this browser, else the device's own
+     setting. Set here, before the page is drawn, so it never flashes. #}
+  <script>
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem("airwave-theme"); } catch (e) {}
+      var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    })();
+  </script>
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   <script src="{{ static_url('htmx.min.js') }}" defer></script>
   <script src="{{ static_url('player.js') }}" defer></script>
@@ -23,9 +33,15 @@
   <header class="topbar">
     <a class="brand" href="/">Airwave Archive</a>
     {% include "_menu.html" %}
-    <form class="search-box" action="/search" method="get" role="search">
-      <input type="search" name="q" placeholder="Search" aria-label="Search titles, series, people, notes">
-    </form>
+    <div class="top-tools">
+      <button id="theme-switch" class="theme-switch" type="button" role="switch" aria-checked="false"
+              aria-label="Dark mode" title="Switch between light and dark">
+        <span class="theme-track"><span class="theme-knob"></span></span>
+      </button>
+      <form class="search-box" action="/search" method="get" role="search">
+        <input type="search" name="q" placeholder="Search" aria-label="Search titles, series, people, notes">
+      </form>
+    </div>
   </header>
   <main id="content" class="content" hx-history-elt>
     {% block content %}{% endblock %}
