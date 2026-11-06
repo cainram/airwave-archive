@@ -26,6 +26,11 @@
     {% for f, done, art in unfinished %}
     {% set ep = f.episode %}
     <li class="continue-item">
+      <form class="continue-remove" method="post" action="/listening/{{ ep.id }}/dismiss">
+        <input type="hidden" name="view" value="{{ view }}">
+        <button type="submit" aria-label="Remove {{ f | display_title }} from Continue listening"
+                title="Remove from Continue listening (your place is kept)">×</button>
+      </form>
       {{ picture(art, ep.series or (f | display_title), "small") }}
       <div class="continue-text">
         <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>

@@ -5,6 +5,9 @@ The player bar reports its place every few seconds (and when paused). For
 an episode made of several files, the place is a part plus a time within
 it. Pressing Play again picks up from there. Hearing the last part to its
 end marks the episode as played, and its place is forgotten.
+
+An episode can be taken off the front page's "Continue listening" row
+without forgetting its place; listening to it again brings it back.
 """
 
 from __future__ import annotations
@@ -48,7 +51,12 @@ def save_place(session: Session, episode: Episode, file_id: int | None,
         return
     if file_id not in {f.id for f in episode.files}:
         return
-    row.file_id, row.position = file_id, max(0.0, float(seconds))
+    seconds = max(0.0, float(seconds))
+    # Listening again brings a removed card back (but the same place
+    # reported again, say when a paused tab is hidden, doesn't).
+    if row.dismissed and (row.file_id != file_id or abs((row.position or 0) - seconds) > 1):
+        row.dismissed = False
+    row.file_id, row.position = file_id, seconds
     if row.played and (row.position >= STARTED or file_id != episode.parts[0].id):
         row.played = False      # listening again
 
@@ -65,6 +73,14 @@ def mark(session: Session, episodes: list[Episode], played: bool) -> None:
             row = _record(session, episode.id)
             row.played, row.played_at, row.updated_at = False, None, utcnow()
             row.file_id, row.position = None, 0.0
+        row.dismissed = False
+
+
+def dismiss(session: Session, episode: Episode) -> None:
+    """Take an episode off "Continue listening", keeping its place."""
+    row = session.get(Listening, episode.id)
+    if row is not None:
+        row.dismissed = True
 
 
 def progress(episode: Episode | None) -> Progress | None:
@@ -118,7 +134,8 @@ def continue_listening(session: Session, limit: int = 8) -> list[tuple[AudioFile
     """Unfinished episodes, most recently played first: (first part, progress)."""
     found = []
     rows = session.scalars(
-        select(Episode).join(Listening).where(Listening.played.is_(False))
+        select(Episode).join(Listening)
+        .where(Listening.played.is_(False), Listening.dismissed.is_(False))
         .order_by(Listening.updated_at.desc()).limit(limit * 3)).all()
     for episode in rows:
         done = progress(episode)

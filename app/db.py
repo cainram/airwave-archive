@@ -48,7 +48,8 @@ DB_FILENAME = "airwave.db"
 #  10: Phase 8, where you stopped listening, and what's played (listening table)
 #  11: Phase 11, a permanent ID for each episode (episodes.uid), for exports
 #  12: Phase 11b, inbox files from an export zip keep its details (inbox_items.extra_json)
-SCHEMA_VERSION = 12
+#  13: an episode can be taken off "Continue listening" (listening.dismissed)
+SCHEMA_VERSION = 13
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -224,6 +225,9 @@ class Listening(Base):
     played: Mapped[bool] = mapped_column(default=False)
     played_at: Mapped[datetime | None]   # UTC
     updated_at: Mapped[datetime] = mapped_column(index=True)   # UTC
+    # Taken off the front page's "Continue listening" row (the place is
+    # kept). Listening again puts it back.
+    dismissed: Mapped[bool] = mapped_column(default=False)
 
 
 class InboxItem(Base):
@@ -321,6 +325,10 @@ def _migrate(conn) -> None:
     # Version 12: inbox files can bring more details with them.
     if "extra_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN extra_json VARCHAR")
+    # Version 13: episodes can be taken off "Continue listening".
+    if "dismissed" not in _columns(conn, "listening"):
+        conn.exec_driver_sql(
+            "ALTER TABLE listening ADD COLUMN dismissed BOOLEAN NOT NULL DEFAULT 0")
 
 
 def make_engine(db_path: Path) -> Engine:

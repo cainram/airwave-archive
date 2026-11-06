@@ -919,6 +919,20 @@ async def mark_played(request: Request):
                                      played="1" if played else "0"))
 
 
+@app.post("/listening/{episode_id}/dismiss")
+async def dismiss_listening(request: Request, episode_id: int):
+    """Take an episode off the front page's "Continue listening" row
+    (its place is kept, so Resume still works)."""
+    view = str((await request.form()).get("view", ""))
+    with Session(get_engine()) as session:
+        episode = session.get(Episode, episode_id)
+        if episode is None:
+            raise HTTPException(status_code=404, detail="No such episode")
+        listening.dismiss(session, episode)
+        session.commit()
+    return go_to(request, "/?view=list" if view == "list" else "/")
+
+
 @app.post("/listening/{episode_id}", status_code=204)
 async def save_listening_place(request: Request, episode_id: int):
     """The player bar reporting where it is (or that it reached the end)."""

@@ -133,3 +133,24 @@ def test_bad_reports_are_refused(client):
     # A file from another episode is ignored.
     client.post(f"/listening/{show}", data={"file": files(client)[SHOW.format(1)], "at": "30"})
     assert "Continue listening" not in client.get("/").text
+
+
+def test_removing_a_card_from_continue_listening(client):
+    ids, show = files(client), episode_of(client, SHOW.format(1))
+    client.post(f"/listening/{show}", data={"file": ids[SHOW.format(2)], "at": "30"})
+    page = client.get("/").text
+    assert "Continue listening" in page and f'action="/listening/{show}/dismiss"' in page
+
+    sent = client.post(f"/listening/{show}/dismiss", data={"view": "list"}, follow_redirects=False)
+    assert sent.status_code == 303 and sent.headers["location"] == "/?view=list"
+    assert "Continue listening" not in client.get("/").text
+    # The place is kept: the episode still resumes.
+    assert place(client, SHOW.format(1)) == (ids[SHOW.format(2)], 30.0, False)
+    assert "▶ Resume" in client.get(f"/files/{ids[SHOW.format(1)]}").text
+    # The same place reported again (a paused tab) doesn't bring it back...
+    client.post(f"/listening/{show}", data={"file": ids[SHOW.format(2)], "at": "30.4"})
+    assert "Continue listening" not in client.get("/").text
+    # ...listening on does.
+    client.post(f"/listening/{show}", data={"file": ids[SHOW.format(2)], "at": "45"})
+    assert "Continue listening" in client.get("/").text
+    assert client.post("/listening/99999/dismiss").status_code == 404

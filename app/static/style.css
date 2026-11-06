@@ -452,10 +452,28 @@ mark { background: var(--mark); color: var(--text); border-radius: 2px; padding:
   display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 .continue-item {
+  position: relative;
   display: flex; align-items: center; gap: 12px; padding: 10px 12px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
 }
-.continue-text { flex: 1; min-width: 0; }
+.continue-text { flex: 1; min-width: 0; padding-right: 14px; }
+/* The small ⓧ in a card's top-right corner. The visible circle is small;
+   the area that can be tapped around it is bigger. */
+.continue-remove { position: absolute; top: 0; right: 0; margin: 0; }
+.continue-remove button {
+  width: 36px; height: 36px; padding: 0; border: none; background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--muted);
+  -webkit-tap-highlight-color: transparent;
+}
+.continue-remove button::before {
+  content: "×"; display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--panel); font-size: 15px; line-height: 1;
+}
+.continue-remove button { font-size: 0; }
+.continue-remove button:hover::before, .continue-remove button:focus-visible::before {
+  color: var(--text); border-color: var(--muted); background: var(--hover);
+}
 .continue-text .title { font-weight: 600; color: var(--text); text-decoration: none; overflow-wrap: break-word; }
 .progress-bar { height: 5px; margin: 6px 0 2px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .progress-bar span { display: block; height: 100%; background: var(--accent); }
