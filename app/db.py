@@ -47,7 +47,8 @@ DB_FILENAME = "airwave.db"
 #   9: Phase 7a, the upload inbox (inbox_items table)
 #  10: Phase 8, where you stopped listening, and what's played (listening table)
 #  11: Phase 11, a permanent ID for each episode (episodes.uid), for exports
-SCHEMA_VERSION = 11
+#  12: Phase 11b, inbox files from an export zip keep its details (inbox_items.extra_json)
+SCHEMA_VERSION = 12
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -243,6 +244,18 @@ class InboxItem(Base):
     air_year: Mapped[int | None]
     air_month: Mapped[int | None]
     air_day: Mapped[int | None]
+    # More details that came with the file (from an export zip or Airwave
+    # tags): ID, part, air time, station, cast, notes... as JSON. Saved on
+    # its episode when it's added.
+    extra_json: Mapped[str | None]
+
+    @property
+    def extra(self) -> dict:
+        return json.loads(self.extra_json) if self.extra_json else {}
+
+    @extra.setter
+    def extra(self, value: dict) -> None:
+        self.extra_json = json.dumps(value, sort_keys=True) if value else None
 
 
 # Load a file's episode and all that episode's parts along with it.
@@ -305,6 +318,9 @@ def _migrate(conn) -> None:
     if "uid" not in _columns(conn, "episodes"):
         conn.exec_driver_sql("ALTER TABLE episodes ADD COLUMN uid VARCHAR")
     conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_episodes_uid ON episodes (uid)")
+    # Version 12: inbox files can bring more details with them.
+    if "extra_json" not in _columns(conn, "inbox_items"):
+        conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN extra_json VARCHAR")
 
 
 def make_engine(db_path: Path) -> Engine:

@@ -592,6 +592,19 @@ overwrites, renames or deletes library files.
   Episodes get a permanent ID (`episodes.uid`, database version 11) the
   first time they're exported. Phase 10 is on hold (owner's choice,
   2026-11-06).
+- 11b (import) ✅ *done*: the inbox's upload takes zips (`app/zipimport.py`);
+  a zip copied into the inbox folder gets an "Unpack" button. Recordings
+  are unpacked into the inbox (folder names in the zip ignored, names made
+  safe, free space checked first) and the zip is deleted. From an Airwave
+  zip, the manifest (or, for a lone tagged copy, its Airwave tags) fills
+  in the inbox boxes; the other details (time, station, host, cast, notes,
+  ID, part, series picture) wait in `inbox_items.extra_json` (database
+  version 12) and are saved as manual edits when the file is added. An
+  air time is kept only if the date wasn't changed in the inbox. A file
+  whose episode ID is already in the library is marked "Already in your
+  library" and can only be rejected ("Add all" skips it; one button
+  deletes them all); a part an episode is still missing joins it. A series
+  picture is used only if the series has none.
 - Export selected episodes or series as a zip of tagged copies + manifest.
 - Import an Airwave zip through the inbox, with duplicates detected.
 - **Try it:** export a series, import it on a second test server (or a

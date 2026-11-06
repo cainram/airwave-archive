@@ -12,6 +12,13 @@ recordings if there are any, otherwise into a new folder named after the
 series. Its details are saved on its episode as if typed by hand.
 
 Nothing is ever overwritten: if a name is taken, a number is added.
+
+Files can bring more details with them: an export zip from Airwave
+Archive (see app/zipimport.py) lists every detail, and its copies carry
+Airwave tags. Those details (time, station, cast, notes, the episode's
+permanent ID, which part it is) wait with the file and are saved on its
+episode when it's added. The permanent ID shows when you already have an
+episode; parts of one episode are put back together.
 """
 
 from __future__ import annotations
@@ -25,14 +32,20 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import AudioFile, Episode, InboxItem, utcnow
-from app.episodes import _clean, apply_confirmed, date_from_tag
-from app.filenames import parse_filename
+from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
+from app.episodes import (
+    TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
+)
+from app.filenames import date_text, parse_filename
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
+from app.series import one_series, set_uploaded_picture
+from app.tagging import read_airwave_tags
 
 UNSAFE = re.compile(r'[\x00-\x1f/\\:*?"<>|]')
 MAX_NAME = 180
 NO_SERIES_FOLDER = "Unsorted"
+MAX_TEXT = 20_000                      # longest detail kept from an import
+UID_PATTERN = re.compile(r"^[0-9A-Za-z-]{8,64}$")
 
 
 def is_audio(name: str) -> bool:
@@ -76,23 +89,70 @@ def _known_parts(date: tuple) -> int:
     return sum(part is not None for part in date)
 
 
+def _text(value, limit: int = MAX_TEXT) -> str | None:
+    return _clean(str(value)[:limit]) if value is not None else None
+
+
+def airwave_details(values: dict) -> tuple[dict, dict]:
+    """Read Airwave details (named as in Airwave tags: SERIES, AIR_DATE,
+    PART "1/2"...) into (main details, extra details). Anything that
+    doesn't make sense is left out, never guessed."""
+    values = {str(key).upper(): value for key, value in values.items()}
+    date, _error = read_date_text(_text(values.get("AIR_DATE"), 20))
+    main = {"series": _text(values.get("SERIES"), 500),
+            "episode_number": _text(values.get("EPISODE_NUMBER"), 100),
+            "title": _text(values.get("TITLE"), 1000)}
+    if date:
+        main.update(air_year=date[0], air_month=date[1], air_day=date[2])
+    extra = {name.lower(): _text(values.get(name))
+             for name in ("NETWORK", "HOST", "CAST", "NOTES")}
+    uid = _text(values.get("ID"), 100)
+    if uid and UID_PATTERN.match(uid):
+        extra["uid"] = uid
+    time = TIME_PATTERN.match(_text(values.get("AIR_TIME"), 10) or "")
+    if time and date and None not in date:
+        extra["air_date"] = date_text(*date)
+        extra["air_time"] = f"{int(time[1]):02d}:{time[2]}"
+        if values.get("TIME_ZONE") in TIME_ZONES:
+            extra["time_zone"] = values["TIME_ZONE"]
+    part = re.match(r"^\s*(\d{1,3})\s*/\s*(\d{1,3})\s*$", str(values.get("PART") or ""))
+    if part and 1 <= int(part[1]) <= int(part[2]) and int(part[2]) > 1:
+        extra["part"], extra["parts"] = int(part[1]), int(part[2])
+    return main, {key: value for key, value in extra.items() if value}
+
+
 def guess_details(path: Path) -> dict:
     """What the file's tags and name say: series, episode number, title and
     air date. Tags come first; the name fills in what they lack, and gives
-    the date if it says more (tags often have only the year)."""
+    the date if it says more (tags often have only the year). Airwave tags
+    (from an export) beat both, and bring extra details (``extra``)."""
     info = read_audio(path)
     tags = info.tags
     guess = parse_filename(path.name)
     from_tags = (date_from_tag(tags.get("date")))
     from_name = (guess.year, guess.month, guess.day) if guess else (None, None, None)
     date = from_name if _known_parts(from_name) > _known_parts(from_tags) else from_tags
-    return {
+    details = {
         "series": _clean(tags.get("artist")) or _clean(tags.get("album")) or (guess and guess.series),
         "episode_number": guess.episode_number if guess else None,
         "title": _clean(tags.get("title")) or (guess and guess.title),
         "air_year": date[0], "air_month": date[1], "air_day": date[2],
         "duration_seconds": info.duration_seconds,
     }
+    found = read_airwave_tags(path)
+    if found:
+        return with_airwave(details, found)
+    return details
+
+
+def with_airwave(details: dict, values: dict) -> dict:
+    """``details`` updated with Airwave details (which win where known)."""
+    main, extra = airwave_details(values)
+    details = {**details, **{key: value for key, value in main.items() if value is not None}}
+    if "air_year" in main:
+        details.update(air_year=main["air_year"], air_month=main.get("air_month"),
+                       air_day=main.get("air_day"))
+    return {**details, "extra": extra}
 
 
 def inbox_files(folder: Path) -> dict[str, Path]:
@@ -184,22 +244,103 @@ def move_into(source: Path, folder: Path) -> Path:
     return final
 
 
+class AlreadyHave(Exception):
+    """The library already has this episode (same permanent ID)."""
+
+
+def same_episode(session: Session, item: InboxItem) -> Episode | None:
+    """The library's episode with this file's permanent ID, if any."""
+    uid = item.extra.get("uid")
+    return session.scalar(select(Episode).where(Episode.uid == uid)) if uid else None
+
+
+def part_to_come(episode: Episode, extra: dict) -> bool:
+    """Is this file a part the episode is still waiting for?"""
+    part = extra.get("part")
+    return bool(part) and all(
+        f.part_number is not None and f.part_number != part for f in episode.files)
+
+
+def already_have(session: Session, item: InboxItem) -> AudioFile | None:
+    """The library's copy of this file's episode, if adding it would make
+    a second copy. (A missing part of an episode isn't a second copy: it
+    joins the rest.)"""
+    episode = same_episode(session, item)
+    if episode is None or not episode.files or part_to_come(episode, item.extra):
+        return None
+    return episode.parts[0]
+
+
 def add_to_library(session: Session, inbox_folder: Path, library: Path,
                    item: InboxItem, art_dir: Path | None = None) -> AudioFile | None:
     """Move an inbox file into the library and add it, with the details
-    confirmed in the inbox. None if the file isn't in the inbox any more."""
+    confirmed in the inbox and any extra ones it brought. None if the file
+    isn't in the inbox any more; AlreadyHave if the library has its
+    episode already."""
     source = item_path(inbox_folder, item)
     if source is None:
         return None
-    folder = library / target_folder(session, item.series)
+    if already_have(session, item) is not None:
+        raise AlreadyHave(item.name)
+    extra = item.extra
+    joining = same_episode(session, item)           # a part of it is there
+    if joining is not None and joining.files:
+        folder = library / joining.parts[0].folder
+    else:
+        folder = library / target_folder(session, item.series)
     if library.resolve() not in (folder.resolve(), *folder.resolve().parents):
         raise ValueError("That folder isn't inside the library")
     path = move_into(source, folder)
     row = add_one_file(session, library, path, art_dir)
-    date = (item.air_year, item.air_month, item.air_day)
-    apply_confirmed(row.episode, {
-        "series": item.series, "episode_number": item.episode_number, "title": item.title,
-        "date": date if item.air_year is not None else None,
-    })
+    if joining is not None:
+        session.flush()
+        empty, row.episode = row.episode, joining
+        session.delete(empty)
+        episode = joining
+    else:
+        episode = row.episode
+        date = (item.air_year, item.air_month, item.air_day)
+        apply_confirmed(episode, {
+            "series": item.series, "episode_number": item.episode_number, "title": item.title,
+            "date": date if item.air_year is not None else None,
+        })
+        _apply_extra(episode, date, extra)
+    if extra.get("part"):
+        row.part_number = extra["part"]
+        sources = episode.sources
+        sources["parts"] = MANUAL
+        episode.sources = sources
+        episode.updated_at = utcnow()
+    _use_picture(session, episode.series, extra.get("picture"))
     session.delete(item)
     return row
+
+
+def _apply_extra(episode: Episode, date: tuple, extra: dict) -> None:
+    """Save the extra details a file brought, as if typed by hand."""
+    sources = episode.sources
+    for name in ("network", "host", "cast", "notes"):
+        if extra.get(name):
+            setattr(episode, name, extra[name])
+            sources[name] = MANUAL
+    # The time belongs to the date it came with: if that was changed in the
+    # inbox, the time is dropped.
+    if extra.get("air_time") and None not in date and date_text(*date) == extra.get("air_date"):
+        episode.air_time = extra["air_time"]
+        episode.air_timezone = extra.get("time_zone")
+    if extra.get("uid"):
+        episode.uid = extra["uid"]
+    episode.sources = sources
+    episode.updated_at = utcnow()
+
+
+def _use_picture(session: Session, series: str | None, art_hash: str | None) -> None:
+    """Use a picture that came with the file for its series, but only if
+    the series has none of its own yet."""
+    if not series or not art_hash or session.get(SeriesArt, series) is not None:
+        return
+    session.flush()
+    found = one_series(session, series)
+    if found and found.get("art"):
+        return
+    set_uploaded_picture(session, series, art_hash)
