@@ -30,8 +30,8 @@
 <div class="week">
   {% for day, files in week.days %}
   <section class="week-day{% if not files %} is-empty{% endif %}" id="day-{{ day.isoformat() }}">
-    <h2><span class="weekday">{{ day.strftime("%A") }}</span>
-      <span class="week-date">{{ month_names[day.month - 1] }} {{ day.day }}{% if day.year != week.end.year or week.start.year != week.end.year %}, {{ day.year }}{% endif %}</span></h2>
+    <h2><a class="day-title" href="/calendar/day?date={{ day.isoformat() }}"><span class="weekday">{{ day.strftime("%A") }}</span>
+      <span class="week-date">{{ month_names[day.month - 1] }} {{ day.day }}{% if day.year != week.end.year or week.start.year != week.end.year %}, {{ day.year }}{% endif %}</span></a></h2>
     {% if files %}
     <ul class="results">{% for f in files %}{% include "_calendar_row.html" %}{% endfor %}</ul>
     {% else %}

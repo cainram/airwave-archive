@@ -131,3 +131,44 @@ def test_the_month_links_to_its_weeks(client):
     page = client.get("/calendar?year=1938&month=10").text
     assert 'href="/calendar/week?date=1938-10-30">Week</a>' in page
     assert 'href="/calendar/week?date=1938-10-30">Week view</a>' in page
+
+
+# ---------------------------------------------------------------- days
+
+def test_hour_labels():
+    from app.airdates import hour_label
+    assert [hour_label(h) for h in (0, 9, 12, 20)] == ["12 AM (midnight)", "9 AM", "12 PM (noon)", "8 PM"]
+
+
+def test_a_day(client):
+    page = client.get("/calendar/day?date=October 30, 1938").text
+    assert "<h1>Sunday, October 30th, 1938</h1>" in page and "3 broadcasts this day" in page
+    assert page.index("<h2>7 PM</h2>") < page.index(">Early<") < page.index("<h2>8 PM</h2>") \
+        < page.index(">Wotw<") < page.index("<h2>Time unknown</h2>") < page.index(">Late<")
+    assert "different zones" in page                       # one has a zone, one hasn't
+    page = page.replace("&amp;", "&")
+    assert 'href="/calendar/day?date=1938-10-29"' in page and 'href="/calendar/day?date=1938-10-31"' in page
+    assert 'href="/calendar/day?date=1935-07-04">⇤ Earlier' in page
+    assert 'href="/calendar/day?date=1940-02-03">Later' in page
+    assert 'href="/calendar/week?date=1938-10-30">Week view' in page
+    assert 'href="/calendar?year=1938&month=10">Month view' in page
+
+
+def test_an_overnight_show_continues_the_next_morning(client):
+    import app.main as main
+    from app.db import Episode
+    with Session(main._engine) as session:
+        ep = session.scalars(select(Episode).where(Episode.title == "Later")).one()
+        ep.air_time, ep.air_timezone = "22:00", None
+        ep.files[0].duration_seconds = 3 * 3600               # on until 1 AM
+        session.commit()
+    nextday = client.get("/calendar/day?date=1940-02-04").text
+    assert "Continued from the night before" in nextday and ">Later<" in nextday
+    assert "10:00 PM – 1:00 AM (next day)" in nextday
+    assert "Continued" not in client.get("/calendar/day?date=1940-02-03").text
+
+
+def test_day_pages_open_on_the_latest_and_are_linked(client):
+    assert "Saturday, February 3rd, 1940" in client.get("/calendar/day").text
+    assert 'href="/calendar/day?date=1938-10-30"' in client.get("/calendar/week?date=1938-10-30").text
+    assert 'href="/calendar/day?date=1938-10-30"' in client.get("/calendar?year=1938&month=10").text

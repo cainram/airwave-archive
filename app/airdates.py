@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
@@ -197,3 +197,77 @@ def nearest_week(session: Session, start: date, later: bool) -> date | None:
             Episode.air_year.desc(), Episode.air_month.desc(), Episode.air_day.desc())
     row = session.execute(query.limit(1)).first()
     return week_start(date(*row)) if row else None
+
+
+# ---------------------------------------------------------------- days
+
+@dataclass
+class Day:
+    day: date
+    hours: list[tuple[int, list[AudioFile]]]   # (hour 0-23, shows starting then)
+    unknown: list[AudioFile]                   # time not known
+    carried: list[tuple[AudioFile, datetime]]  # from the night before, with their end
+
+    @property
+    def count(self) -> int:
+        return sum(len(files) for _hour, files in self.hours) + len(self.unknown)
+
+    @property
+    def mixed_zones(self) -> bool:
+        """True if shows with a time are in more than one time zone."""
+        return len({f.episode.air_timezone for _hour, files in self.hours for f in files}) > 1
+
+
+def _on_day(session: Session, day: date, timed_only: bool = False) -> list[AudioFile]:
+    query = (select(AudioFile).join(Episode, AudioFile.episode_id == Episode.id)
+             .where(Episode.air_year == day.year, Episode.air_month == day.month,
+                    Episode.air_day == day.day, FIRST_PARTS)
+             .options(WITH_PARTS)
+             .order_by(Episode.air_time.is_(None), Episode.air_time,
+                       Episode.series, Episode.title, AudioFile.name))
+    if timed_only:
+        query = query.where(Episode.air_time.is_not(None))
+    return list(session.scalars(query).unique().all())
+
+
+def day_view(session: Session, day: date) -> Day:
+    """One day's broadcasts by the hour they started (in their own local
+    time), shows still on from the night before, and those whose time
+    isn't known."""
+    from app.episodes import air_end   # here, to avoid a circular import
+    hours: dict[int, list[AudioFile]] = {}
+    unknown: list[AudioFile] = []
+    for f in _on_day(session, day):
+        if f.episode.air_time:
+            hours.setdefault(int(f.episode.air_time[:2]), []).append(f)
+        else:
+            unknown.append(f)
+    carried = []
+    for f in _on_day(session, day - timedelta(days=1), timed_only=True):
+        end = air_end(f.episode, f.episode.length)
+        if end is not None and end.date() >= day and end > datetime(day.year, day.month, day.day):
+            carried.append((f, end))
+    return Day(day, sorted(hours.items()), unknown, carried)
+
+
+def nearest_day(session: Session, day: date, later: bool) -> date | None:
+    """The closest day before (or after) this one with broadcasts."""
+    query = select(Episode.air_year, Episode.air_month, Episode.air_day).where(
+        Episode.air_day.is_not(None))
+    if later:
+        query = query.where(_FULL_DATE > _day(day)).order_by(
+            Episode.air_year, Episode.air_month, Episode.air_day)
+    else:
+        query = query.where(_FULL_DATE < _day(day)).order_by(
+            Episode.air_year.desc(), Episode.air_month.desc(), Episode.air_day.desc())
+    row = session.execute(query.limit(1)).first()
+    return date(*row) if row else None
+
+
+def hour_label(hour: int) -> str:
+    """20 -> '8 PM', 0 -> '12 AM (midnight)', 12 -> '12 PM (noon)'."""
+    if hour == 0:
+        return "12 AM (midnight)"
+    if hour == 12:
+        return "12 PM (noon)"
+    return f"{hour % 12} {'AM' if hour < 12 else 'PM'}"

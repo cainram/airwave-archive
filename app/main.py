@@ -399,24 +399,30 @@ def calendar_month(request: Request, year: int | None = None, month: int | None 
     })
 
 
+def typed_day(session: Session, text: str) -> tuple[date, str | None]:
+    """The day typed in a calendar's "Go to date" box (any common way; a
+    year and month means the 1st), or the most recent broadcast if none
+    was typed. Returns (day, what's wrong with what was typed)."""
+    error = None
+    found, problem = csvimport.read_date(text) if text.strip() else (None, None)
+    if problem or (found and found[1] is None):
+        error = problem or "Type a date with at least a month, like 1938-10-30."
+        found = None
+    try:
+        day = date(found[0], found[1], found[2] or 1) if found else None
+    except ValueError:
+        day, error = None, "That day doesn't exist."
+    return day or airdates.latest_day(session) or date.today(), error
+
+
 @app.get("/calendar/week", response_class=HTMLResponse)
 def calendar_week(request: Request, date_text: str = Query("", alias="date")):
     """A week of broadcasts, Sunday to Saturday, holding the given date
     (typed any common way). Without one: the week of the most recent
     broadcast. A date with only a year and month goes to that month's
     first week."""
-    error = None
-    found, problem = csvimport.read_date(date_text) if date_text.strip() else (None, None)
-    if problem or (found and found[1] is None):
-        error = problem or "Type a date with at least a month, like 1938-10-30."
-        found = None
     with Session(get_engine()) as session:
-        try:
-            day = date(found[0], found[1], found[2] or 1) if found else None
-        except ValueError:
-            day, error = None, "That day doesn't exist."
-        if day is None:
-            day = airdates.latest_day(session) or date.today()
+        day, error = typed_day(session, date_text)
         week = airdates.week_view(session, day)
         earlier = airdates.nearest_week(session, week.start, later=False)
         later = airdates.nearest_week(session, week.start, later=True)
@@ -426,6 +432,23 @@ def calendar_week(request: Request, date_text: str = Query("", alias="date")):
         "week": week, "earlier": earlier, "later": later, "error": error, "typed": date_text,
         "before": week.start - timedelta(days=7), "after": week.start + timedelta(days=7),
         "month": (middle.year, middle.month), "month_names": MONTHS,
+    }, status_code=400 if error else 200)
+
+
+@app.get("/calendar/day", response_class=HTMLResponse)
+def calendar_day(request: Request, date_text: str = Query("", alias="date")):
+    """One day's broadcasts, hour by hour. Without a date: the most recent
+    day with a broadcast."""
+    with Session(get_engine()) as session:
+        day, error = typed_day(session, date_text)
+        view = airdates.day_view(session, day)
+        earlier = airdates.nearest_day(session, day, later=False)
+        later = airdates.nearest_day(session, day, later=True)
+        session.expunge_all()
+    return render(request, "calendar_day.html", {
+        "view": view, "earlier": earlier, "later": later, "error": error, "typed": date_text,
+        "before": day - timedelta(days=1), "after": day + timedelta(days=1),
+        "hour_label": airdates.hour_label,
     }, status_code=400 if error else 200)
 
 

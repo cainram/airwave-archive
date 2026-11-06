@@ -546,7 +546,7 @@ overwrites, renames or deletes library files.
   "✓ Played" or the time left. The `listening` table (database version
   10) is removed along with its episode.
 
-### Phase 9 — The calendar
+### Phase 9 — The calendar ✅ *done*
 - Month view, then week view, then day view.
 - 9a (month view) ✅ *done*: "Calendar" in the menu; a month grid (weeks
   start on Sunday) with the number of episodes each day (titles on wide
@@ -564,6 +564,12 @@ overwrites, renames or deletes library files.
   empty weeks, "Month view"; the month view has "Week view" and a "Week"
   button on each day. Episodes with no known day are counted with a link
   to their month.
+- 9c (day view) ✅ *done*: `/calendar/day?date=…` lists the day hour by
+  hour ("8 PM"), by each show's own local time (a note says so when zones
+  are mixed), then "Time unknown". Shows from the night before still on
+  after midnight appear first as "Continued from the night before".
+  Previous/next day, jumps over empty days, Week and Month view buttons;
+  day headings in the week and month views link to their day.
 - Correct handling of partial dates, "time unknown", time zones, and
   overnight shows.
 - **Try it:** open the week of a famous broadcast and see everything you own
