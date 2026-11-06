@@ -1,0 +1,11 @@
+{% extends layout %}
+{% block title %}Delete · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
+<h1>Not everything could be deleted</h1>
+{% if result.deleted %}<div class="notice success" role="status">Deleted {{ result.deleted }} recording{{ "" if result.deleted == 1 else "s" }} ({{ result.freed | size }}).</div>{% endif %}
+<div class="notice error" role="alert">
+  These were left in the library:
+  <ul>{% for problem in result.problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+</div>
+{% endblock %}

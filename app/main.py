@@ -31,7 +31,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, csvimport, export, inbox, listening, zipimport
+from app import airdates, csvimport, deleting, export, inbox, listening, zipimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -994,6 +994,47 @@ def export_download(ids: list[int] = Query(default=[]), whole_series: str = ""):
     work_dir = Path(get_engine().url.database).parent / "export-temp"
     return StreamingResponse(export.stream_zip(plan, work_dir), media_type="application/zip",
                              headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
+
+
+@app.get("/delete", response_class=HTMLResponse)
+def delete_page(request: Request, ids: list[int] = Query(default=[]), back: str = "/library"):
+    """Which files deleting these episodes would remove, and the button to
+    do it. Nothing is deleted until that button is pressed."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        episodes = chosen_episodes(session, ids, "")
+        plan = deleting.make_plan(episodes, LIBRARY_DIR)
+        firsts = {e.id: e.parts[0] for e in episodes if e.files}
+        for f in plan.files + plan.missing:
+            f.episode                     # (loaded now, for the page)
+        session.expunge_all()
+    return render(request, "delete.html", {"plan": plan, "firsts": firsts,
+                                           "back": safe_back(back)})
+
+
+@app.post("/delete", response_class=HTMLResponse)
+async def delete_episodes(request: Request):
+    """Delete the episodes' files from the disk, and the episodes from the
+    app. For good: only after the confirmation page."""
+    form = await request.form()
+    ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
+    back = safe_back(form.get("back"))
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the delete page first")
+    with Session(get_engine()) as session:
+        episodes = chosen_episodes(session, ids, "")
+        series = next((e.series for e in episodes if e.series), None)
+        result = deleting.delete_episodes(session, episodes, LIBRARY_DIR)
+        session.commit()
+        if back.startswith("/files/") or back.startswith("/series/episodes"):
+            # That page may be gone now: the series' page if it's still
+            # there, else the library.
+            still = series and one_series(session, series)
+            if back.startswith("/files/") or not still:
+                back = series_url(series) if still else "/library"
+    if result.problems:
+        return render(request, "deleted.html", {"result": result, "back": back})
+    return go_to(request, with_query(back, deleted=str(result.deleted),
+                                     freed=str(result.freed)))
 
 
 @app.get("/series/rename", response_class=HTMLResponse)

@@ -558,3 +558,9 @@ a.day-title:hover { color: var(--accent); text-decoration: underline; }
 :root[data-theme="dark"] .theme-knob { transform: translateX(20px); }
 :root[data-theme="dark"] .theme-knob::before { content: "☀\FE0E"; }
 .theme-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 16px; }
+
+/* Deleting: the red button, and the list of files that will go. */
+.button.danger { background: var(--error-text); border-color: var(--error-text); color: var(--panel); font-weight: 600; }
+.delete-files { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; }
+.delete-files code { color: var(--text); word-break: break-all; }
+.delete-confirm { margin-top: 16px; }

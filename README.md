@@ -9,7 +9,8 @@ it has a calendar showing everything in your collection that aired on a given
 day, week, or month.
 
 - Runs on your own server (homelab-first), for one household.
-- Reads your recordings where they sit; never changes your library files.
+- Reads your recordings where they sit; never changes your library files
+  (it deletes them only when you ask, after confirming).
 - Hosts no content. You bring your own recordings.
 
 This is a personal project, shared as-is. You're welcome to use or fork it

@@ -46,6 +46,7 @@
     </form>
     {% endif %}
     <a class="button" href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
+    {% if ep %}<a class="button" href="/delete?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Delete…</a>{% endif %}
   </div>
 </section>
 

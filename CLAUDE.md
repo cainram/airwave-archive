@@ -82,7 +82,11 @@ These come from the plan and should not be changed without the owner's OK:
   owner approves uploads from the **inbox** (`/srv/airwave/inbox`). Writing
   tags back into files is only allowed as an explicit, opt-in action.
   Exports (PLAN.md section 5a) write tags into **copies** only, never the
-  originals.
+  originals. The one exception: the owner can **delete** recordings
+  (owner's choice, 2026-11-06; they keep backups and snapshots), only as
+  an explicit action after a confirmation page listing exactly which
+  files will go (`app/deleting.py`). Nothing else ever deletes from the
+  library.
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud
@@ -136,6 +140,8 @@ These come from the plan and should not be changed without the owner's OK:
   and days, nearest months with recordings)
 - `app/tagging.py`: writes episode details into tags of **copies** only
   (standard tags plus `AIRWAVE_*` tags), and reads Airwave tags back
+- `app/deleting.py`: deleting episodes' files from the library, for good
+  (only after the confirmation page), and the episodes from the app
 - `app/export.py`: export zips (tagged copies, manifest, pictures), made
   while they download
 - `app/zipimport.py`: unpacking zips (Airwave exports or plain zips of
