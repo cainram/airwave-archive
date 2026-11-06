@@ -87,6 +87,13 @@ ways files ever get added to the library are when *you* approve uploads from
 the inbox (below). Writing tags into files is a separate, opt-in action
 (section 5).
 
+**The one exception is deleting** (owner's choice, 2026-11-06; the owner keeps
+backups and snapshots): you can delete an episode's recordings from the disk,
+from its page ("Delete…") or by ticking episodes ("Delete ticked…"). It's
+always an explicit action, after a page listing exactly which files will go,
+and only files inside the library can be deleted. The episode and its details
+are removed from the app too. Folders are left as they are.
+
 ### Where things live
 
 The recommended layout on the server is one folder, `/srv/airwave`, ideally
@@ -101,9 +108,10 @@ on its own disk:
 - The app reads recordings **where they sit**; it never makes copies.
 - Deleting the app or its database never touches your recordings.
 - In Docker, the library is mounted **writable** (owner's choice, Phase 7)
-  so approved uploads can be added to it. The app still never changes,
-  renames or deletes the recordings already there; the owner keeps backups
-  and snapshots.
+  so approved uploads can be added to it, and recordings can be deleted
+  when the owner asks (see the ground rule). The app never changes or
+  renames the recordings already there; the owner keeps backups and
+  snapshots.
 - Network shares (NFS/SMB) aren't a goal for now. Anything mounted into
   `/srv/airwave/library` by the operating system will simply work, though.
 
@@ -143,6 +151,8 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 - **Persistent player bar** — a player at the bottom of the screen that keeps
   playing while you browse to other pages.
 - **Calendar** — day / week / month (section 2).
+- **Continue listening** cards have a small × to take one off the row (its
+  place is kept; listening again brings it back).
 - **Light and dark themes** — a switch in the top bar, left of the search
   box. Each browser remembers its choice; until one is made, it follows
   the device's own light/dark setting. All colours are listed once at the

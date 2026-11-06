@@ -225,9 +225,9 @@ needs free disk space for the recordings, as well as the zip itself.
 
 The app keeps its database in `/srv/airwave/data`. It's small, and it will
 hold all the information you add, so include it in your backups. (The app
-never changes, renames or deletes the recordings in `/srv/airwave/library`;
-it only adds the files you approve in the inbox. Back up your recordings
-too.)
+never changes or renames the recordings in `/srv/airwave/library`; it only
+adds the files you approve in the inbox, and deletes recordings only when
+you ask it to, after a confirmation page. Back up your recordings too.)
 
 The `artwork` folder inside it holds the app's small copies of pictures
 from your library. It doesn't need backing up: a scan makes the copies

@@ -1,4 +1,4 @@
-{# After a bulk edit, a rename, or marking played: say what happened. #}
+{# After a bulk edit, a rename, marking played, or deleting: say what happened. #}
 {% set q = request.query_params %}
 {% set changed = q.get("changed", "-1") | int(-1) %}
 {% set skipped = q.get("skipped", "0") | int(0) %}
@@ -22,4 +22,9 @@
 {% elif marked > 0 %}
 <div class="notice success" role="status">
   Marked {{ marked }} episode{{ "" if marked == 1 else "s" }} as {{ "played" if q.get("played") == "1" else "not played" }}.</div>
+{% endif %}
+{% set deleted = q.get("deleted", "-1") | int(-1) %}
+{% if deleted >= 0 %}
+<div class="notice success" role="status">
+  {% if deleted %}Deleted {{ deleted }} recording{{ "" if deleted == 1 else "s" }} ({{ q.get("freed", "0") | int(0) | size }}) from your library.{% else %}Removed from the app (the files were already gone from the disk).{% endif %}</div>
 {% endif %}

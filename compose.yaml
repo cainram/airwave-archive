@@ -14,8 +14,9 @@ services:
       AIRWAVE_INBOX: /inbox
     volumes:
       # Your recordings folder. It's writable so that files you approve in
-      # the inbox can be added to it; the app never changes, renames or
-      # deletes the recordings already there. (Keep backups anyway.)
+      # the inbox can be added to it, and recordings you choose to delete
+      # (after a confirmation page) can be removed. The app never changes
+      # or renames the recordings already there. (Keep backups.)
       # Change the left side if your recordings live somewhere other than
       # /srv/airwave/library.
       - /srv/airwave/library:/library

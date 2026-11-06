@@ -1,0 +1,46 @@
+{% extends layout %}
+{% block title %}Delete · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back without deleting</a></nav>
+<h1>Delete from the library</h1>
+
+{% if not plan.episodes %}
+<div class="notice">No episodes were ticked, so there's nothing to delete.</div>
+{% else %}
+{% set count = plan.episodes | length %}
+<div class="notice error" role="alert">
+  <strong>This deletes {{ plan.files | length }} recording{{ "" if plan.files | length == 1 else "s" }}
+  ({{ plan.size | size }}) from your library's disk, for good.</strong>
+  {{ "Its" if count == 1 else "Their" }} details and listening place are removed from the app too.
+  It can't be undone here: only your backups can bring {{ "it" if plan.files | length == 1 else "them" }} back.
+</div>
+
+<h2>{{ count }} episode{{ "" if count == 1 else "s" }}</h2>
+<ul class="results delete-list">
+  {% for ep in plan.episodes %}
+  <li class="result">
+    <div class="result-text">
+      {% set first = firsts.get(ep.id) %}
+      <span class="title">{{ (first | display_title) if first else (ep.title or "Untitled") }}</span>
+      <div class="muted small">{% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+      <ul class="delete-files">
+        {% for f in ep.parts %}
+        <li><code>{{ (f.folder ~ "/") if f.folder }}{{ f.name }}</code>
+          <span class="muted small">{% if f in plan.missing %}already gone from the disk: only removed from the app{% else %}{{ f.size_bytes | size }}{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+
+<form method="post" action="/delete" class="form-buttons delete-confirm">
+  {% for ep in plan.episodes %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}
+  <input type="hidden" name="back" value="{{ back }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button danger" type="submit">Delete permanently</button>
+  <a class="button" href="{{ back }}">Cancel</a>
+</form>
+<p class="muted small">Folders are left as they are, even if they end up empty.</p>
+{% endif %}
+{% endblock %}
