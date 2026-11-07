@@ -13,7 +13,8 @@
   document.addEventListener("change", function (event) {
     const box = event.target;
     if (box.matches("[data-select-all]")) {
-      document.querySelectorAll('input[form="pick"][name="ids"]').forEach(function (other) {
+      const form = box.getAttribute("form") || "pick";
+      document.querySelectorAll('input[form="' + form + '"][name="ids"]').forEach(function (other) {
         other.checked = box.checked;
       });
     }

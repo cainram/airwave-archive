@@ -654,3 +654,15 @@ a.day-title:hover { color: var(--accent); text-decoration: underline; }
   border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text);
 }
 .feed-list .result { align-items: center; }
+/* Feeds: choosing a feed to add ticked episodes to; the ticked list. */
+.feed-choose fieldset {
+  margin: 0 0 12px; padding: 8px 14px 10px; max-width: 700px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+}
+.feed-choose legend { font-weight: 600; padding: 0 4px; }
+.feed-choose .choice { display: flex; gap: 10px; align-items: center; padding: 6px 0; cursor: pointer; }
+.feed-choose .choice input { width: 18px; height: 18px; margin: 0; }
+@media (pointer: coarse) { .feed-choose .choice { min-height: 44px; } }
+.picked-list { margin: 0 0 8px; }
+.picked-list summary { cursor: pointer; }
+.picked-list ul { margin: 6px 0 0; padding-left: 1.4em; }

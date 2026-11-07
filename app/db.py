@@ -15,6 +15,7 @@ Tables:
 - ``series_art``: pictures the owner uploaded for a series.
 - ``inbox_items``: uploaded files waiting in the inbox, with their details.
 - ``feeds``: podcast feeds (RSS) the owner made, for podcast apps.
+- ``feed_items``: the episodes in each hand-picked feed.
 - ``scan_runs``: one row per scan, recording what changed.
 """
 
@@ -51,7 +52,8 @@ DB_FILENAME = "airwave.db"
 #  12: Phase 11b, inbox files from an export zip keep its details (inbox_items.extra_json)
 #  13: an episode can be taken off "Continue listening" (listening.dismissed)
 #  14: Phase 12a, podcast feeds (feeds table)
-SCHEMA_VERSION = 14
+#  15: Phase 12b, hand-picked feeds (feed_items table)
+SCHEMA_VERSION = 15
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -265,8 +267,8 @@ class InboxItem(Base):
 
 
 class Feed(Base):
-    """A podcast feed (RSS) for podcast apps: a series' episodes, at a
-    private address. Feeds start as drafts; the address only works once
+    """A podcast feed (RSS) for podcast apps: a series' episodes, or
+    hand-picked ones, at a private address. Feeds start as drafts; the address only works once
     the feed is published. Deleting a feed never touches the recordings."""
 
     __tablename__ = "feeds"
@@ -278,10 +280,27 @@ class Feed(Base):
     title: Mapped[str]                   # the podcast's name in the app
     description: Mapped[str | None]
     series: Mapped[str | None]           # a series feed: every episode of it
+    #                                      (None: hand-picked, see FeedItem)
     published: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime]   # UTC; episodes already there count as added then
     updated_at: Mapped[datetime]   # UTC
     published_at: Mapped[datetime | None]   # UTC
+
+    picks: Mapped[list[FeedItem]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True)
+
+
+class FeedItem(Base):
+    """An episode in a hand-picked feed. Removed along with its feed or its
+    episode (so episodes deleted from the library drop out of feeds)."""
+
+    __tablename__ = "feed_items"
+
+    feed_id: Mapped[int] = mapped_column(
+        ForeignKey("feeds.id", ondelete="CASCADE"), primary_key=True)
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True, index=True)
+    added_at: Mapped[datetime]   # UTC: its date in podcast apps (never an air date)
 
 
 # Load a file's episode and all that episode's parts along with it.

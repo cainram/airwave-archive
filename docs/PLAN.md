@@ -682,9 +682,14 @@ Decisions (owner, 2026-11-07):
   (not MP3/M4A/AAC) are pointed out. A feed follows its series when it's
   renamed. Deleting a feed never touches recordings. Database version 14
   (`feeds` table). `app/feeds.py`; QR codes by segno.
-- 12b (hand-picked feeds): "☰ With ticked → Make a feed… / Add to a
-  feed…"; a feed's page lists its episodes with ticks to remove some;
-  episodes deleted from the library drop out.
+- 12b (hand-picked feeds) ✅ *done*: "☰ With ticked → Make a feed…"
+  (name suggested when they're all one series) and "Add to a feed…"
+  (choose a hand-picked feed; ones already in it are skipped; new ones go
+  at the end). A hand-picked feed's page lists all its episodes with
+  ticks to take some out (never out of the library). Episodes deleted
+  from the library drop out (`feed_items` rows go with their episode;
+  database version 15). Each batch is a second apart per part in
+  air-date order. The picture is the first episode's series picture.
 - 12c (editing and extras): author and picture (series picture by
   default, or another), order (switch a feed to newest first), a new private
   link if the old one got out.
