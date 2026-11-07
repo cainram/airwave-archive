@@ -68,6 +68,7 @@ def test_library_rows_link_to_file_page_and_play(client):
 def test_htmx_gets_only_the_middle_of_the_page(client):
     full = client.get("/files/1")
     assert 'id="player"' in full.text and "<html" in full.text
+    assert 'id="player-close"' in full.text      # the × that stops and hides the bar
 
     partial = client.get("/files/1", headers=HTMX)
     assert 'id="player"' not in partial.text and "<html" not in partial.text

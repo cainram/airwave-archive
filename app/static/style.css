@@ -228,6 +228,12 @@ h2 { font-size: 1.1rem; margin: 28px 0 8px; }
   font-weight: 700; font-size: 0.9rem;
 }
 .player-skip:active { background: var(--tint-strong); }
+/* Close (×): quieter than the other buttons, a little apart from them. */
+.player-buttons .player-close {
+  width: 36px; height: 36px; margin-left: 6px; border: none; border-radius: 50%;
+  background: transparent; color: var(--muted); font-size: 1.4rem; line-height: 1; cursor: pointer;
+}
+.player-buttons .player-close:hover { background: var(--hover); color: var(--text); }
 
 .player-progress { display: flex; align-items: center; gap: 10px; }
 .player-time { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.6em; }
