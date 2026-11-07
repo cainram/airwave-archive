@@ -194,6 +194,22 @@
   document.getElementById("player-back").addEventListener("click", function () { skip(-BACK); });
   document.getElementById("player-forward").addEventListener("click", function () { skip(FORWARD); });
 
+  // Close: stop, keep the place (so Resume still works), and hide the bar
+  // until something is played again.
+  document.getElementById("player-close").addEventListener("click", function () {
+    if (episode && audio.currentTime > 0 && !audio.ended) save(false);
+    current = null;
+    episode = "";
+    queue = [];
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    bar.hidden = true;
+    document.body.classList.remove("has-player");
+    if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
+    markButtons();
+  });
+
   // The lock screen's buttons do the same.
   if ("mediaSession" in navigator) {
     const actions = {

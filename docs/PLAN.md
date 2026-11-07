@@ -160,7 +160,8 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 - **Continue listening** — remembers where you stopped in each episode and
   lists partly-played episodes on the home page.
 - **Persistent player bar** — a player at the bottom of the screen that keeps
-  playing while you browse to other pages.
+  playing while you browse to other pages. A × at its right end stops it and hides the
+  bar, to free the screen (the place is kept, so Resume still works).
 - **Calendar** — day / week / month (section 2).
 - **Continue listening** cards have a small × to take one off the row (its
   place is kept; listening again brings it back).
