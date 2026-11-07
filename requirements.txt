@@ -7,3 +7,4 @@ sqlalchemy==2.1.8      # talks to the SQLite database
 python-multipart==0.0.33  # reads what forms send (e.g. the edit form)
 tzdata==2026.6         # time zone rules (summer time etc.), so end times are right on any computer
 pillow==13.0.0         # makes small copies of pictures (series and episode artwork)
+segno==1.6.6           # draws QR codes (for adding a podcast feed on a phone)

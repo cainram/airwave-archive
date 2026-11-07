@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.artwork import folder_art
 from app.db import (
-    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, FolderArt, Listening, SeriesArt, natural_key,
-    utcnow,
+    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, Feed, FolderArt, Listening, SeriesArt,
+    natural_key, utcnow,
 )
 from app.listening import STARTED
 
@@ -182,18 +182,33 @@ def set_uploaded_picture(session: Session, name: str, art_hash: str | None) -> N
 
 def follow_rename(session: Session, old: str | None, new: str | None) -> None:
     """After an episode's series name changed: if no episode is left with
-    the old name, its uploaded picture moves to the new name (unless that
-    already has one of its own)."""
+    the old name, the series' feeds follow it to the new name, and its
+    uploaded picture moves too (unless the new name has one of its own)."""
     if not old or not new or old == new:
         return
     session.flush()
+    if session.scalar(select(func.count(Episode.id)).where(Episode.series == old)):
+        return   # other episodes still use the old name
+    for feed in session.scalars(select(Feed).where(Feed.series == old)):
+        feed.series = new
     picture = session.get(SeriesArt, old)
     if picture is None or session.get(SeriesArt, new) is not None:
         return
-    if session.scalar(select(func.count(Episode.id)).where(Episode.series == old)):
-        return   # other episodes still use the old name
     set_uploaded_picture(session, new, picture.art_hash)
     session.delete(picture)
+
+
+# Episodes in air-date order: known dates first, in order; within a year,
+# a date known only to the month (or year) comes after the full dates.
+# Then by episode number (as numbers where they are: "2" before "10"),
+# then title.
+AIR_ORDER = (Episode.air_year.is_(None), Episode.air_year,
+             Episode.air_month.is_(None), Episode.air_month,
+             Episode.air_day.is_(None), Episode.air_day,
+             Episode.air_time.is_(None), Episode.air_time,
+             Episode.episode_number.is_(None),
+             cast(Episode.episode_number, Integer), Episode.episode_number,
+             Episode.title)
 
 
 def series_files(session: Session, name: str | None, page: int, page_size: int):
@@ -204,16 +219,7 @@ def series_files(session: Session, name: str | None, page: int, page_size: int):
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     files = session.scalars(
         query.options(WITH_PARTS)
-        # Known dates first, in order; within a year, a date known only to
-        # the month (or year) comes after the full dates. Then by title.
-        .order_by(Episode.air_year.is_(None), Episode.air_year,
-                  Episode.air_month.is_(None), Episode.air_month,
-                  Episode.air_day.is_(None), Episode.air_day,
-                  Episode.air_time.is_(None), Episode.air_time,
-                  # Episode numbers as numbers where they are ("2" before "10").
-                  Episode.episode_number.is_(None),
-                  cast(Episode.episode_number, Integer), Episode.episode_number,
-                  Episode.title, AudioFile.name)
+        .order_by(*AIR_ORDER, AudioFile.name)
         .offset((page - 1) * page_size).limit(page_size)
     ).unique().all()
     return files, total

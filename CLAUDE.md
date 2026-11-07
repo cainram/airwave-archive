@@ -145,6 +145,9 @@ These come from the plan and should not be changed without the owner's OK:
   (only after the confirmation page), and the episodes from the app
 - `app/export.py`: export zips (tagged copies, manifest, pictures), made
   while they download
+- `app/feeds.py`: podcast feeds (RSS) for podcast apps: which recordings
+  a feed holds, their dates (when added to the feed, never invented),
+  the RSS itself, and QR codes
 - `app/zipimport.py`: unpacking zips (Airwave exports or plain zips of
   recordings) into the inbox, with the details from the export's manifest
 - `app/search.py`: the search index (SQLite FTS5) and searching. The

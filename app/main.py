@@ -22,7 +22,8 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db import (
-    DB_FILENAME, InboxItem, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, ScanRun, make_engine, utcnow,
+    DB_FILENAME, InboxItem, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, Feed, ScanRun,
+    make_engine, utcnow,
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
@@ -31,7 +32,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, csvimport, deleting, export, inbox, listening, zipimport
+from app import airdates, csvimport, deleting, export, feeds, inbox, listening, zipimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -1293,6 +1294,201 @@ def file_art(file_id: int):
     if art is None:
         raise HTTPException(status_code=404, detail="No picture")
     return RedirectResponse(f"/art/{art}.jpg", status_code=307)
+
+
+# ------------------------------------------------------------------ feeds
+# Podcast feeds (RSS) for podcast apps; see app/feeds.py.
+
+MAX_FEED_TITLE, MAX_FEED_DESCRIPTION = 200, 4000
+FEED_PAGE_ITEMS = 25    # recordings listed on a feed's page (the newest)
+
+
+def get_feed(session: Session, feed_id: int) -> Feed:
+    feed = session.get(Feed, feed_id)
+    if feed is None:
+        raise HTTPException(status_code=404, detail="No such feed")
+    return feed
+
+
+def server_address(request: Request) -> str:
+    """This server's address as the browser (or podcast app) reached it."""
+    return str(request.base_url).rstrip("/")
+
+
+def read_feed_form(form) -> tuple[dict, dict]:
+    values = {"title": str(form.get("title", "")).strip(),
+              "description": str(form.get("description", "")).strip()}
+    errors = {}
+    if not values["title"]:
+        errors["title"] = "Give the podcast a name."
+    elif len(values["title"]) > MAX_FEED_TITLE:
+        errors["title"] = f"Keep the name under {MAX_FEED_TITLE} characters."
+    if len(values["description"]) > MAX_FEED_DESCRIPTION:
+        errors["description"] = f"Keep the description under {MAX_FEED_DESCRIPTION} characters."
+    return values, errors
+
+
+@app.get("/feeds", response_class=HTMLResponse)
+def feeds_page(request: Request):
+    """All the podcast feeds, newest first."""
+    with Session(get_engine()) as session:
+        rows = []
+        for feed in session.scalars(select(Feed).order_by(Feed.created_at.desc())):
+            found = feeds.items(feed, feeds.feed_episodes(session, feed))
+            series = one_series(session, feed.series) if feed.series is not None else None
+            rows.append({"feed": feed, "recordings": len(found),
+                         "episodes": len({i.episode.id for i in found}),
+                         "art": series["art"] if series else None})
+        session.expunge_all()
+    return render(request, "feeds.html", {"rows": rows})
+
+
+@app.get("/feeds/new", response_class=HTMLResponse)
+def new_feed(request: Request, series: str = ""):
+    """Make a feed of a series: its name and description first."""
+    with Session(get_engine()) as session:
+        totals = one_series(session, series) if series else None
+    if totals is None:
+        raise HTTPException(status_code=404, detail="No such series")
+    return render(request, "feed_form.html", {
+        "feed": None, "series": series, "totals": totals,
+        "values": {"title": series, "description": ""}, "errors": {}})
+
+
+@app.post("/feeds", response_class=HTMLResponse)
+async def create_feed(request: Request):
+    form = await request.form()
+    series = str(form.get("series", ""))
+    values, errors = read_feed_form(form)
+    with Session(get_engine()) as session:
+        totals = one_series(session, series) if series else None
+        if totals is None:
+            raise HTTPException(status_code=404, detail="No such series")
+        if errors:
+            return render(request, "feed_form.html", {
+                "feed": None, "series": series, "totals": totals,
+                "values": values, "errors": errors}, status_code=400)
+        feed = feeds.make_series_feed(session, series, values["title"],
+                                      values["description"] or None)
+        session.commit()
+        feed_id = feed.id
+    return go_to(request, f"/feeds/{feed_id}?made=1")
+
+
+@app.get("/feeds/{feed_id}", response_class=HTMLResponse)
+def feed_page(request: Request, feed_id: int, made: bool = False, published: str = ""):
+    """One feed: its details, whether it's published, its address and QR
+    code, how to add it on an iPhone, and the episodes in it."""
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        found = feeds.items(feed, feeds.feed_episodes(session, feed))
+        series = one_series(session, feed.series) if feed.series is not None else None
+        newest = feeds.newest_first(found)[:FEED_PAGE_ITEMS]
+        session.expunge_all()
+    address = f"{server_address(request)}/feeds/{feed.token}/feed.xml"
+    podcast_address = "podcast://" + address.split("://", 1)[1]
+    return render(request, "feed.html", {
+        "feed": feed, "series": series, "art": series["art"] if series else None,
+        "recordings": len(found), "episodes": len({i.episode.id for i in found}),
+        "newest": newest, "odd": feeds.odd_formats(found),
+        "address": address, "podcast_address": podcast_address,
+        "qr": feeds.qr_svg(podcast_address) if feed.published else None,
+        "made": made, "published_now": published,
+    })
+
+
+@app.get("/feeds/{feed_id}/edit", response_class=HTMLResponse)
+def edit_feed_form(request: Request, feed_id: int):
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        session.expunge_all()
+    return render(request, "feed_form.html", {
+        "feed": feed, "series": feed.series, "totals": None,
+        "values": {"title": feed.title, "description": feed.description or ""}, "errors": {}})
+
+
+@app.post("/feeds/{feed_id}/edit", response_class=HTMLResponse)
+async def edit_feed(request: Request, feed_id: int):
+    values, errors = read_feed_form(await request.form())
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        if errors:
+            session.expunge_all()
+            return render(request, "feed_form.html", {
+                "feed": feed, "series": feed.series, "totals": None,
+                "values": values, "errors": errors}, status_code=400)
+        feed.title, feed.description = values["title"], values["description"] or None
+        feed.updated_at = utcnow()
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}")
+
+
+@app.post("/feeds/{feed_id}/publish")
+async def publish_feed(request: Request, feed_id: int):
+    """Publish a feed (its address starts working) or take it back to a
+    draft (its address stops working; podcast apps keep what they have)."""
+    publish = str((await request.form()).get("published", "")) == "1"
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        if publish and not feed.published:
+            feed.published_at = utcnow()
+        feed.published = publish
+        feed.updated_at = utcnow()
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?published={'yes' if publish else 'no'}")
+
+
+@app.get("/feeds/{feed_id}/delete", response_class=HTMLResponse)
+def delete_feed_page(request: Request, feed_id: int):
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        session.expunge_all()
+    return render(request, "feed_delete.html", {"feed": feed})
+
+
+@app.post("/feeds/{feed_id}/delete")
+async def delete_feed(request: Request, feed_id: int):
+    """Delete a feed (never its recordings). Its address stops working."""
+    if str((await request.form()).get("confirm", "")) != "yes":
+        raise HTTPException(status_code=400, detail="Not confirmed")
+    with Session(get_engine()) as session:
+        session.delete(get_feed(session, feed_id))
+        session.commit()
+    return go_to(request, "/feeds?deleted=1")
+
+
+def published_feed(session: Session, token: str) -> Feed:
+    """The published feed with this private token (else "not found", the
+    same for a draft as for a wrong token)."""
+    feed = session.scalar(select(Feed).where(Feed.token == token))
+    if feed is None or not feed.published:
+        raise HTTPException(status_code=404, detail="No such feed")
+    return feed
+
+
+@app.get("/feeds/{token}/feed.xml")
+def feed_xml(request: Request, token: str):
+    """The feed itself, for podcast apps."""
+    with Session(get_engine()) as session:
+        feed = published_feed(session, token)
+        body = feeds.rss(session, feed, server_address(request))
+    return Response(body, media_type="application/rss+xml; charset=utf-8",
+                    headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/feeds/{token}/audio/{name}")
+def feed_audio(token: str, name: str):
+    """A recording of a published feed, for podcast apps (like /audio,
+    which can send any part of the file)."""
+    stem = name.split(".", 1)[0]
+    if not stem.isdigit():
+        raise HTTPException(status_code=404, detail="No such recording")
+    with Session(get_engine()) as session:
+        feed = published_feed(session, token)
+        f = session.get(AudioFile, int(stem))
+        if f is None or not feeds.in_feed(session, feed, f):
+            raise HTTPException(status_code=404, detail="No such recording")
+    return audio(int(stem))
 
 
 @app.get("/health")
