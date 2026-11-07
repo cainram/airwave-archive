@@ -189,3 +189,68 @@ def test_editing_renaming_and_deleting(client):
     assert (client.lib / "Suspense" / "a.mp3").is_file()
     with Session(client.engine) as session:
         assert len(session.scalars(select(AudioFile)).all()) == 6
+
+
+def episode_ids(client, *names) -> list[int]:
+    with Session(client.engine) as session:
+        return [session.scalar(select(AudioFile.episode_id).where(AudioFile.name == n)) for n in names]
+
+
+def test_a_hand_picked_feed(client):
+    a, b, art = episode_ids(client, "a.mp3", "b.mp3", "Art Bell 1996-05-02 Hour 1.wav")
+    page = client.get("/series/episodes?name=Suspense").text
+    assert 'formaction="/feeds/new">Make a feed…' in page and 'formaction="/feeds/add">Add to a feed…' in page
+    # Ticked from two series: no name is suggested.
+    form = client.get(f"/feeds/new?ids={b}&ids={art}&back=/library").text
+    assert 'value=""' in form and "the 2 episodes" in " ".join(form.split())
+    # From one series: its name is.
+    assert 'value="Suspense"' in client.get(f"/feeds/new?ids={a}&ids={b}").text
+    assert "No episodes were ticked" in client.get("/feeds/new").text
+
+    sent = client.post("/feeds", data={"title": "Mix", "ids": [str(b), str(art)], "back": "/library"},
+                       follow_redirects=False)
+    feed_id = int(re.search(r"/feeds/(\d+)", sent.headers["location"])[1])
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    channel = read(client, feed_id)
+    # In air-date order (the 1943 one before the 1996 one), parts in order.
+    titles = [i.findtext("title") for i in channel.findall("item")]
+    assert titles == ["Sorry, Wrong Number", "Art Bell (part 1 of 2)", "Art Bell (part 2 of 2)"]
+    dates = [i.findtext("pubDate") for i in channel.findall("item")]
+    assert len(set(dates)) == 3
+    # Each episode's series is in its description (it isn't a series feed).
+    assert "Series: Coast to Coast AM" in channel.findall("item")[1].findtext("description")
+    listing = client.get("/feeds").text
+    assert "Hand-picked" in listing
+
+    # Adding: only the new one goes in, at the end (even though it aired first).
+    page = client.get(f"/feeds/add?ids={a}&ids={b}&back=/library").text
+    assert "Mix" in page and "2 ticked episodes" in page
+    page = client.post("/feeds/add", data={"feed": str(feed_id), "ids": [str(a), str(b)]},
+                       follow_redirects=True).text
+    assert "Added 1 episode to the feed." in page and "1 was in it already." in page
+    titles = [i.findtext("title") for i in read(client, feed_id).findall("item")]
+    assert titles[-1] == "The Hitchhiker" and titles[:3] == ["Sorry, Wrong Number", "Art Bell (part 1 of 2)",
+                                                             "Art Bell (part 2 of 2)"]
+    # The feed's recordings play; others don't.
+    secret = token(client, feed_id)
+    assert client.get(f"/feeds/{secret}/audio/{client.ids['a.mp3']}.mp3").status_code == 200
+    assert client.get(f"/feeds/{secret}/audio/{client.ids['c.mp3']}.mp3").status_code == 404
+
+    # Taking one out (it stays in the library).
+    page = client.post(f"/feeds/{feed_id}/remove", data={"ids": [str(art)]}, follow_redirects=True).text
+    assert "Took 1 episode out of the feed." in page
+    titles = [i.findtext("title") for i in read(client, feed_id).findall("item")]
+    assert titles == ["Sorry, Wrong Number", "The Hitchhiker"]
+    assert client.get(f"/feeds/{secret}/audio/{client.ids['Art Bell 1996-05-02 Hour 1.wav']}.wav").status_code == 404
+
+    # Deleting an episode from the library drops it from the feed.
+    client.post("/delete", data={"ids": [str(b)], "confirm": "yes", "back": "/library"})
+    titles = [i.findtext("title") for i in read(client, feed_id).findall("item")]
+    assert titles == ["The Hitchhiker"]
+
+
+def test_a_series_feed_cant_be_added_to(client):
+    a, = episode_ids(client, "a.mp3")
+    feed_id = make(client)
+    assert "no hand-picked feeds yet" in client.get(f"/feeds/add?ids={a}").text
+    assert client.post("/feeds/add", data={"feed": str(feed_id), "ids": [str(a)]}).status_code == 400

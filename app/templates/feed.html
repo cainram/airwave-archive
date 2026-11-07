@@ -10,6 +10,14 @@
 {% elif published_now == "yes" %}
 <div class="notice success" role="status">Published. Podcast apps can read it now: see below for
   how to add it on your iPhone.</div>
+{% elif request.query_params.get("added") %}
+{% set added = request.query_params.get("added") | int(0) %}{% set already = request.query_params.get("already") | int(0) %}
+<div class="notice success" role="status">Added {{ added }} episode{{ "" if added == 1 else "s" }} to the feed.
+  {% if already %}{{ already }} {{ "was" if already == 1 else "were" }} in it already.{% endif %}</div>
+{% elif request.query_params.get("removed") %}
+{% set removed = request.query_params.get("removed") | int(0) %}
+<div class="notice success" role="status">Took {{ removed }} episode{{ "" if removed == 1 else "s" }} out of the feed.
+  {{ "It's" if removed == 1 else "They're" }} still in your library.</div>
 {% elif published_now == "no" %}
 <div class="notice success" role="status">Back to a draft. Its address no longer works; podcast
   apps that follow it stop getting new episodes.</div>
@@ -21,7 +29,7 @@
     <h1>{{ feed.title }}</h1>
     <p class="muted">
       {% if feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
-      {% if feed.series %}Every episode of <a href="{{ feed.series | series_url }}">{{ feed.series }}</a> ·{% endif %}
+      {% if feed.series %}Every episode of <a href="{{ feed.series | series_url }}">{{ feed.series }}</a> ·{% else %}Hand-picked ·{% endif %}
       {{ episodes }} episode{{ "" if episodes == 1 else "s" }}{% if recordings != episodes %} ({{ recordings }} recordings){% endif %}
     </p>
     {% if feed.description %}<p class="feed-description">{{ feed.description }}</p>{% endif %}
@@ -94,17 +102,31 @@
 
 <section aria-labelledby="in-feed-heading">
   <h2 id="in-feed-heading">In the feed</h2>
-  {% if not first %}
-  <p class="muted">No episodes yet. Episodes added to {{ feed.series or "the series" }} later appear here.</p>
+  {% if not first and feed.series %}
+  <p class="muted">No episodes yet. Episodes added to {{ feed.series }} later appear here.</p>
+  {% elif not first %}
+  <p class="muted">No episodes in it. To add some, tick them in the <a href="/library">Library</a> or on a
+    series' page and choose <strong>☰ With ticked → Add to a feed…</strong></p>
   {% else %}
   <p class="muted small">Oldest first, in air-date order, as podcast apps list them. The apps show
     the date each one was added to the feed; the real air date is in each episode's description.</p>
+  {% set picked = feed.series is none %}
+  {% if picked %}
+  <form id="feed-remove" class="pick-toolbar" method="post" action="/feeds/{{ feed.id }}/remove">
+    <button class="button" type="submit">Take ticked out of the feed</button>
+    <span class="muted small">They stay in your library. To add more, tick episodes in the Library or on a
+      series' page and choose <strong>☰ With ticked → Add to a feed…</strong></span>
+  </form>
+  {% endif %}
   <div class="table-wrap">
     <table class="files">
-      <thead><tr><th>Title</th><th class="date">Aired</th><th class="num">Length</th></tr></thead>
+      <thead><tr>
+        {% if picked %}<th class="pick"><input type="checkbox" form="feed-remove" data-select-all aria-label="Tick all"></th>{% endif %}
+        <th>Title</th><th class="date">Aired</th><th class="num">Length</th></tr></thead>
       <tbody>
         {% for item in first %}
         <tr>
+          {% if picked %}<td class="pick">{% if (item.part or 1) == 1 %}<input type="checkbox" form="feed-remove" name="ids" value="{{ item.episode.id }}" aria-label="Tick {{ item.title }}">{% endif %}</td>{% endif %}
           <td><a class="title" href="/files/{{ item.file.id }}">{{ item.title }}</a></td>
           <td class="date">{{ item.episode | air_date(short=true) or "unknown" }}</td>
           <td class="num">{{ item.file.duration_seconds | duration }}</td>

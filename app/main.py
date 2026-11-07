@@ -1334,61 +1334,131 @@ def feeds_page(request: Request):
     with Session(get_engine()) as session:
         rows = []
         for feed in session.scalars(select(Feed).order_by(Feed.created_at.desc())):
-            found = feeds.items(feed, feeds.feed_episodes(session, feed))
-            series = one_series(session, feed.series) if feed.series is not None else None
+            found = feeds.feed_items(session, feed)
             rows.append({"feed": feed, "recordings": len(found),
                          "episodes": len({i.episode.id for i in found}),
-                         "art": series["art"] if series else None})
+                         "art": feeds.feed_picture(session, feed, found)})
         session.expunge_all()
     return render(request, "feeds.html", {"rows": rows})
 
 
+def picked_episodes(session: Session, ids: list[int]) -> list[Episode]:
+    """Ticked episodes (the ones that still exist), in air-date order."""
+    found = []
+    ids = list(dict.fromkeys(ids))[:5000]
+    for i in range(0, len(ids), 500):
+        found += session.scalars(select(Episode).where(Episode.id.in_(ids[i:i + 500]))).all()
+    return sorted(found, key=feeds.air_key)
+
+
+def render_new_feed(request: Request, series: str, totals, picked, back: str,
+                    values: dict, errors: dict):
+    return render(request, "feed_form.html", {
+        "feed": None, "series": series, "totals": totals, "picked": picked,
+        "back": safe_back(back) if back else (series_url(series) if series else "/feeds"),
+        "values": values, "errors": errors}, status_code=400 if errors else 200)
+
+
 @app.get("/feeds/new", response_class=HTMLResponse)
-def new_feed(request: Request, series: str = ""):
-    """Make a feed of a series: its name and description first."""
+def new_feed(request: Request, series: str = "", ids: list[int] = Query(default=[]),
+             back: str = ""):
+    """Make a feed: of a whole series, or of ticked episodes. Its name and
+    description first."""
     with Session(get_engine()) as session:
         totals = one_series(session, series) if series else None
-    if totals is None:
+        picked = [] if series else picked_episodes(session, ids)
+        session.expunge_all()
+    if series and totals is None:
         raise HTTPException(status_code=404, detail="No such series")
-    return render(request, "feed_form.html", {
-        "feed": None, "series": series, "totals": totals,
-        "values": {"title": series, "description": ""}, "errors": {}})
+    names = {e.series for e in picked}
+    title = series or (names.pop() if len(names) == 1 and None not in names else "")
+    return render_new_feed(request, series, totals, picked, back,
+                           {"title": title or "", "description": ""}, {})
 
 
 @app.post("/feeds", response_class=HTMLResponse)
 async def create_feed(request: Request):
     form = await request.form()
     series = str(form.get("series", ""))
+    ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
+    back = str(form.get("back", ""))
     values, errors = read_feed_form(form)
     with Session(get_engine()) as session:
         totals = one_series(session, series) if series else None
-        if totals is None:
+        picked = [] if series else picked_episodes(session, ids)
+        if series and totals is None:
             raise HTTPException(status_code=404, detail="No such series")
+        if not series and not picked:
+            errors["picked"] = "No episodes were ticked."
         if errors:
-            return render(request, "feed_form.html", {
-                "feed": None, "series": series, "totals": totals,
-                "values": values, "errors": errors}, status_code=400)
-        feed = feeds.make_series_feed(session, series, values["title"],
-                                      values["description"] or None)
+            session.expunge_all()
+            return render_new_feed(request, series, totals, picked, back, values, errors)
+        if series:
+            feed = feeds.make_series_feed(session, series, values["title"],
+                                          values["description"] or None)
+        else:
+            feed = feeds.make_picked_feed(session, picked, values["title"],
+                                          values["description"] or None)
         session.commit()
         feed_id = feed.id
     return go_to(request, f"/feeds/{feed_id}?made=1")
 
 
+@app.get("/feeds/add", response_class=HTMLResponse)
+def add_to_feed_page(request: Request, ids: list[int] = Query(default=[]), back: str = ""):
+    """Ticked episodes: choose a hand-picked feed to add them to."""
+    with Session(get_engine()) as session:
+        picked = picked_episodes(session, ids)
+        choices = list(session.scalars(
+            select(Feed).where(Feed.series.is_(None)).order_by(Feed.title)))
+        session.expunge_all()
+    return render(request, "feed_add.html", {
+        "picked": picked, "choices": choices, "back": safe_back(back) if back else "/feeds"})
+
+
+@app.post("/feeds/add")
+async def add_to_feed(request: Request):
+    """Add ticked episodes to the hand-picked feed chosen."""
+    form = await request.form()
+    ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
+    feed_id = int(form.get("feed", "0")) if str(form.get("feed", "")).isdigit() else 0
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        if feed.series is not None:
+            raise HTTPException(status_code=400, detail="A series feed holds its whole series")
+        picked = picked_episodes(session, ids)
+        added = feeds.add_episodes(session, feed, picked)
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?added={added}&already={len(picked) - added}")
+
+
+@app.post("/feeds/{feed_id}/remove")
+async def remove_from_feed(request: Request, feed_id: int):
+    """Take ticked episodes out of a hand-picked feed (never out of the library)."""
+    form = await request.form()
+    ids = {int(i) for i in form.getlist("ids") if str(i).isdigit()}
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        removed = feeds.remove_episodes(feed, ids)
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?removed={removed}")
+
+
 @app.get("/feeds/{feed_id}", response_class=HTMLResponse)
 def feed_page(request: Request, feed_id: int, made: bool = False, published: str = ""):
     """One feed: its details, whether it's published, its address and QR
-    code, how to add it on an iPhone, and the episodes in it."""
+    code, how to add it on an iPhone, and the episodes in it (all of a
+    hand-picked feed's, with ticks to remove some)."""
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
-        found = feeds.items(feed, feeds.feed_episodes(session, feed))
-        series = one_series(session, feed.series) if feed.series is not None else None
-        first = feeds.in_order(found)[:FEED_PAGE_ITEMS]
+        found = feeds.feed_items(session, feed)
+        art = feeds.feed_picture(session, feed, found)
+        first = found if feed.series is None else found[:FEED_PAGE_ITEMS]
         session.expunge_all()
     address = f"{server_address(request)}/feeds/{feed.token}/feed.xml"
     podcast_address = "podcast://" + address.split("://", 1)[1]
     return render(request, "feed.html", {
-        "feed": feed, "series": series, "art": series["art"] if series else None,
+        "feed": feed, "art": art,
         "recordings": len(found), "episodes": len({i.episode.id for i in found}),
         "first": first, "odd": feeds.odd_formats(found),
         "address": address, "podcast_address": podcast_address,

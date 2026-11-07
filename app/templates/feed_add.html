@@ -1,0 +1,36 @@
+{% extends layout %}
+{% block title %}Add to a feed · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
+<h1>Add to a feed</h1>
+{% if not picked %}
+<div class="notice">No episodes were ticked. Tick some in the <a href="/library">Library</a>
+  or on a series' page, then choose <strong>☰ With ticked → Add to a feed…</strong></div>
+{% else %}
+<p class="muted">{{ picked | length }} ticked episode{{ "" if picked | length == 1 else "s" }}.
+  They go at the end of the feed, in air-date order (any already in it are skipped).</p>
+{% if not choices %}
+<div class="notice">You have no hand-picked feeds yet to add them to.
+  (A series feed always holds its whole series.)</div>
+{% else %}
+<form method="post" action="/feeds/add" class="feed-choose">
+  {% for ep in picked %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}
+  <fieldset>
+    <legend>Which feed?</legend>
+    {% for feed in choices %}
+    <label class="choice">
+      <input type="radio" name="feed" value="{{ feed.id }}" {% if loop.first %}checked{% endif %}>
+      {{ feed.title }}
+      {% if feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
+    </label>
+    {% endfor %}
+  </fieldset>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Add to this feed</button>
+    <a class="button" href="{{ back }}">Cancel</a>
+  </div>
+</form>
+{% endif %}
+<p><a class="button" href="/feeds/new?{% for ep in picked %}ids={{ ep.id }}&amp;{% endfor %}back={{ back | urlencode }}">Make a new feed of them instead…</a></p>
+{% endif %}
+{% endblock %}

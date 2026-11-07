@@ -2,8 +2,11 @@
 
 An RSS feed is a web address that lists episodes in a standard form that
 podcast apps read: the app shows them and plays the recordings straight
-from this server. The feed follows a series: episodes added to the series
-later appear in it too.
+from this server. Two kinds:
+
+- A series feed follows a series: episodes added to it later appear too.
+- A hand-picked feed holds the episodes ticked for it (more can be added,
+  and some removed, later). Episodes deleted from the library drop out.
 
 - Each feed has a private address, with a long random "token" in it
   (podcast apps can't log in, so the address itself is the key).
@@ -15,7 +18,8 @@ later appear in it too.
   an item's date is when it was added to the feed: episodes already in
   the series when the feed was made count as added then, a second apart
   in air-date order (so apps list them in that order); later ones, when
-  they arrived in the library. The real air date goes in the description.
+  they arrived in the library. Episodes picked together for a hand-picked
+  feed are likewise a second apart in air-date order. The real air date goes in the description.
 - An episode in several parts (Hour 1, Hour 2) is one item per part,
   since a podcast item holds one recording.
 - Feeds are "serial" shows: podcast apps list them oldest first, in
@@ -41,7 +45,7 @@ import segno
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import AudioFile, Episode, Feed, utcnow
+from app.db import AudioFile, Episode, Feed, FeedItem, utcnow
 from app.episodes import format_air_date
 from app.series import AIR_ORDER, one_series
 
@@ -73,14 +77,92 @@ def make_series_feed(session: Session, series: str, title: str,
     return feed
 
 
+def make_picked_feed(session: Session, episodes: list[Episode], title: str,
+                     description: str | None) -> Feed:
+    """A hand-picked feed of these episodes."""
+    now = utcnow()
+    feed = Feed(token=new_token(), title=title, description=description, series=None,
+                published=False, created_at=now, updated_at=now)
+    session.add(feed)
+    session.flush()
+    add_episodes(session, feed, episodes)
+    return feed
+
+
+def add_episodes(session: Session, feed: Feed, episodes: list[Episode]) -> int:
+    """Add episodes to a hand-picked feed (ones already in it are skipped),
+    after the ones there, in air-date order: each part a second after the
+    one before (podcast apps sort by dates to the second). Returns how
+    many episodes were added."""
+    have = {pick.episode_id for pick in feed.picks}
+    last = [pick.added_at + timedelta(seconds=PART_SECONDS) for pick in feed.picks]
+    when = max([utcnow(), *last])
+    new = sorted((e for e in {e.id: e for e in episodes}.values() if e.id not in have),
+                 key=air_key)
+    for episode in new:
+        feed.picks.append(FeedItem(episode_id=episode.id, added_at=when))
+        when += timedelta(seconds=max(len(episode.files), 1))
+    if new:
+        feed.updated_at = utcnow()
+    return len(new)
+
+
+# Room left after an episode's date for its parts (each a second apart).
+PART_SECONDS = 100
+
+
+def remove_episodes(feed: Feed, episode_ids: set[int]) -> int:
+    """Take episodes out of a hand-picked feed (never out of the library)."""
+    gone = [pick for pick in feed.picks if pick.episode_id in episode_ids]
+    for pick in gone:
+        feed.picks.remove(pick)
+    if gone:
+        feed.updated_at = utcnow()
+    return len(gone)
+
+
+def air_key(e: Episode):
+    """Sorts episodes in air-date order, like AIR_ORDER does in the database."""
+    number = e.episode_number or ""
+    return (e.air_year is None, e.air_year or 0, e.air_month is None, e.air_month or 0,
+            e.air_day is None, e.air_day or 0, e.air_time is None, e.air_time or "",
+            not number, int(number) if number.isdigit() else 0, number, e.title or "", e.id)
+
+
 def feed_episodes(session: Session, feed: Feed) -> list[Episode]:
-    """The feed's episodes, in air-date order, with their files."""
-    if feed.series is None:
-        return []
+    """The feed's episodes, in air-date order (a hand-picked feed's: in the
+    order they were added, each batch in air-date order), with their files."""
+    if feed.series is not None:
+        return list(session.scalars(
+            select(Episode).where(Episode.series == feed.series)
+            .options(selectinload(Episode.files))
+            .order_by(*AIR_ORDER, Episode.id)))
     return list(session.scalars(
-        select(Episode).where(Episode.series == feed.series)
+        select(Episode).join(FeedItem, FeedItem.episode_id == Episode.id)
+        .where(FeedItem.feed_id == feed.id)
         .options(selectinload(Episode.files))
-        .order_by(*AIR_ORDER, Episode.id)))
+        .order_by(FeedItem.added_at, *AIR_ORDER, Episode.id)))
+
+
+def feed_items(session: Session, feed: Feed) -> list[Item]:
+    """The feed's recordings, in the order podcast apps list them."""
+    added = None
+    if feed.series is None:
+        added = {pick.episode_id: pick.added_at for pick in session.scalars(
+            select(FeedItem).where(FeedItem.feed_id == feed.id))}
+    return in_order(items(feed, feed_episodes(session, feed), added))
+
+
+def feed_picture(session: Session, feed: Feed, found: list[Item]) -> str | None:
+    """The podcast's picture: its series' (for a hand-picked feed, that of
+    the first episode's series that has one)."""
+    names = [feed.series] if feed.series is not None else list(dict.fromkeys(
+        item.episode.series for item in found if item.episode.series))
+    for name in names:
+        series = one_series(session, name)
+        if series and series["art"]:
+            return series["art"]
+    return None
 
 
 @dataclass
@@ -103,9 +185,10 @@ def episode_title(episode: Episode, f: AudioFile) -> str:
     return episode.title or f.tag_title or PurePosixPath(f.name).stem
 
 
-def items(feed: Feed, episodes: list[Episode]) -> list[Item]:
-    """The feed's recordings, oldest air date first. Missing files are
-    left out."""
+def items(feed: Feed, episodes: list[Episode],
+          added_at: dict[int, datetime] | None = None) -> list[Item]:
+    """The feed's recordings, in the episodes' order. Missing files are
+    left out. `added_at`: when each episode was added (hand-picked feeds)."""
     found: list[Item] = []
     already = 0     # items there when the feed was made: a second apart
     for episode in episodes:
@@ -115,7 +198,9 @@ def items(feed: Feed, episodes: list[Episode]) -> list[Item]:
             title = title or episode_title(episode, f)
             number = parts.index(f) + 1
             name = title if len(parts) == 1 else f"{title} (part {number} of {len(parts)})"
-            if f.first_seen <= feed.created_at:
+            if added_at is not None:
+                added = added_at[episode.id] + timedelta(seconds=number - 1)
+            elif f.first_seen <= feed.created_at:
                 added = feed.created_at + timedelta(seconds=already)
                 already += 1
             else:
@@ -178,16 +263,14 @@ def _add(parent: ET.Element, tag: str, text: str | None = None, **attrs) -> ET.E
 def rss(session: Session, feed: Feed, base: str) -> bytes:
     """The feed, as RSS (XML). `base`: this server's address as the podcast
     app reached it, like http://192.168.1.20:8000."""
-    episodes = feed_episodes(session, feed)
-    found = items(feed, episodes)
-    series = one_series(session, feed.series) if feed.series is not None else None
-    picture = series["art"] if series else None
+    found = feed_items(session, feed)
+    picture = feed_picture(session, feed, found)
     it = f"{{{ITUNES}}}"
 
     root = ET.Element("rss", {"version": "2.0"})
     channel = _add(root, "channel")
     description = feed.description or (
-        f"{feed.series}, from Airwave Archive." if feed.series else "From Airwave Archive.")
+        f"{feed.series}, from Airwave Archive." if feed.series else "Episodes from Airwave Archive.")
     _add(channel, "title", feed.title)
     _add(channel, "link", f"{base}/feeds/{feed.id}")
     _add(channel, "description", description)
@@ -209,7 +292,7 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
         _add(image, "title", feed.title)
         _add(image, "link", f"{base}/feeds/{feed.id}")
 
-    for item in in_order(found):
+    for item in found:
         f, episode = item.file, item.episode
         entry = _add(channel, "item")
         _add(entry, "title", item.title)
@@ -231,8 +314,12 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
 
 def in_feed(session: Session, feed: Feed, f: AudioFile) -> bool:
     """Whether a recording belongs to this feed."""
-    episode = session.get(Episode, f.episode_id) if f.episode_id else None
-    return episode is not None and feed.series is not None and episode.series == feed.series
+    if f.episode_id is None:
+        return False
+    if feed.series is None:
+        return session.get(FeedItem, (feed.id, f.episode_id)) is not None
+    episode = session.get(Episode, f.episode_id)
+    return episode is not None and episode.series == feed.series
 
 
 def qr_svg(text: str) -> str:

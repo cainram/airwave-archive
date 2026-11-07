@@ -1,16 +1,39 @@
 {% extends layout %}
 {% block title %}{{ "Edit feed" if feed else "Make a feed" }} · Airwave Archive{% endblock %}
 {% block content %}
-{% set back = ("/feeds/" ~ feed.id) if feed else (series | series_url) %}
-<nav class="back"><a class="button" href="{{ back }}">← {{ "Back without saving" if feed else "Back to " ~ series }}</a></nav>
+{% if feed %}{% set back = "/feeds/" ~ feed.id %}{% endif %}
+<nav class="back"><a class="button" href="{{ back }}">← {{ "Back without saving" if feed else "Back" }}</a></nav>
 <h1>{{ "Edit feed" if feed else "Make a feed" }}</h1>
-{% if not feed %}
+{% if not feed and series %}
 <p class="muted">A podcast feed of <strong>{{ series }}</strong>: all {{ totals.episodes }}
   episode{{ "" if totals.episodes == 1 else "s" }}, and any added to the series later.
   It starts as a draft: nothing can read it until you publish it.</p>
+{% elif not feed %}
+  {% if not picked %}
+  <div class="notice">No episodes were ticked. Tick some in the
+    <a href="/library">Library</a> or on a series' page, then choose
+    <strong>☰ With ticked → Make a feed…</strong></div>
+  {% else %}
+  <p class="muted">A podcast feed of the {{ picked | length }} episode{{ "" if picked | length == 1 else "s" }}
+    you ticked. You can add more, or take some out, later.
+    It starts as a draft: nothing can read it until you publish it.</p>
+  <details class="picked-list">
+    <summary>See the {{ picked | length }} episode{{ "" if picked | length == 1 else "s" }}</summary>
+    <ul>
+      {% for ep in picked %}
+      <li>{{ ep.title or "Untitled" }} <span class="muted small">{% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
 {% endif %}
+{% if feed or series or picked %}
 <form class="edit-form" method="post" action="{{ ('/feeds/' ~ feed.id ~ '/edit') if feed else '/feeds' }}">
-  {% if not feed %}<input type="hidden" name="series" value="{{ series }}">{% endif %}
+  {% if not feed %}
+  <input type="hidden" name="series" value="{{ series }}">
+  <input type="hidden" name="back" value="{{ back }}">
+  {% for ep in picked %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}
+  {% endif %}
   <label for="title">Podcast name</label>
   <input id="title" name="title" type="text" value="{{ values.title }}" maxlength="200" required
          {% if errors.title %}aria-invalid="true" aria-describedby="title-error"{% endif %}>
@@ -26,4 +49,5 @@
     <a class="button" href="{{ back }}">Cancel</a>
   </div>
 </form>
+{% endif %}
 {% endblock %}
