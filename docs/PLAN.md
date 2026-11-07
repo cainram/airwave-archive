@@ -774,6 +774,33 @@ on first run. Built automatically by GitHub for each release.
   (automatic HTTPS), with only ports 80/443 open, SSH over Tailscale only,
   and automatic security updates.
 
+### Later — Look up episode details online (after v1.0)
+The dream: fill in air dates, titles, and cast from public OTR sources
+instead of typing them. Research notes (2026-11-07): no ready-made "TV
+guide for old radio" service exists, but these sources are worth knowing:
+
+| Source | What it has | Can a program ask it? |
+|--------|-------------|-----------------------|
+| **Internet Archive** (archive.org) | Huge OTR holdings, including many OTRR-checked sets; series, titles, often dates (usually in file names) | **Yes**: free, documented metadata and search API. The best first source. |
+| **Wikipedia / Wikidata** | Episode tables for major series (e.g. "List of The Shadow episodes"); Wikidata mostly whole series | Yes, but tables must be picked apart. Free with credit (CC BY-SA). |
+| **OTRR episode database** (OTTER) | Aims to log every Golden Age episode | No API found. If they offer an export, it can come in through the CSV import (Phase 6c). |
+| **RadioGOLDINdex** (UMKC Libraries) | The most detailed: cast, dates, notes | No API or download. Don't copy pages automatically; ask David Goldin / UMKC about an export. |
+
+How it would work:
+- A **"Look it up online"** action on a series or episode, used only when
+  pressed. **Off by default**: this is an exception to the "no cloud
+  services" ground rule, so it needs the owner's OK when it's built.
+- It sends only a series name or episode title, never anything about the
+  owner or their files.
+- Results are shown as **suggestions with their source named**, side by side
+  with what's already there. The owner accepts or rejects each one. Nothing
+  is overwritten, and manual edits always win.
+- Sources disagree (one *Suspense* episode has two different air dates in
+  two logs), so the source shown on each suggestion matters.
+- Partial dates stay partial. A lookup never "completes" a date unless a
+  source actually gives the full date.
+
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
-  database, import from online episode logs, podcast RSS feed subscriptions.
+  database, podcast RSS feed subscriptions. (Online episode logs: see
+  "Look up episode details online" above.)
