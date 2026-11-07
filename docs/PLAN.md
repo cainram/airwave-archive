@@ -203,6 +203,9 @@ opposed to the sound itself. The app gets it from several sources:
    its information into the files' own tags (including custom radio fields
    like air date and network), so other players can see it too. Off by
    default; always an explicit action.
+6. **Later: rename files from their details.** File names and folders can
+   follow the app's details, like classic MP3 software's "organise" feature.
+   Always previewed and undoable (Phase 10b, after v1.0).
 
 ### Airwave tags
 
@@ -607,12 +610,63 @@ overwrites, renames or deletes library files.
 - **Try it:** open the week of a famous broadcast and see everything you own
   from that week.
 
-### Phase 10 — Writing tags back (optional)
-- Opt-in action to write the app's metadata into the files' tags, with a
-  preview and a clear warning. Requires the music folder to be mounted
-  writable.
-- **Try it:** write tags to one file, open it in another player, see the
-  new info.
+### Phase 10 — Writing tags back and renaming files (after v1.0)
+
+**Not part of v1.0** (owner's decision, 2026-11-07). The owner still wants
+it, in a later version. Both parts change files that are already in the
+library, so when they're built, the ground rule in section 3 gets a second
+exception alongside deleting. Until then the rule stands unchanged.
+
+Rules for both parts:
+- Always an **explicit action**: one episode, ticked episodes, a series, or
+  the whole library. Never automatic, never during a scan.
+- A **preview page first**, listing every file and exactly what will change.
+  Nothing happens until it's confirmed.
+- Only files inside the library are touched. The sound itself is never
+  re-encoded.
+- Large batches run with progress shown and can be stopped partway. A
+  stopped batch leaves every file either fully done or untouched.
+
+#### 10a — Write details into the files' tags
+- Save the app's details into each file's own tags: the standard tags
+  (title, artist/series, year...) plus the Airwave tags (section 5), so
+  other players and other Airwave servers can see them.
+- Reuse `app/tagging.py`, which already does this for export copies
+  (Phase 11). The difference is that here it writes to the originals.
+- After writing, the next scan sees the files as changed. It must not undo
+  the owner's edits (manual details still win, section 5).
+- **Try it:** write tags to one episode, open the file in another player
+  (VLC, iTunes/Music), see the new details.
+
+#### 10b — Rename and organise files from the database
+Like the "organise my music folder" feature in classic MP3 software
+(Winamp, iTunes, MusicBrainz Picard): file names and folders follow the
+app's details.
+- A **naming pattern** the owner picks once, e.g.
+  `{series}/{series} {air_date} - {title}` →
+  `Suspense/Suspense 1943-05-13 - Donovan's Brain.mp3`. Multi-part
+  episodes add `- Part 1`, `- Part 2`...
+- **Never invent dates** (ground rule): a partial date is written as known,
+  e.g. `1943` or `1943-05`. Empty fields are left out cleanly, with no
+  stray dashes or brackets.
+- Names are made **safe on Windows and Mac too**: characters like `: ? " / \`
+  are replaced, and names are kept to a sensible length.
+- **Clashes** (two episodes that would get the same name) are shown on the
+  preview and get a number added, or are skipped and reported. An existing
+  file is never overwritten.
+- **The app updates its own records in the same step**, so edits, listening
+  history, artwork and podcast feeds keep working. Feed entries use file
+  IDs, not names, so podcast apps won't see "new" episodes. (Renaming files
+  *outside* the app would look like delete-and-add to the scanner, and the
+  details would be lost. That's why the app has to do it.)
+- **An undo record**: every rename (old name → new name) is kept, so a batch
+  can be put back.
+- Folders left empty by a move are removed. Pictures in a folder
+  (`cover.jpg`...) move along with the recordings.
+- Caveat: other programs that point at the old file names (another
+  player's playlists, for example) will lose track of them.
+- **Try it:** preview renaming one series, confirm, check the files on
+  disk, then undo it.
 
 ### Phase 11 — Export and import
 - 11a (export) ✅ *done*: "Export…" on a series page and "Export ticked…"
