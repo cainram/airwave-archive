@@ -750,6 +750,35 @@ Decisions (owner, 2026-11-07):
 - **Try it:** make a feed of a series, publish it, add it on the iPhone
   (QR code), and play an episode in Podcasts.
 
+### Later — Converting other formats with ffmpeg (after v1.0)
+Prompted by Lone Ranger episodes in `.mkv` (2026-11-07). The Mac's upload
+window greys them out, because the inbox only accepts audio file types.
+
+Why just allowing `.mkv` isn't enough: MKV is a *container* (video, audio,
+or both). Safari, iPhones, and podcast apps can't play it, and mutagen
+can't read its length or tags. The audio has to come out of the container.
+
+The plan: **ffmpeg** (the standard free converter) inside the inbox.
+- Uploads also accept `.mkv`, `.mka`, `.webm`, `.mp4` (video), and `.ra`
+  (RealAudio, common on older OTR sites).
+- The inbox pulls out the audio track. If it's already MP3 or AAC, it's
+  **copied unchanged** (no quality loss, fast) into `.mp3` or `.m4a`.
+  Otherwise it's converted to a format every browser, phone, and podcast app
+  plays. The owner's suggested default is MP3, at a quality matching the
+  original.
+- If the "video" is just a still picture (typical of YouTube downloads),
+  that picture can become the episode's artwork.
+- What becomes of the original: suggested default is to remove it from the
+  inbox once conversion succeeds (the owner keeps their own copy). To be
+  confirmed when built.
+- **The ground rules stay intact:** conversion happens only in the inbox, so
+  no library file changes. New files still only arrive through the inbox.
+- ffmpeg goes into the Docker image (a few hundred MB). It also exists for
+  Windows and Mac, so desktop packaging still works, and its licence is
+  compatible with GPL v3.
+- Meanwhile, a batch can be converted by hand with ffmpeg on the dev VM and
+  then uploaded as normal.
+
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
 program (a Windows installer, a Mac `.dmg`). It starts in the background,
