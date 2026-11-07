@@ -748,9 +748,18 @@ Decisions (owner, 2026-11-07):
   from the library drop out (`feed_items` rows go with their episode;
   database version 15). Each batch is a second apart per part in
   air-date order. The picture is the first episode's series picture.
-- 12c (editing and extras): author and picture (series picture by
-  default, or another), order (switch a feed to newest first), a new private
-  link if the old one got out.
+- 12c (editing and extras) ✅ *done*: "Edit details…" adds an author
+  (empty: "Airwave Archive") and the order: oldest first (a "serial"
+  show, the default) or newest first (an "episodic" one); parts read 1,
+  2, 3 either way (in newest first, part 1 gets the latest second).
+  "Change picture…" uploads a picture for just that feed (kept with the
+  uploaded series pictures), or goes back to the series' picture. "New
+  private link…" (after a confirmation page) gives the feed a new token;
+  the old address stops working. Database version 16 (`feeds.author`,
+  `art_hash`, `newest_first`).
+- Not done (offered, not asked for): a setting to fix the feed address
+  (e.g. always the Tailscale name) instead of using the address the page
+  was opened with.
 - **Try it:** make a feed of a series, publish it, add it on the iPhone
   (QR code), and play an episode in Podcasts.
 

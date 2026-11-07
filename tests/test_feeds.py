@@ -1,5 +1,6 @@
 """Tests for podcast feeds (RSS). Run with:  pytest"""
 
+import html
 import re
 from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
@@ -254,3 +255,51 @@ def test_a_series_feed_cant_be_added_to(client):
     feed_id = make(client)
     assert "no hand-picked feeds yet" in client.get(f"/feeds/add?ids={a}").text
     assert client.post("/feeds/add", data={"feed": str(feed_id), "ids": [str(a)]}).status_code == 400
+
+
+def test_author_order_picture_and_a_new_link(client):
+    import io
+    from PIL import Image
+    feed_id = make(client, series="Coast to Coast AM")
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    page = client.get(f"/feeds/{feed_id}/edit").text
+    assert 'name="author"' in page and 'value="oldest" checked' in page
+    # Newest first, with an author: the parts still read 1, 2.
+    client.post(f"/feeds/{feed_id}/edit", data={"title": "Art Bell", "author": "Art Bell",
+                                                "order": "newest"})
+    with Session(client.engine) as session:
+        a = session.scalar(select(AudioFile).where(AudioFile.name == "a.mp3"))
+        a.episode.series = "Coast to Coast AM"          # a second, earlier episode
+        session.commit()
+    channel = read(client, feed_id)
+    assert channel.findtext(ITUNES + "author") == "Art Bell"
+    assert channel.findtext(ITUNES + "type") == "episodic"
+    titles = [i.findtext("title") for i in channel.findall("item")]
+    assert titles == ["Art Bell (part 1 of 2)", "Art Bell (part 2 of 2)", "The Hitchhiker"]
+    page = " ".join(client.get(f"/feeds/{feed_id}").text.split())
+    assert "By Art Bell" in page and "Newest first" in page
+    assert page.index("(part 1 of 2)") < page.index("(part 2 of 2)") < page.index("The Hitchhiker")
+
+    # Its own picture.
+    out = io.BytesIO()
+    Image.new("RGB", (40, 40), (10, 200, 10)).save(out, "PNG")
+    assert "This feed has no picture yet." in client.get(f"/feeds/{feed_id}/picture").text
+    bad = client.post(f"/feeds/{feed_id}/picture", files={"picture": ("x.png", b"nope", "image/png")})
+    assert bad.status_code == 400 and "isn't a picture" in html.unescape(bad.text)
+    client.post(f"/feeds/{feed_id}/picture", files={"picture": ("x.png", out.getvalue(), "image/png")})
+    href = read(client, feed_id).find(ITUNES + "image").get("href")
+    assert re.fullmatch(r"http://testserver/art/[0-9a-f]+\.jpg", href)
+    assert client.get(href).status_code == 200
+    client.post(f"/feeds/{feed_id}/picture/remove")
+    assert read(client, feed_id).find(ITUNES + "image") is None
+
+    # A new private link: the old address stops working.
+    old = token(client, feed_id)
+    assert "the old one stops working at once" in client.get(f"/feeds/{feed_id}/new-link").text
+    assert client.post(f"/feeds/{feed_id}/new-link").status_code == 400      # not confirmed
+    page = client.post(f"/feeds/{feed_id}/new-link", data={"confirm": "yes"}, follow_redirects=True).text
+    assert "The feed has a new private address." in page
+    new = token(client, feed_id)
+    assert new != old and new in page
+    assert client.get(f"/feeds/{old}/feed.xml").status_code == 404
+    assert client.get(f"/feeds/{new}/feed.xml").status_code == 200

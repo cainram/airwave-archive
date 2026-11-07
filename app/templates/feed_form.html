@@ -44,6 +44,20 @@
             {% if errors.description %}aria-invalid="true" aria-describedby="description-error"{% endif %}>{{ values.description }}</textarea>
   {% if errors.description %}<p id="description-error" class="field-error">{{ errors.description }}</p>{% endif %}
   <p class="muted small">Shown on the podcast's page in the app.</p>
+  <label for="author">Author <span class="muted">(optional)</span></label>
+  <input id="author" name="author" type="text" value="{{ values.author }}" maxlength="200"
+         placeholder="Airwave Archive"
+         {% if errors.author %}aria-invalid="true" aria-describedby="author-error"{% endif %}>
+  {% if errors.author %}<p id="author-error" class="field-error">{{ errors.author }}</p>{% endif %}
+  <p class="muted small">Shown under the podcast's name. Left empty: “Airwave Archive”.</p>
+  <fieldset class="feed-order">
+    <legend>Order in the podcast app</legend>
+    <label class="choice"><input type="radio" name="order" value="oldest" {% if values.order != "newest" %}checked{% endif %}>
+      <span>Oldest first <span class="muted small">— in air-date order, playing on to the next (good for old radio)</span></span></label>
+    <label class="choice"><input type="radio" name="order" value="newest" {% if values.order == "newest" %}checked{% endif %}>
+      <span>Newest first <span class="muted small">— like most podcasts</span></span></label>
+    <p class="muted small">Either way, an episode's parts stay in order: part 1, part 2…</p>
+  </fieldset>
   <div class="form-buttons">
     <button class="button primary" type="submit">{{ "Save" if feed else "Make the feed" }}</button>
     <a class="button" href="{{ back }}">Cancel</a>

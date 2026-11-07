@@ -666,3 +666,9 @@ a.day-title:hover { color: var(--accent); text-decoration: underline; }
 .picked-list { margin: 0 0 8px; }
 .picked-list summary { cursor: pointer; }
 .picked-list ul { margin: 6px 0 0; padding-left: 1.4em; }
+.feed-order { margin: 14px 0 0; padding: 8px 14px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.feed-order legend { font-weight: 600; padding: 0 4px; }
+.feed-order .choice { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; cursor: pointer; font-weight: normal; margin: 0; }
+.edit-form .feed-order .choice input { flex: none; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
+.feed-order .choice { align-items: flex-start; }
+.feed-order p { margin: 4px 0 0; }

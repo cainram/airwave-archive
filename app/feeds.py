@@ -23,7 +23,8 @@ from this server. Two kinds:
 - An episode in several parts (Hour 1, Hour 2) is one item per part,
   since a podcast item holds one recording.
 - Feeds are "serial" shows: podcast apps list them oldest first, in
-  air-date order (and each episode's parts in order). Episode numbers
+  air-date order (and each episode's parts in order). A feed can be
+  switched to newest first (an "episodic" show); parts still read 1, 2, 3. Episode numbers
   aren't sent as Apple's episode numbers (apps would sort serial shows by
   them, and many episodes have none); they're in the description.
 
@@ -150,12 +151,14 @@ def feed_items(session: Session, feed: Feed) -> list[Item]:
     if feed.series is None:
         added = {pick.episode_id: pick.added_at for pick in session.scalars(
             select(FeedItem).where(FeedItem.feed_id == feed.id))}
-    return in_order(items(feed, feed_episodes(session, feed), added))
+    return in_order(items(feed, feed_episodes(session, feed), added), feed.newest_first)
 
 
 def feed_picture(session: Session, feed: Feed, found: list[Item]) -> str | None:
-    """The podcast's picture: its series' (for a hand-picked feed, that of
-    the first episode's series that has one)."""
+    """The podcast's picture: one uploaded for it, else its series' (for a
+    hand-picked feed, that of the first episode's series that has one)."""
+    if feed.art_hash:
+        return feed.art_hash
     names = [feed.series] if feed.series is not None else list(dict.fromkeys(
         item.episode.series for item in found if item.episode.series))
     for name in names:
@@ -188,32 +191,38 @@ def episode_title(episode: Episode, f: AudioFile) -> str:
 def items(feed: Feed, episodes: list[Episode],
           added_at: dict[int, datetime] | None = None) -> list[Item]:
     """The feed's recordings, in the episodes' order. Missing files are
-    left out. `added_at`: when each episode was added (hand-picked feeds)."""
+    left out. `added_at`: when each episode was added (hand-picked feeds).
+
+    Each episode's parts are a second apart, so they keep their order in
+    podcast apps whichever way the feed is listed: part 1 first."""
     found: list[Item] = []
-    already = 0     # items there when the feed was made: a second apart
+    already = 0     # seconds used by recordings there when the feed was made
     for episode in episodes:
         parts = [f for f in episode.parts if not f.missing]
-        title = None
-        for f in parts:
-            title = title or episode_title(episode, f)
-            number = parts.index(f) + 1
+        if not parts:
+            continue
+        title = episode_title(episode, parts[0])
+        if added_at is not None:
+            start = added_at[episode.id]
+        elif min(f.first_seen for f in parts) <= feed.created_at:
+            start = feed.created_at + timedelta(seconds=already)
+            already += len(parts)
+        else:
+            start = min(f.first_seen for f in parts)
+        for number, f in enumerate(parts, 1):
             name = title if len(parts) == 1 else f"{title} (part {number} of {len(parts)})"
-            if added_at is not None:
-                added = added_at[episode.id] + timedelta(seconds=number - 1)
-            elif f.first_seen <= feed.created_at:
-                added = feed.created_at + timedelta(seconds=already)
-                already += 1
-            else:
-                added = f.first_seen + timedelta(seconds=number - 1)
+            # Newest first lists later dates first, so part 1 gets the latest.
+            offset = len(parts) - number if feed.newest_first else number - 1
             found.append(Item(f, episode, name, number if len(parts) > 1 else None,
-                              len(parts), added))
+                              len(parts), start + timedelta(seconds=offset)))
     return found
 
 
-def in_order(found: list[Item]) -> list[Item]:
+def in_order(found: list[Item], newest_first: bool = False) -> list[Item]:
     """The order podcast apps list them in: oldest first (in air-date
-    order, each episode's parts 1, 2, 3...), then ones added later."""
-    return sorted(found, key=lambda item: item.added)
+    order, each episode's parts 1, 2, 3...), then ones added later; or
+    all that backwards, but each episode's parts still 1, 2, 3."""
+    return sorted(found, key=lambda item: item.added, reverse=newest_first)
 
 
 def odd_formats(found: list[Item]) -> dict[str, int]:
@@ -277,12 +286,13 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
     _add(channel, "language", "en-us")
     _add(channel, "generator", "Airwave Archive")
     _add(channel, "lastBuildDate", _when(utcnow()))
-    _add(channel, it + "author", "Airwave Archive")
+    _add(channel, it + "author", feed.author or "Airwave Archive")
     _add(channel, it + "summary", description)
     _add(channel, it + "explicit", "false")
     # "serial": a show to hear in order, so Podcasts lists the oldest first
-    # and plays on to the next (owner's choice, 2026-11-07).
-    _add(channel, it + "type", "serial")
+    # and plays on to the next (owner's choice, 2026-11-07); "episodic":
+    # newest first.
+    _add(channel, it + "type", "episodic" if feed.newest_first else "serial")
     _add(channel, it + "block", "Yes")    # never list it in Apple's directory
     if picture:
         url = f"{base}/art/{picture}.jpg"
