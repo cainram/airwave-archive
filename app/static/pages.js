@@ -52,6 +52,40 @@
   });
   document.addEventListener("DOMContentLoaded", showTheme);
 
+  // Action menus (<details class="drop">): one open at a time; a click
+  // elsewhere or Esc closes them; one that would run off the right edge
+  // of the screen lines up with its button's right side instead.
+  function closeMenus(except) {
+    document.querySelectorAll("details.drop[open]").forEach(function (menu) {
+      if (menu !== except) menu.open = false;
+    });
+  }
+  document.addEventListener("toggle", function (event) {
+    const menu = event.target;
+    if (!menu.matches || !menu.matches("details.drop") || !menu.open) return;
+    closeMenus(menu);
+    menu.classList.remove("drop-right");
+    const list = menu.querySelector(".drop-list");
+    if (list && list.getBoundingClientRect().right > document.documentElement.clientWidth - 4) {
+      menu.classList.add("drop-right");
+    }
+  }, true);
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest) return;
+    const inside = event.target.closest("details.drop");
+    if (inside && event.target.closest(".drop-list a, .drop-list button")) {
+      // Choosing an item closes its menu, once the item has done its job.
+      setTimeout(function () { inside.open = false; }, 0);
+      return;
+    }
+    closeMenus(inside);
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    const open = document.querySelector("details.drop[open]");
+    if (open) { open.open = false; open.querySelector("summary").focus(); }
+  });
+
   document.addEventListener("DOMContentLoaded", countTicked);
   document.addEventListener("htmx:afterSettle", countTicked);
 })();

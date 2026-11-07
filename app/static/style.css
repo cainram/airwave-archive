@@ -374,6 +374,33 @@ ol.parts li > * { vertical-align: middle; margin-right: 6px; }
 /* Ticking episodes to edit together. */
 .files .pick { width: 1%; padding-right: 0; }
 .files .pick input { width: 20px; height: 20px; margin: 4px 0 0; }
+/* Action menus ("☰ Actions", "☰ With ticked"): a button that drops down
+   a list of the page's less-used actions. Built on <details>, so it works
+   without scripts; pages.js closes it on a click elsewhere or Esc, and
+   lines it up with the screen's right edge if it would run off. */
+.drop { position: relative; }
+.drop > summary { list-style: none; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 6px; }
+.drop > summary::-webkit-details-marker { display: none; }
+.drop[open] > summary { background: var(--tint); border-color: var(--accent); }
+.drop-list {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 220px;
+  display: flex; flex-direction: column; padding: 6px 0;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+.drop.drop-right .drop-list { left: auto; right: 0; }
+.drop-list form { display: contents; }
+.drop-list a, .drop-list button {
+  display: block; width: 100%; padding: 9px 16px; border: none; background: none;
+  font: inherit; text-align: left; color: var(--text); text-decoration: none; cursor: pointer;
+  white-space: nowrap;
+}
+.drop-list a:hover, .drop-list button:hover, .drop-list a:focus-visible, .drop-list button:focus-visible {
+  background: var(--hover); text-decoration: none;
+}
+.drop-list .danger { color: var(--error-text); }
+@media (pointer: coarse) { .drop-list a, .drop-list button { min-height: 44px; } }
 .pick-toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 10px; }
 
 /* The bulk edit form. */

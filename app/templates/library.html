@@ -20,11 +20,16 @@
     </p>
   </div>
   <div class="actions">
-    <a class="button" href="/review/filenames">Review file names</a>
-    <a class="button" href="/import">Import spreadsheet…</a>
     <form method="post" action="/rescan">
       <button class="button primary" type="submit">Rescan</button>
     </form>
+    <details class="drop">
+      <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
+      <div class="drop-list">
+        <a href="/review/filenames">Review file names</a>
+        <a href="/import">Import spreadsheet…</a>
+      </div>
+    </details>
   </div>
 </section>
 

@@ -32,21 +32,26 @@
   <div class="actions">
     {% set first = (parts | rejectattr("missing") | first) %}
     {% if first %}{% with big = true, f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}
-    <a class="button" href="/files/{{ f.id }}/edit">Edit details</a>
-    {% if ep %}
-    <form method="post" action="/episodes/played">
-      <input type="hidden" name="ids" value="{{ ep.id }}">
-      <input type="hidden" name="back" value="/files/{{ f.id }}">
-      {% if ep.listening and (ep.listening.played or (ep | progress)) %}
-      <button class="button" type="submit" name="played" value="0">{{ "Mark not played" if ep.listening.played else "Start over" }}</button>
-      {% endif %}
-      {% if not (ep.listening and ep.listening.played) %}
-      <button class="button" type="submit" name="played" value="1">Mark played</button>
-      {% endif %}
-    </form>
-    {% endif %}
-    <a class="button" href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
-    {% if ep %}<a class="button" href="/delete?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Delete…</a>{% endif %}
+    <details class="drop">
+      <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
+      <div class="drop-list">
+        <a href="/files/{{ f.id }}/edit">Edit details</a>
+        {% if ep %}
+        <form method="post" action="/episodes/played">
+          <input type="hidden" name="ids" value="{{ ep.id }}">
+          <input type="hidden" name="back" value="/files/{{ f.id }}">
+          {% if ep.listening and (ep.listening.played or (ep | progress)) %}
+          <button type="submit" name="played" value="0">{{ "Mark not played" if ep.listening.played else "Start over" }}</button>
+          {% endif %}
+          {% if not (ep.listening and ep.listening.played) %}
+          <button type="submit" name="played" value="1">Mark played</button>
+          {% endif %}
+        </form>
+        {% endif %}
+        <a href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
+        {% if ep %}<a class="danger" href="/delete?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Delete…</a>{% endif %}
+      </div>
+    </details>
   </div>
 </section>
 
