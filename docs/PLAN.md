@@ -627,6 +627,10 @@ Rules for both parts:
 - Large batches run with progress shown and can be stopped partway. A
   stopped batch leaves every file either fully done or untouched.
 
+Whole-library runs of both parts live on the hidden **Advanced page**
+(`/advanced`, see "Later" below). Everyday pages offer only one episode,
+ticked episodes, or a series.
+
 #### 10a — Write details into the files' tags
 - Save the app's details into each file's own tags: the standard tags
   (title, artist/series, year...) plus the Airwave tags (section 5), so
@@ -749,6 +753,62 @@ Decisions (owner, 2026-11-07):
   link if the old one got out.
 - **Try it:** make a feed of a series, publish it, add it on the iPhone
   (QR code), and play an episode in Podcasts.
+
+### Later — Converting other formats with ffmpeg (after v1.0)
+Prompted by Lone Ranger episodes in `.mkv` (2026-11-07). The Mac's upload
+window greys them out, because the inbox only accepts audio file types.
+
+Why just allowing `.mkv` isn't enough: MKV is a *container* (video, audio,
+or both). Safari, iPhones, and podcast apps can't play it, and mutagen
+can't read its length or tags. The audio has to come out of the container.
+
+The plan: **ffmpeg** (the standard free converter) inside the inbox.
+- Uploads also accept `.mkv`, `.mka`, `.webm`, `.mp4` (video), and `.ra`
+  (RealAudio, common on older OTR sites).
+- The inbox pulls out the audio track. If it's already MP3 or AAC, it's
+  **copied unchanged** (no quality loss, fast) into `.mp3` or `.m4a`.
+  Otherwise it's converted to a format every browser, phone, and podcast app
+  plays. The owner's suggested default is MP3, at a quality matching the
+  original.
+- If the "video" is just a still picture (typical of YouTube downloads),
+  that picture can become the episode's artwork.
+- What becomes of the original: suggested default is to remove it from the
+  inbox once conversion succeeds (the owner keeps their own copy). To be
+  confirmed when built.
+- **The ground rules stay intact:** conversion happens only in the inbox, so
+  no library file changes. New files still only arrive through the inbox.
+- ffmpeg goes into the Docker image (a few hundred MB). It also exists for
+  Windows and Mac, so desktop packaging still works, and its licence is
+  compatible with GPL v3.
+- Meanwhile, a batch can be converted by hand with ffmpeg on the dev VM and
+  then uploaded as normal.
+
+### Later — The Advanced page (`/advanced`, after v1.0)
+A page of **power-user tools** that work on the whole library at once
+(owner's request, 2026-11-07). Examples:
+- converting the entire library's odd formats (see ffmpeg above)
+- writing tags into every file (Phase 10a)
+- renaming and organising every file (Phase 10b)
+- and similar bulk jobs added later
+
+How it works:
+- **Reached only by typing the address**: `http://<server>:8000/advanced`.
+  No link to it anywhere in the app, not in menus, the footer, or help text.
+- **A big red bar across the top** of the page saying, in effect: *"These
+  tools change your library files. You're on your own: keep backups and
+  take a snapshot first."*
+- Each tool still follows the usual safety steps: a **preview** of exactly
+  what will change, an explicit confirmation, progress shown, the ability to
+  stop partway (files left either fully done or untouched), and an undo
+  record where possible (e.g. renames).
+- The everyday pages keep the small-scale versions (one episode, ticked
+  episodes, a series). Whole-library versions live only here.
+- **Ground rules:** these tools change existing library files, so each one
+  is an owner-approved exception to "never change files in the library."
+  The exceptions get written into section 3 when each tool is built.
+- Note: an unlinked address is a **"keep out of the way" measure, not a
+  lock**. Anyone on the network who knows the address can open it. That's
+  fine for a single household, but it isn't security.
 
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
