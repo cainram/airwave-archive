@@ -13,37 +13,11 @@
   </div>
   {% if series %}
   <nav class="view-switch" aria-label="Show as">
-    <a href="/"{% if view == "tiles" %} aria-current="page"{% endif %}>Tiles</a>
-    <a href="/?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
+    <a href="/series"{% if view == "tiles" %} aria-current="page"{% endif %}>Tiles</a>
+    <a href="/series?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
   </nav>
   {% endif %}
 </section>
-
-{% if unfinished %}
-<section class="continue" aria-labelledby="continue-heading">
-  <h2 id="continue-heading">Continue listening</h2>
-  <ul class="continue-list">
-    {% for f, done, art in unfinished %}
-    {% set ep = f.episode %}
-    <li class="continue-item">
-      <form class="continue-remove" method="post" action="/listening/{{ ep.id }}/dismiss">
-        <input type="hidden" name="view" value="{{ view }}">
-        <button type="submit" aria-label="Remove {{ f | display_title }} from Continue listening"
-                title="Remove from Continue listening (your place is kept)">×</button>
-      </form>
-      {{ picture(art, ep.series or (f | display_title), "small") }}
-      <div class="continue-text">
-        <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
-        <div class="muted small">{% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
-        {% if done.percent is not none %}<div class="progress-bar" role="img" aria-label="{{ done.percent }}% heard"><span style="width: {{ done.percent }}%"></span></div>{% endif %}
-        <div class="muted small">{{ done | time_left }}</div>
-      </div>
-      {% include "_play_button.html" %}
-    </li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
 
 {% if not series %}
 <div class="notice">No episodes yet. Add recordings to the library and press <strong>Rescan</strong>.</div>

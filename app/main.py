@@ -36,7 +36,8 @@ from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
-    all_series, episode_art, follow_rename, one_series, series_files, set_uploaded_picture,
+    all_series, episode_art, follow_rename, most_played, one_series, recently_added,
+    series_files, set_uploaded_picture,
 )
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
@@ -368,18 +369,30 @@ def forget(request: Request, file_id: int):
 
 
 @app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    """The home page: Continue listening, then rows of series (recently
+    added, most played). A row with nothing in it isn't shown."""
+    last_scan_or_scan()
+    with Session(get_engine()) as session:
+        unfinished = [(f, done, episode_art(session, f))
+                      for f, done in listening.continue_listening(session)]
+        recent = recently_added(session)
+        played = most_played(session)
+        anything = recent or session.scalar(select(Episode.id).limit(1)) is not None
+        session.expunge_all()
+    return render(request, "home.html", {"unfinished": unfinished, "recent": recent,
+                                         "played": played, "anything": anything})
+
+
+@app.get("/series", response_class=HTMLResponse)
 def series_list(request: Request, view: str = "tiles"):
-    """The front page: all series, as picture tiles or (view=list) as a
-    table."""
+    """All series, as picture tiles or (view=list) as a table."""
     last_scan_or_scan()
     with Session(get_engine()) as session:
         found = all_series(session)
-        unfinished = [(f, done, episode_art(session, f))
-                      for f, done in listening.continue_listening(session)]
         session.expunge_all()
     return render(request, "series.html",
-                  {"series": found, "view": "list" if view == "list" else "tiles",
-                   "unfinished": unfinished})
+                  {"series": found, "view": "list" if view == "list" else "tiles"})
 
 
 @app.get("/calendar", response_class=HTMLResponse)
@@ -452,12 +465,6 @@ def calendar_day(request: Request, date_text: str = Query("", alias="date")):
         "before": day - timedelta(days=1), "after": day + timedelta(days=1),
         "hour_label": airdates.hour_label,
     }, status_code=400 if error else 200)
-
-
-@app.get("/series")
-def old_series_address(request: Request):
-    """The series list used to be here; it's the front page now."""
-    return RedirectResponse("/" + (f"?{request.url.query}" if request.url.query else ""), 303)
 
 
 @app.get("/series/episodes", response_class=HTMLResponse)
@@ -920,17 +927,16 @@ async def mark_played(request: Request):
 
 
 @app.post("/listening/{episode_id}/dismiss")
-async def dismiss_listening(request: Request, episode_id: int):
-    """Take an episode off the front page's "Continue listening" row
+def dismiss_listening(request: Request, episode_id: int):
+    """Take an episode off the home page's "Continue listening" row
     (its place is kept, so Resume still works)."""
-    view = str((await request.form()).get("view", ""))
     with Session(get_engine()) as session:
         episode = session.get(Episode, episode_id)
         if episode is None:
             raise HTTPException(status_code=404, detail="No such episode")
         listening.dismiss(session, episode)
         session.commit()
-    return go_to(request, "/?view=list" if view == "list" else "/")
+    return go_to(request, "/")
 
 
 @app.post("/listening/{episode_id}", status_code=204)

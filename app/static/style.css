@@ -73,7 +73,7 @@ code { font-size: 0.9em; color: var(--accent); }
   border-bottom: 1px solid var(--line);
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px;
 }
-.menu { display: flex; gap: 4px; }
+.menu { display: flex; flex-wrap: wrap; gap: 4px; }
 .menu a {
   padding: 6px 12px; border-radius: 6px; text-decoration: none; color: var(--text, inherit);
 }
@@ -448,7 +448,7 @@ mark { background: var(--mark); color: var(--text); border-radius: 2px; padding:
 .inbox-upload progress { width: 100%; height: 14px; }
 .inbox-file { gap: 8px 12px; }
 
-/* Continue listening (front page) and played / time-left badges. */
+/* Continue listening (home page) and played / time-left badges. */
 .continue { margin-bottom: 24px; }
 .continue h2 { margin-top: 0; }
 .continue-list {
@@ -568,3 +568,36 @@ a.day-title:hover { color: var(--accent); text-decoration: underline; }
 .delete-files { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; }
 .delete-files code { color: var(--text); word-break: break-all; }
 .delete-confirm { margin-top: 16px; }
+
+/* The home page uses the whole width of the window, so a big screen
+   shows more tiles. Each "shelf" (a row of series tiles) is one line: as
+   many whole tiles as fit, the rest hidden (they wrap onto lines of no
+   height). The padding leaves room for a tile's outline under the mouse
+   (none below, or the hidden tiles would peek through). */
+.content:has(> .home) { max-width: none; }
+.shelf-section { margin-bottom: 28px; }
+.shelf-section h2 { margin: 0 0 10px; }
+.shelf {
+  list-style: none; margin: -6px -6px 0; padding: 6px 6px 0;
+  display: grid; column-gap: 20px; row-gap: 0;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-rows: auto; grid-auto-rows: 0; overflow: hidden;
+}
+.shelf > li { min-width: 0; }
+/* On a phone: the first 10, in a line you swipe sideways. */
+@media (max-width: 600px) {
+  .shelf {
+    display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity; scrollbar-width: none;
+    /* Right to the screen's edges, so a tile cut off there says "swipe". */
+    margin: -6px -12px; padding: 6px 12px; scroll-padding-inline: 12px;
+  }
+  .shelf::-webkit-scrollbar { display: none; }
+  .shelf > li { flex: 0 0 128px; scroll-snap-align: start; }
+  .shelf > li:nth-child(n+11) { display: none; }
+}
+/* Small phones: a tighter menu, so all five sections fit on one line. */
+@media (max-width: 420px) {
+  .menu { gap: 0; }
+  .menu a { padding-left: 8px; padding-right: 8px; }
+}
