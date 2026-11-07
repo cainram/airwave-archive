@@ -49,8 +49,12 @@
   --outside: #191c21;
   --shadow: rgba(0, 0, 0, 0.5);
 }
-/* Plain links (ones without their own colour) in the dark theme. */
-:where(:root[data-theme="dark"]) a { color: var(--accent); }
+/* Plain links (ones without their own look): the colour of the text around
+   them, visited or not, and underlined only while the mouse is over them
+   (owner's choice, like Plex). :where() keeps these rules weak, so any
+   link with its own look (buttons, tiles, the menu) keeps it. */
+:where(a) { color: inherit; text-decoration: none; }
+:where(a:hover) { text-decoration: underline; }
 
 * { box-sizing: border-box; }
 
