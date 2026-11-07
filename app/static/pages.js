@@ -86,6 +86,32 @@
     if (open) { open.open = false; open.querySelector("summary").focus(); }
   });
 
+  // "Copy" buttons (data-copy="#box"): copy the box's text. The newer way
+  // (navigator.clipboard) needs a secure (https) address, which the app
+  // usually doesn't have, so the older way is used when it's missing.
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest && event.target.closest("[data-copy]");
+    if (!button) return;
+    const box = document.querySelector(button.dataset.copy);
+    if (!box) return;
+    function done(ok) {
+      const label = button.textContent;
+      button.textContent = ok ? "Copied ✓" : "Select and copy it by hand";
+      setTimeout(function () { button.textContent = label; }, 2000);
+    }
+    box.focus();
+    box.select();
+    box.setSelectionRange(0, box.value.length);   // (iPhones need this)
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(box.value).then(function () { done(true); },
+                                                    function () { done(false); });
+    } else {
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      done(ok);
+    }
+  });
+
   document.addEventListener("DOMContentLoaded", countTicked);
   document.addEventListener("htmx:afterSettle", countTicked);
 })();

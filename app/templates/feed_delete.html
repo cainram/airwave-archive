@@ -1,0 +1,16 @@
+{% extends layout %}
+{% block title %}Delete feed · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/feeds/{{ feed.id }}">← Back without deleting</a></nav>
+<h1>Delete the feed “{{ feed.title }}”</h1>
+<div class="notice warning" role="alert">
+  <p>The feed's address stops working, so podcast apps subscribed to it stop getting
+    updates (and may remove the episodes they show from it).</p>
+  <p><strong>Your recordings aren't touched:</strong> they stay in your library, with their details.</p>
+</div>
+<form method="post" action="/feeds/{{ feed.id }}/delete" class="form-buttons">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button danger" type="submit">Delete the feed</button>
+  <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
+</form>
+{% endblock %}

@@ -14,6 +14,7 @@ Tables:
 - ``folder_art``: picture files found in library folders (cover.jpg...).
 - ``series_art``: pictures the owner uploaded for a series.
 - ``inbox_items``: uploaded files waiting in the inbox, with their details.
+- ``feeds``: podcast feeds (RSS) the owner made, for podcast apps.
 - ``scan_runs``: one row per scan, recording what changed.
 """
 
@@ -49,7 +50,8 @@ DB_FILENAME = "airwave.db"
 #  11: Phase 11, a permanent ID for each episode (episodes.uid), for exports
 #  12: Phase 11b, inbox files from an export zip keep its details (inbox_items.extra_json)
 #  13: an episode can be taken off "Continue listening" (listening.dismissed)
-SCHEMA_VERSION = 13
+#  14: Phase 12a, podcast feeds (feeds table)
+SCHEMA_VERSION = 14
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -260,6 +262,26 @@ class InboxItem(Base):
     @extra.setter
     def extra(self, value: dict) -> None:
         self.extra_json = json.dumps(value, sort_keys=True) if value else None
+
+
+class Feed(Base):
+    """A podcast feed (RSS) for podcast apps: a series' episodes, at a
+    private address. Feeds start as drafts; the address only works once
+    the feed is published. Deleting a feed never touches the recordings."""
+
+    __tablename__ = "feeds"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # The secret part of the feed's address (long and unguessable, since
+    # podcast apps can't log in).
+    token: Mapped[str] = mapped_column(unique=True)
+    title: Mapped[str]                   # the podcast's name in the app
+    description: Mapped[str | None]
+    series: Mapped[str | None]           # a series feed: every episode of it
+    published: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime]   # UTC; episodes already there count as added then
+    updated_at: Mapped[datetime]   # UTC
+    published_at: Mapped[datetime | None]   # UTC
 
 
 # Load a file's episode and all that episode's parts along with it.

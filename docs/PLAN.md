@@ -642,6 +642,55 @@ overwrites, renames or deletes library files.
 - **Try it:** export a series, import it on a second test server (or a
   fresh install), and see it arrive fully labelled.
 
+### Phase 12 — Podcast feeds (RSS)
+Owner's request (2026-11-07): a **Feeds** menu entry; the app makes RSS
+feeds of episodes for podcast apps, from whole series or ticked
+episodes, with basic details to edit, publish, manage and delete them.
+Apple Podcasts on the owner's iPhone comes first: it reads LAN-only
+plain-http feeds and their artwork fine (the owner has done so for years
+with WordPress's Seriously Simple Podcasting), so feeds are standard RSS
+2.0 with Apple's `itunes:` tags. Cloud-based podcast apps (Pocket Casts,
+Overcast...) can't reach a home server.
+
+Decisions (owner, 2026-11-07):
+- **Dates (option A):** an item's date is when it was added to the feed,
+  never an invented air date. Episodes already in the series when the
+  feed is made count as added then, one second apart in air-date order
+  (so apps keep that order); later ones, when they arrived in the
+  library. The real air date (and time, station, cast, notes) is only in
+  the episode's description.
+- **Names:** the podcast's name starts as the series name (changeable);
+  each item's name is the episode's title in Airwave Archive. An episode
+  in several parts is one item per part ("Title (part 1 of 2)").
+- **Drafts first:** a feed's address works only once it's published.
+- **Oldest first (option A):** feeds are "serial" shows, so Podcasts
+  lists them in air-date order with each episode's parts 1, 2, 3, and
+  plays on to the next; episodes added later come at the end.
+- **QR code** on the feed page (`podcast://` address, opens Podcasts).
+- Each feed has a private address with a long random token (podcast apps
+  can't log in); `itunes:block` keeps it out of Apple's directory. The
+  addresses use the server name the page (or podcast app) used.
+
+- 12a (series feeds) ✅ *done*: **Feeds** in the menu (list of feeds,
+  draft or published); "☰ Actions → Make a feed…" on a series (name and
+  description); a feed's page (Publish, ☰ Actions: edit name and
+  description, unpublish, delete), with "Add it on your iPhone": QR code,
+  "Open in Podcasts", the address with a Copy button, and steps for
+  "Follow a Show by URL". The feed is `/feeds/<token>/feed.xml`, its
+  recordings `/feeds/<token>/audio/<file id>.<ext>` (only while
+  published, only that feed's recordings). Files Apple's app may not play
+  (not MP3/M4A/AAC) are pointed out. A feed follows its series when it's
+  renamed. Deleting a feed never touches recordings. Database version 14
+  (`feeds` table). `app/feeds.py`; QR codes by segno.
+- 12b (hand-picked feeds): "☰ With ticked → Make a feed… / Add to a
+  feed…"; a feed's page lists its episodes with ticks to remove some;
+  episodes deleted from the library drop out.
+- 12c (editing and extras): author and picture (series picture by
+  default, or another), order (switch a feed to newest first), a new private
+  link if the old one got out.
+- **Try it:** make a feed of a series, publish it, add it on the iPhone
+  (QR code), and play an episode in Podcasts.
+
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
 program (a Windows installer, a Mac `.dmg`). It starts in the background,

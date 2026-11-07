@@ -1,0 +1,121 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}{{ feed.title }} · Feeds · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/feeds">← All feeds</a></nav>
+
+{% if made %}
+<div class="notice success" role="status">Feed made. It's a draft for now: check its name and
+  episodes, then press <strong>Publish</strong> to switch its address on.</div>
+{% elif published_now == "yes" %}
+<div class="notice success" role="status">Published. Podcast apps can read it now: see below for
+  how to add it on your iPhone.</div>
+{% elif published_now == "no" %}
+<div class="notice success" role="status">Back to a draft. Its address no longer works; podcast
+  apps that follow it stop getting new episodes.</div>
+{% endif %}
+
+<section class="summary with-art">
+  {{ picture(art, feed.title, "large") }}
+  <div class="summary-text">
+    <h1>{{ feed.title }}</h1>
+    <p class="muted">
+      {% if feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
+      {% if feed.series %}Every episode of <a href="{{ feed.series | series_url }}">{{ feed.series }}</a> ·{% endif %}
+      {{ episodes }} episode{{ "" if episodes == 1 else "s" }}{% if recordings != episodes %} ({{ recordings }} recordings){% endif %}
+    </p>
+    {% if feed.description %}<p class="feed-description">{{ feed.description }}</p>{% endif %}
+  </div>
+  <div class="actions">
+    {% if not feed.published %}
+    <form method="post" action="/feeds/{{ feed.id }}/publish">
+      <button class="button primary" type="submit" name="published" value="1">Publish</button>
+    </form>
+    {% endif %}
+    <details class="drop">
+      <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
+      <div class="drop-list">
+        <a href="/feeds/{{ feed.id }}/edit">Edit name and description</a>
+        {% if feed.published %}
+        <form method="post" action="/feeds/{{ feed.id }}/publish">
+          <button type="submit" name="published" value="0">Unpublish (back to a draft)</button>
+        </form>
+        {% endif %}
+        <a class="danger" href="/feeds/{{ feed.id }}/delete">Delete the feed…</a>
+      </div>
+    </details>
+  </div>
+</section>
+
+{% if not feed.published %}
+<div class="notice">This feed is a <strong>draft</strong>: its address doesn't work yet.
+  Press <strong>Publish</strong> when it's ready, and the way to add it on your iPhone appears here.</div>
+{% else %}
+<section class="feed-subscribe" aria-labelledby="subscribe-heading">
+  <h2 id="subscribe-heading">Add it on your iPhone</h2>
+  <div class="feed-ways">
+    <div class="feed-qr">
+      {{ qr | safe }}
+      <p class="small">Point your iPhone's <strong>Camera</strong> at this code and tap the
+        link that appears. It opens Podcasts: tap <strong>Follow</strong>.</p>
+    </div>
+    <div class="feed-by-hand">
+      <p>Reading this on your iPhone?
+        <a class="button" href="{{ podcast_address }}" hx-boost="false">Open in Podcasts</a></p>
+      <p>Or add it by hand:</p>
+      <ol>
+        <li>Press <strong>Copy</strong> to copy the feed's address.</li>
+        <li>In <strong>Podcasts</strong>, tap <strong>Library</strong>, then <strong>⋯</strong>
+          (top right), then <strong>Follow a Show by URL</strong>.</li>
+        <li>Paste the address and tap <strong>Follow</strong>.</li>
+      </ol>
+      <div class="copy-row">
+        <input id="feed-address" type="text" value="{{ address }}" readonly aria-label="The feed's address">
+        <button class="button" type="button" data-copy="#feed-address">Copy</button>
+      </div>
+      <p class="muted small">The address is <strong>private</strong>: anyone who has it can listen,
+        so share it only with your household.</p>
+      <p class="muted small">It starts with <code>{{ address.split("/feeds/")[0] }}</code>, the
+        address you opened this page with. Your iPhone needs to reach the server there: on your
+        home network, or with Tailscale on when you're away. If that address doesn't work on the
+        iPhone, open this page on the iPhone instead, and the code and address will use the one it can reach.</p>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if odd %}
+<div class="notice warning">
+  {% for kind, count in odd | dictsort %}{{ count }} {{ kind }}{% if not loop.last %}, {% endif %}{% endfor %}
+  recording{{ "" if odd.values() | sum == 1 else "s" }}: Apple's Podcasts app is made for MP3 and M4A
+  files, so {{ "this one" if odd.values() | sum == 1 else "these" }} may not play there.
+</div>
+{% endif %}
+
+<section aria-labelledby="in-feed-heading">
+  <h2 id="in-feed-heading">In the feed</h2>
+  {% if not first %}
+  <p class="muted">No episodes yet. Episodes added to {{ feed.series or "the series" }} later appear here.</p>
+  {% else %}
+  <p class="muted small">Oldest first, in air-date order, as podcast apps list them. The apps show
+    the date each one was added to the feed; the real air date is in each episode's description.</p>
+  <div class="table-wrap">
+    <table class="files">
+      <thead><tr><th>Title</th><th class="date">Aired</th><th class="num">Length</th></tr></thead>
+      <tbody>
+        {% for item in first %}
+        <tr>
+          <td><a class="title" href="/files/{{ item.file.id }}">{{ item.title }}</a></td>
+          <td class="date">{{ item.episode | air_date(short=true) or "unknown" }}</td>
+          <td class="num">{{ item.file.duration_seconds | duration }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if recordings > first | length %}
+  <p class="muted small">…and {{ recordings - first | length }} more.</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

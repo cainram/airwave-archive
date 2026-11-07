@@ -1,0 +1,38 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}Feeds · Airwave Archive{% endblock %}
+{% block content %}
+<section class="summary">
+  <div>
+    <h1>Feeds</h1>
+    <p class="muted">Podcast feeds of your episodes, to listen to them in a podcast app
+      (such as Podcasts on an iPhone).</p>
+  </div>
+</section>
+{% if request.query_params.get("deleted") %}
+<div class="notice success" role="status">The feed was deleted. Its recordings are still in your library.</div>
+{% endif %}
+
+{% if not rows %}
+<div class="notice">No feeds yet. To make one, open a series and choose
+  <strong>☰ Actions → Make a feed…</strong></div>
+{% else %}
+<ul class="results feed-list">
+  {% for row in rows %}
+  {% set feed = row.feed %}
+  <li class="result">
+    {{ picture(row.art, feed.title, "small") }}
+    <div class="result-text">
+      <a class="title" href="/feeds/{{ feed.id }}">{{ feed.title }}</a>
+      {% if feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
+      <div class="muted small">
+        {% if feed.series %}Series: {{ feed.series }} · {% endif %}{{ row.episodes }} episode{{ "" if row.episodes == 1 else "s" }}
+        {% if row.recordings != row.episodes %}({{ row.recordings }} recordings){% endif %}
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+<p class="muted small">To make another, open a series and choose <strong>☰ Actions → Make a feed…</strong></p>
+{% endif %}
+{% endblock %}
