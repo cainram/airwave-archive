@@ -165,6 +165,10 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 - **Calendar** — day / week / month (section 2).
 - **Continue listening** cards have a small × to take one off the row (its
   place is kept; listening again brings it back).
+- **Action menus** (owner's choice, 2026-11-07) — to save space, mostly
+  on phones, a page's main action stays a button (Play, Rescan) and the
+  rest go in a **☰ Actions** drop-down; ticked episodes have a **☰ With
+  ticked** menu. Delete items are red.
 - **Light and dark themes** — a switch in the top bar, left of the search
   box. Each browser remembers its choice; until one is made, it follows
   the device's own light/dark setting. All colours are listed once at the

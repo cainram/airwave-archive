@@ -171,6 +171,11 @@ series", "← Back without saving" and similar links are written as
 `<nav class="back"><a class="button" href="...">← ...</a></nav>`, never
 as plain text links. Do the same for any new page.
 
+**Action menus** (owner's choice): a page's main action is a button; its
+other actions go in a `<details class="drop">` menu ("☰ Actions"), with
+plain `<a>` / `<button>` items inside `.drop-list` (delete items get
+`class="danger"`). Do the same for any new page with several actions.
+
 **Browser checks against the owner's running app** must not save anything
 into their real database (it holds their edits, and test values could be
 invented dates). Use a throwaway copy of the app with its own data folder
