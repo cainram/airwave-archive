@@ -137,7 +137,8 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 
 - **Home page** (`/`, owner's choice 2026-11-07) — the first item in the
   menu (Home · Series · Library · Calendar · Inbox) and where the app
-  opens. Rows, top to bottom: **Continue listening**; **Recently added
+  opens. Rows, top to bottom: **Continue listening** (the 4 most recently
+  played unfinished episodes; starting another pushes the oldest off); **Recently added
   series** (series by their newest recording, so an old series with a new
   episode comes back to the front; no time limit); **Most played** (series
   by how many of their episodes have been listened to; the app doesn't

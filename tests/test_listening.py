@@ -154,3 +154,27 @@ def test_removing_a_card_from_continue_listening(client):
     client.post(f"/listening/{show}", data={"file": ids[SHOW.format(2)], "at": "45"})
     assert "Continue listening" in client.get("/").text
     assert client.post("/listening/99999/dismiss").status_code == 404
+
+
+def test_only_the_four_most_recent_cards_show(tmp_path, monkeypatch):
+    import app.main as main
+    lib = tmp_path / "library"
+    names = [f"Show {n}.wav" for n in range(1, 6)]
+    for name in names:
+        make_wav(lib / name, 60)
+    monkeypatch.setattr(main, "LIBRARY_DIR", lib)
+    monkeypatch.setattr(main, "_engine", make_engine(tmp_path / "data" / "airwave.db"))
+    client = TestClient(main.app)
+    client.get("/")
+    ids = files(client)
+
+    def cards() -> list[str]:
+        row = client.get("/").text.split('class="continue-list"')[1].split("</ul>")[0]
+        return re.findall(r'href="/files/\d+">(Show \d)', row)
+
+    for name in names:                  # started one after another
+        client.post(f"/listening/{episode_of(client, name)}", data={"file": ids[name], "at": "30"})
+    assert cards() == ["Show 5", "Show 4", "Show 3", "Show 2"]
+    # Listening to Show 1 again brings it back to the front; Show 2 drops off.
+    client.post(f"/listening/{episode_of(client, names[0])}", data={"file": ids[names[0]], "at": "40"})
+    assert cards() == ["Show 1", "Show 5", "Show 4", "Show 3"]

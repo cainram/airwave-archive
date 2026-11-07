@@ -23,6 +23,10 @@ from app.db import AudioFile, Episode, Listening, utcnow
 # Less than this, at the very start, doesn't count as having started.
 STARTED = 10.0
 REWIND = 3.0   # resume a little before where it stopped, to catch the thread
+# Cards on the home page's "Continue listening" row (owner's choice). The
+# most recently played come first, so starting another episode pushes the
+# oldest card off the end (it comes back if that episode is played again).
+CONTINUE_CARDS = 4
 
 
 @dataclass
@@ -130,7 +134,7 @@ def resume_point(f: AudioFile) -> tuple[int, float] | None:
     return row.file_id, max(0.0, row.position - REWIND)
 
 
-def continue_listening(session: Session, limit: int = 8) -> list[tuple[AudioFile, Progress]]:
+def continue_listening(session: Session, limit: int = CONTINUE_CARDS) -> list[tuple[AudioFile, Progress]]:
     """Unfinished episodes, most recently played first: (first part, progress)."""
     found = []
     rows = session.scalars(
