@@ -6,7 +6,7 @@ an episode made of several files, the place is a part plus a time within
 it. Pressing Play again picks up from there. Hearing the last part to its
 end marks the episode as played, and its place is forgotten.
 
-An episode can be taken off the front page's "Continue listening" row
+An episode can be taken off the home page's "Continue listening" row
 without forgetting its place; listening to it again brings it back.
 """
 

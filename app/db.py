@@ -225,7 +225,7 @@ class Listening(Base):
     played: Mapped[bool] = mapped_column(default=False)
     played_at: Mapped[datetime | None]   # UTC
     updated_at: Mapped[datetime] = mapped_column(index=True)   # UTC
-    # Taken off the front page's "Continue listening" row (the place is
+    # Taken off the home page's "Continue listening" row (the place is
     # kept). Listening again puts it back.
     dismissed: Mapped[bool] = mapped_column(default=False)
 

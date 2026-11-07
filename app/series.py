@@ -1,4 +1,5 @@
-"""Series: the list of all series, and the episodes of one series.
+"""Series: the list of all series, the episodes of one series, and the
+home page's rows of series (recently added, most played).
 
 A series is simply the "Series" detail of its episodes: every episode with
 the same series name belongs to the same series. (To merge two spellings,
@@ -14,8 +15,10 @@ from sqlalchemy.orm import Session
 
 from app.artwork import folder_art
 from app.db import (
-    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, FolderArt, SeriesArt, natural_key, utcnow,
+    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, FolderArt, Listening, SeriesArt, natural_key,
+    utcnow,
 )
+from app.listening import STARTED
 
 # Words ignored at the start of a name when sorting, so "The Shadow" is
 # listed under S.
@@ -112,6 +115,45 @@ def one_series(session: Session, name: str | None) -> dict | None:
     found = _totals(session, _in_series(name))
     _add_art(session, found, _in_series(name))
     return found[0] if found else None
+
+
+def _named(session: Session, names: list[str]) -> list[dict]:
+    """These series, in this order, with their totals and pictures."""
+    if not names:
+        return []
+    where = Episode.series.in_(names)
+    found = {s["name"]: s for s in _totals(session, where)}
+    _add_art(session, list(found.values()), where)
+    return [found[name] for name in names if name in found]
+
+
+def recently_added(session: Session, limit: int = 20) -> list[dict]:
+    """The home page's "Recently added": series by their newest recording
+    (when the app first saw it), newest first. An old series with a new
+    episode counts. No time limit, so it's never empty after a long break."""
+    newest = func.max(AudioFile.first_seen)
+    rows = session.execute(
+        select(Episode.series, newest)
+        .join(AudioFile, AudioFile.episode_id == Episode.id)
+        .where(Episode.series.is_not(None), AudioFile.missing.is_(False))
+        .group_by(Episode.series)
+        .order_by(newest.desc(), Episode.series).limit(limit))
+    return _named(session, [name for name, _ in rows])
+
+
+def most_played(session: Session, limit: int = 20) -> list[dict]:
+    """The home page's "Most played": series by how many of their episodes
+    have been listened to (played to the end, or started), most first.
+    (The app doesn't count plays of the same episode.)"""
+    heard = func.count(Listening.episode_id)
+    rows = session.execute(
+        select(Episode.series, heard)
+        .join(Listening, Listening.episode_id == Episode.id)
+        .where(Episode.series.is_not(None),
+               Listening.played.is_(True) | (Listening.position >= STARTED))
+        .group_by(Episode.series)
+        .order_by(heard.desc(), func.max(Listening.updated_at).desc()).limit(limit))
+    return _named(session, [name for name, _ in rows])
 
 
 def episode_art(session: Session, f: AudioFile) -> str | None:

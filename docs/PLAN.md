@@ -135,7 +135,17 @@ for large collections, copying files onto the server is faster).
 
 The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 
-- **Series grid** — a wall of series with their artwork, like album covers.
+- **Home page** (`/`, owner's choice 2026-11-07) — the first item in the
+  menu (Home · Series · Library · Calendar · Inbox) and where the app
+  opens. Rows, top to bottom: **Continue listening**; **Recently added
+  series** (series by their newest recording, so an old series with a new
+  episode comes back to the front; no time limit); **Most played** (series
+  by how many of their episodes have been listened to; the app doesn't
+  count replays). The series rows are tiles like the Series page: on a
+  computer, one line of as many as fit the window; on a phone, 10 in a
+  line you swipe sideways. An empty row isn't shown.
+- **Series grid** (`/series`) — a wall of series with their artwork, like
+  album covers.
 - **Series page** — the episode list in **original air-date order**, with
   unknown dates grouped clearly.
 - **Episode detail page** — artwork, title, air date/time, station, host,
@@ -432,7 +442,9 @@ Split into four smaller steps, done in order.
   version in their address, and a tab from before an update reloads the
   page it's going to by itself.
 - Owner's choice: the Series tiles are the front page (`/`); the file
-  list moved to `/library`. The menu reads Series · Library.
+  list moved to `/library`. The menu reads Series · Library. (Later
+  the home page took `/`, and the series moved to `/series`; see
+  section 4.)
 
 #### 5c — Uploading artwork ✅ *done*
 - Upload your own picture for a series (kept in the data folder, never

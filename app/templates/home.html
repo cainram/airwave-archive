@@ -1,0 +1,62 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}Airwave Archive{% endblock %}
+{% block content %}
+{# The home page: Continue listening, then rows ("shelves") of series. On
+   a computer a shelf is one line of as many tiles as fit the window; on a
+   phone it's 10 tiles in a line you swipe sideways. #}
+<div class="home">
+<h1 class="visually-hidden">Home</h1>
+{% if unfinished %}
+<section class="continue" aria-labelledby="continue-heading">
+  <h2 id="continue-heading">Continue listening</h2>
+  <ul class="continue-list">
+    {% for f, done, art in unfinished %}
+    {% set ep = f.episode %}
+    <li class="continue-item">
+      <form class="continue-remove" method="post" action="/listening/{{ ep.id }}/dismiss">
+        <button type="submit" aria-label="Remove {{ f | display_title }} from Continue listening"
+                title="Remove from Continue listening (your place is kept)">×</button>
+      </form>
+      {{ picture(art, ep.series or (f | display_title), "small") }}
+      <div class="continue-text">
+        <a class="title" href="/files/{{ f.id }}">{{ f | display_title }}</a>
+        <div class="muted small">{% for part in [ep.series, ep | air_date(short=true)] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+        {% if done.percent is not none %}<div class="progress-bar" role="img" aria-label="{{ done.percent }}% heard"><span style="width: {{ done.percent }}%"></span></div>{% endif %}
+        <div class="muted small">{{ done | time_left }}</div>
+      </div>
+      {% include "_play_button.html" %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+
+{% macro shelf(id, heading, series) %}
+{% if series %}
+<section class="shelf-section" aria-labelledby="{{ id }}">
+  <h2 id="{{ id }}">{{ heading }}</h2>
+  <ul class="shelf">
+    {% for s in series %}
+    <li>
+      <a class="tile" href="{{ s.name | series_url }}">
+        {{ picture(s.art, s.name) }}
+        <span class="tile-name">{{ s.name }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endmacro %}
+{{ shelf("recent-heading", "Recently added series", recent) }}
+{{ shelf("played-heading", "Most played", played) }}
+
+{% if not anything %}
+<div class="notice">No episodes yet. Add recordings to the library and press <strong>Rescan</strong> on the <a href="/library">Library</a> page, or upload them in the <a href="/inbox">Inbox</a>.</div>
+{% elif not unfinished and not played %}
+<p class="muted">Play an episode and it will show up here.</p>
+{% endif %}
+</div>
+{% endblock %}

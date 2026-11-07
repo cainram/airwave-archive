@@ -141,8 +141,8 @@ def test_removing_a_card_from_continue_listening(client):
     page = client.get("/").text
     assert "Continue listening" in page and f'action="/listening/{show}/dismiss"' in page
 
-    sent = client.post(f"/listening/{show}/dismiss", data={"view": "list"}, follow_redirects=False)
-    assert sent.status_code == 303 and sent.headers["location"] == "/?view=list"
+    sent = client.post(f"/listening/{show}/dismiss", follow_redirects=False)
+    assert sent.status_code == 303 and sent.headers["location"] == "/"
     assert "Continue listening" not in client.get("/").text
     # The place is kept: the episode still resumes.
     assert place(client, SHOW.format(1)) == (ids[SHOW.format(2)], 30.0, False)

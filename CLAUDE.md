@@ -122,8 +122,9 @@ These come from the plan and should not be changed without the owner's OK:
   review page)
 - `app/parts.py`: episodes made of several files ("Hour 1", "Hour 2"):
   grouping, splitting, numbering the parts
-- `app/series.py`: the series list (with totals and pictures) and one
-  series' episodes in air-date order
+- `app/series.py`: the series list (with totals and pictures), one
+  series' episodes in air-date order, and the home page's rows of series
+  (recently added, most played)
 - `app/artwork.py`: finds pictures in files and folders, and keeps small
   copies in the data folder (`artwork/`)
 - `app/bulk.py`: editing many episodes at once, and renaming a series
@@ -134,7 +135,7 @@ These come from the plan and should not be changed without the owner's OK:
   library next to their series; extra details from imports, spotting
   episodes already in the library by ID, rejoining parts)
 - `app/listening.py`: continue listening (where playback stopped in each
-  episode, the front page's "Continue listening" row) and played / not
+  episode, the home page's "Continue listening" row) and played / not
   played
 - `app/airdates.py`: the calendar (episodes by air date: a month's grid
   and days, nearest months with recordings)
