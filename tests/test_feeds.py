@@ -117,20 +117,20 @@ def test_the_feed_itself(client):
     assert channel.findtext("title") == "Suspense!"
     assert channel.findtext(ITUNES + "block") == "Yes"
     items = channel.findall("item")
-    # Newest first: the air-date order, backwards; no date last... the
-    # undated one is last in air-date order, so first here.
-    assert [i.findtext("title") for i in items] == ["Donovan's Brain", "c", "Sorry, Wrong Number", "The Hitchhiker"]
+    # Oldest first, in air-date order (the undated one last); a serial show.
+    assert channel.findtext(ITUNES + "type") == "serial"
+    assert [i.findtext("title") for i in items] == ["The Hitchhiker", "Sorry, Wrong Number", "c", "Donovan's Brain"]
     dates = [i.findtext("pubDate") for i in items]
     assert len(set(dates)) == 4      # a second apart, so apps keep the order
     # The real air date is only in the description; nothing is made up.
-    wrong = items[2].findtext("description")
+    wrong = items[1].findtext("description")
     assert "Aired: Tuesday, May 25th, 1943, 8:00 PM US Eastern" in wrong
     assert "Station: CBS" in wrong and "Cast: Agnes Moorehead" in wrong
-    assert "Aired: 1944, date unknown" in items[1].findtext("description")
-    assert "Air date unknown" in items[0].findtext("description")
+    assert "Aired: 1944, date unknown" in items[2].findtext("description")
+    assert "Air date unknown" in items[3].findtext("description")
     # The recordings are reachable, from where the app was reached.
     secret = token(client, feed_id)
-    enclosure = items[3].find("enclosure")
+    enclosure = items[0].find("enclosure")
     url = enclosure.get("url")
     assert url == f"http://testserver/feeds/{secret}/audio/{client.ids['a.mp3']}.mp3"
     assert enclosure.get("type") == "audio/mpeg"
@@ -139,7 +139,7 @@ def test_the_feed_itself(client):
     assert client.get(url).content == original
     part = client.get(url, headers={"Range": "bytes=0-99"})
     assert part.status_code == 206 and len(part.content) == 100
-    assert items[3].find("guid").text == f"airwave-file-{client.ids['a.mp3']}"
+    assert items[0].find("guid").text == f"airwave-file-{client.ids['a.mp3']}"
     # A recording of another series isn't sent through this feed.
     other = client.ids["Art Bell 1996-05-02 Hour 1.wav"]
     assert client.get(f"/feeds/{secret}/audio/{other}.wav").status_code == 404
@@ -157,15 +157,15 @@ def test_new_episodes_join_the_feed_as_they_arrive(client):
         f.first_seen = session.get(Feed, feed_id).created_at + timedelta(days=3)
         session.commit()
     items = read(client, feed_id).findall("item")
-    assert items[0].findtext("title") == "Three Skeleton Key"     # newest added: first
-    assert [i.findtext("pubDate") for i in items[1:]] == before     # the others don't change
+    assert items[-1].findtext("title") == "Three Skeleton Key"     # added later: at the end
+    assert [i.findtext("pubDate") for i in items[:-1]] == before     # the others don't change
 
 
 def test_parts_are_separate_items(client):
     feed_id = make(client, series="Coast to Coast AM")
     client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
     titles = [i.findtext("title") for i in read(client, feed_id).findall("item")]
-    assert titles == ["Art Bell (part 2 of 2)", "Art Bell (part 1 of 2)"]
+    assert titles == ["Art Bell (part 1 of 2)", "Art Bell (part 2 of 2)"]
 
 
 def test_editing_renaming_and_deleting(client):

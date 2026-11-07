@@ -94,16 +94,16 @@
 
 <section aria-labelledby="in-feed-heading">
   <h2 id="in-feed-heading">In the feed</h2>
-  {% if not newest %}
+  {% if not first %}
   <p class="muted">No episodes yet. Episodes added to {{ feed.series or "the series" }} later appear here.</p>
   {% else %}
-  <p class="muted small">Newest first, as podcast apps list them. The apps show the date each one was
-    added to the feed; the real air date is in each episode's description.</p>
+  <p class="muted small">Oldest first, in air-date order, as podcast apps list them. The apps show
+    the date each one was added to the feed; the real air date is in each episode's description.</p>
   <div class="table-wrap">
     <table class="files">
       <thead><tr><th>Title</th><th class="date">Aired</th><th class="num">Length</th></tr></thead>
       <tbody>
-        {% for item in newest %}
+        {% for item in first %}
         <tr>
           <td><a class="title" href="/files/{{ item.file.id }}">{{ item.title }}</a></td>
           <td class="date">{{ item.episode | air_date(short=true) or "unknown" }}</td>
@@ -113,8 +113,8 @@
       </tbody>
     </table>
   </div>
-  {% if recordings > newest | length %}
-  <p class="muted small">…and {{ recordings - newest | length }} more.</p>
+  {% if recordings > first | length %}
+  <p class="muted small">…and {{ recordings - first | length }} more.</p>
   {% endif %}
   {% endif %}
 </section>

@@ -1300,7 +1300,7 @@ def file_art(file_id: int):
 # Podcast feeds (RSS) for podcast apps; see app/feeds.py.
 
 MAX_FEED_TITLE, MAX_FEED_DESCRIPTION = 200, 4000
-FEED_PAGE_ITEMS = 25    # recordings listed on a feed's page (the newest)
+FEED_PAGE_ITEMS = 25    # recordings listed on a feed's page (the first ones)
 
 
 def get_feed(session: Session, feed_id: int) -> Feed:
@@ -1383,14 +1383,14 @@ def feed_page(request: Request, feed_id: int, made: bool = False, published: str
         feed = get_feed(session, feed_id)
         found = feeds.items(feed, feeds.feed_episodes(session, feed))
         series = one_series(session, feed.series) if feed.series is not None else None
-        newest = feeds.newest_first(found)[:FEED_PAGE_ITEMS]
+        first = feeds.in_order(found)[:FEED_PAGE_ITEMS]
         session.expunge_all()
     address = f"{server_address(request)}/feeds/{feed.token}/feed.xml"
     podcast_address = "podcast://" + address.split("://", 1)[1]
     return render(request, "feed.html", {
         "feed": feed, "series": series, "art": series["art"] if series else None,
         "recordings": len(found), "episodes": len({i.episode.id for i in found}),
-        "newest": newest, "odd": feeds.odd_formats(found),
+        "first": first, "odd": feeds.odd_formats(found),
         "address": address, "podcast_address": podcast_address,
         "qr": feeds.qr_svg(podcast_address) if feed.published else None,
         "made": made, "published_now": published,

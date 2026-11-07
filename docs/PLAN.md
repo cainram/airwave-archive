@@ -663,6 +663,9 @@ Decisions (owner, 2026-11-07):
   each item's name is the episode's title in Airwave Archive. An episode
   in several parts is one item per part ("Title (part 1 of 2)").
 - **Drafts first:** a feed's address works only once it's published.
+- **Oldest first (option A):** feeds are "serial" shows, so Podcasts
+  lists them in air-date order with each episode's parts 1, 2, 3, and
+  plays on to the next; episodes added later come at the end.
 - **QR code** on the feed page (`podcast://` address, opens Podcasts).
 - Each feed has a private address with a long random token (podcast apps
   can't log in); `itunes:block` keeps it out of Apple's directory. The
@@ -683,7 +686,7 @@ Decisions (owner, 2026-11-07):
   feed…"; a feed's page lists its episodes with ticks to remove some;
   episodes deleted from the library drop out.
 - 12c (editing and extras): author and picture (series picture by
-  default, or another), order (oldest or newest first), a new private
+  default, or another), order (switch a feed to newest first), a new private
   link if the old one got out.
 - **Try it:** make a feed of a series, publish it, add it on the iPhone
   (QR code), and play an episode in Podcasts.

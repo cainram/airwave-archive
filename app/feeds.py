@@ -18,6 +18,10 @@ later appear in it too.
   they arrived in the library. The real air date goes in the description.
 - An episode in several parts (Hour 1, Hour 2) is one item per part,
   since a podcast item holds one recording.
+- Feeds are "serial" shows: podcast apps list them oldest first, in
+  air-date order (and each episode's parts in order). Episode numbers
+  aren't sent as Apple's episode numbers (apps would sort serial shows by
+  them, and many episodes have none); they're in the description.
 
 The feed is written like the ones the owner's iPhone already reads
 (standard RSS 2.0 plus Apple's "itunes:" tags).
@@ -121,9 +125,10 @@ def items(feed: Feed, episodes: list[Episode]) -> list[Item]:
     return found
 
 
-def newest_first(found: list[Item]) -> list[Item]:
-    """The order podcast apps list them in: most recently added first."""
-    return sorted(found, key=lambda item: item.added, reverse=True)
+def in_order(found: list[Item]) -> list[Item]:
+    """The order podcast apps list them in: oldest first (in air-date
+    order, each episode's parts 1, 2, 3...), then ones added later."""
+    return sorted(found, key=lambda item: item.added)
 
 
 def odd_formats(found: list[Item]) -> dict[str, int]:
@@ -192,7 +197,9 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
     _add(channel, it + "author", "Airwave Archive")
     _add(channel, it + "summary", description)
     _add(channel, it + "explicit", "false")
-    _add(channel, it + "type", "episodic")
+    # "serial": a show to hear in order, so Podcasts lists the oldest first
+    # and plays on to the next (owner's choice, 2026-11-07).
+    _add(channel, it + "type", "serial")
     _add(channel, it + "block", "Yes")    # never list it in Apple's directory
     if picture:
         url = f"{base}/art/{picture}.jpg"
@@ -202,7 +209,7 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
         _add(image, "title", feed.title)
         _add(image, "link", f"{base}/feeds/{feed.id}")
 
-    for item in newest_first(found):      # as podcast feeds usually are
+    for item in in_order(found):
         f, episode = item.file, item.episode
         entry = _add(channel, "item")
         _add(entry, "title", item.title)
@@ -216,8 +223,6 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
         _add(entry, "pubDate", _when(item.added))
         if f.duration_seconds:
             _add(entry, it + "duration", str(round(f.duration_seconds)))
-        if episode.episode_number and episode.episode_number.isdigit():
-            _add(entry, it + "episode", str(int(episode.episode_number)))
         if f.art_hash and f.art_hash != picture:      # a picture inside the file
             _add(entry, it + "image", href=f"{base}/art/{f.art_hash}.jpg")
     ET.indent(root)
