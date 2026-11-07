@@ -1,0 +1,36 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}Picture for {{ feed.title }} · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/feeds/{{ feed.id }}">← Back to the feed</a></nav>
+<h1>Picture for {{ feed.title }}</h1>
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+<section class="summary with-art">
+  {{ picture(art, feed.title, "large") }}
+  <div class="summary-text">
+    <p class="muted">
+      {% if feed.art_hash %}This is a picture you uploaded for this feed.
+      {% elif art %}This is the series' picture.
+      {% else %}This feed has no picture yet.{% endif %}
+    </p>
+    <p class="muted small">A picture uploaded here is only for this feed: the series keeps its own.
+      It's kept in the app's data folder; nothing is added to your library.</p>
+  </div>
+</section>
+<form class="upload-form" method="post" action="/feeds/{{ feed.id }}/picture" enctype="multipart/form-data">
+  <label for="picture">{{ "Choose a different picture" if feed.art_hash else "Choose a picture" }}</label>
+  <input id="picture" name="picture" type="file" accept="image/jpeg,image/png,image/webp" required>
+  <p class="muted small">A JPEG, PNG or WebP picture. A square one looks best.</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Upload</button>
+    <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
+  </div>
+</form>
+{% if feed.art_hash %}
+<form method="post" action="/feeds/{{ feed.id }}/picture/remove"
+      hx-confirm="Stop using this picture for the feed? It goes back to the series' picture (if there is one).">
+  <button class="button" type="submit">Use the series' picture instead</button>
+</form>
+{% endif %}
+<p class="muted small">Podcast apps may take a while (or a fresh follow) to show a new picture.</p>
+{% endblock %}

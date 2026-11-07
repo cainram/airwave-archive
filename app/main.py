@@ -1317,8 +1317,12 @@ def server_address(request: Request) -> str:
 
 def read_feed_form(form) -> tuple[dict, dict]:
     values = {"title": str(form.get("title", "")).strip(),
-              "description": str(form.get("description", "")).strip()}
+              "description": str(form.get("description", "")).strip(),
+              "author": str(form.get("author", "")).strip(),
+              "order": "newest" if form.get("order") == "newest" else "oldest"}
     errors = {}
+    if len(values["author"]) > MAX_FEED_TITLE:
+        errors["author"] = f"Keep the author under {MAX_FEED_TITLE} characters."
     if not values["title"]:
         errors["title"] = "Give the podcast a name."
     elif len(values["title"]) > MAX_FEED_TITLE:
@@ -1373,7 +1377,8 @@ def new_feed(request: Request, series: str = "", ids: list[int] = Query(default=
     names = {e.series for e in picked}
     title = series or (names.pop() if len(names) == 1 and None not in names else "")
     return render_new_feed(request, series, totals, picked, back,
-                           {"title": title or "", "description": ""}, {})
+                           {"title": title or "", "description": "", "author": "",
+                            "order": "oldest"}, {})
 
 
 @app.post("/feeds", response_class=HTMLResponse)
@@ -1399,6 +1404,8 @@ async def create_feed(request: Request):
         else:
             feed = feeds.make_picked_feed(session, picked, values["title"],
                                           values["description"] or None)
+        feed.author = values["author"] or None
+        feed.newest_first = values["order"] == "newest"
         session.commit()
         feed_id = feed.id
     return go_to(request, f"/feeds/{feed_id}?made=1")
@@ -1474,7 +1481,9 @@ def edit_feed_form(request: Request, feed_id: int):
         session.expunge_all()
     return render(request, "feed_form.html", {
         "feed": feed, "series": feed.series, "totals": None,
-        "values": {"title": feed.title, "description": feed.description or ""}, "errors": {}})
+        "values": {"title": feed.title, "description": feed.description or "",
+                   "author": feed.author or "",
+                   "order": "newest" if feed.newest_first else "oldest"}, "errors": {}})
 
 
 @app.post("/feeds/{feed_id}/edit", response_class=HTMLResponse)
@@ -1488,9 +1497,73 @@ async def edit_feed(request: Request, feed_id: int):
                 "feed": feed, "series": feed.series, "totals": None,
                 "values": values, "errors": errors}, status_code=400)
         feed.title, feed.description = values["title"], values["description"] or None
+        feed.author = values["author"] or None
+        feed.newest_first = values["order"] == "newest"
         feed.updated_at = utcnow()
         session.commit()
     return go_to(request, f"/feeds/{feed_id}")
+
+
+@app.get("/feeds/{feed_id}/picture", response_class=HTMLResponse)
+def feed_picture_page(request: Request, feed_id: int, error: str | None = None):
+    """Upload a picture for a feed, or go back to its series' picture."""
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        art = feeds.feed_picture(session, feed, feeds.feed_items(session, feed))
+        session.expunge_all()
+    return render(request, "feed_picture.html", {"feed": feed, "art": art, "error": error},
+                  status_code=400 if error else 200)
+
+
+@app.post("/feeds/{feed_id}/picture", response_class=HTMLResponse)
+async def upload_feed_picture(request: Request, feed_id: int):
+    with Session(get_engine()) as session:
+        get_feed(session, feed_id)
+    upload = (await request.form()).get("picture")
+    data = await upload.read(MAX_PICTURE_BYTES + 1) if hasattr(upload, "read") else b""
+    if not data:
+        error = "Please choose a picture first."
+    elif len(data) > MAX_PICTURE_BYTES:
+        error = f"That picture is too big (the limit is {MAX_PICTURE_BYTES // 1_000_000} MB)."
+    elif (art_hash := save_picture(data, upload_dir())) is None:
+        error = "That file isn't a picture the app can read. Try a JPEG, PNG or WebP picture."
+    else:
+        with Session(get_engine()) as session:
+            feed = get_feed(session, feed_id)
+            feed.art_hash, feed.updated_at = art_hash, utcnow()
+            session.commit()
+        return go_to(request, f"/feeds/{feed_id}")
+    return feed_picture_page(request, feed_id, error)
+
+
+@app.post("/feeds/{feed_id}/picture/remove")
+def remove_feed_picture(request: Request, feed_id: int):
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        feed.art_hash, feed.updated_at = None, utcnow()
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}")
+
+
+@app.get("/feeds/{feed_id}/new-link", response_class=HTMLResponse)
+def new_link_page(request: Request, feed_id: int):
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        session.expunge_all()
+    return render(request, "feed_new_link.html", {"feed": feed})
+
+
+@app.post("/feeds/{feed_id}/new-link")
+async def new_link(request: Request, feed_id: int):
+    """Give a feed a new private address; the old one stops working (for
+    when it got out)."""
+    if str((await request.form()).get("confirm", "")) != "yes":
+        raise HTTPException(status_code=400, detail="Not confirmed")
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        feed.token, feed.updated_at = feeds.new_token(), utcnow()
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?new_link=1")
 
 
 @app.post("/feeds/{feed_id}/publish")

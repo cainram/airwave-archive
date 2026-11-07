@@ -53,7 +53,8 @@ DB_FILENAME = "airwave.db"
 #  13: an episode can be taken off "Continue listening" (listening.dismissed)
 #  14: Phase 12a, podcast feeds (feeds table)
 #  15: Phase 12b, hand-picked feeds (feed_items table)
-SCHEMA_VERSION = 15
+#  16: Phase 12c, a feed's author, own picture and order (feeds.author, art_hash, newest_first)
+SCHEMA_VERSION = 16
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -279,6 +280,13 @@ class Feed(Base):
     token: Mapped[str] = mapped_column(unique=True)
     title: Mapped[str]                   # the podcast's name in the app
     description: Mapped[str | None]
+    author: Mapped[str | None]           # None: "Airwave Archive"
+    # A picture uploaded for this feed (kept with the series pictures);
+    # None: its series' picture.
+    art_hash: Mapped[str | None]
+    # Podcast apps list it newest first (an "episodic" show) instead of
+    # oldest first (a "serial" one, the default).
+    newest_first: Mapped[bool] = mapped_column(default=False)
     series: Mapped[str | None]           # a series feed: every episode of it
     #                                      (None: hand-picked, see FeedItem)
     published: Mapped[bool] = mapped_column(default=False)
@@ -370,6 +378,15 @@ def _migrate(conn) -> None:
     if "dismissed" not in _columns(conn, "listening"):
         conn.exec_driver_sql(
             "ALTER TABLE listening ADD COLUMN dismissed BOOLEAN NOT NULL DEFAULT 0")
+    # Version 16: a feed's author, own picture and order.
+    feed_columns = _columns(conn, "feeds")
+    if "author" not in feed_columns:
+        conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN author VARCHAR")
+    if "art_hash" not in feed_columns:
+        conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN art_hash VARCHAR")
+    if "newest_first" not in feed_columns:
+        conn.exec_driver_sql(
+            "ALTER TABLE feeds ADD COLUMN newest_first BOOLEAN NOT NULL DEFAULT 0")
 
 
 def make_engine(db_path: Path) -> Engine:

@@ -1,0 +1,18 @@
+{% extends layout %}
+{% block title %}New private link · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/feeds/{{ feed.id }}">← Back without changing it</a></nav>
+<h1>A new private link for “{{ feed.title }}”</h1>
+<div class="notice warning" role="alert">
+  <p>Use this if the feed's address got to someone who shouldn't have it.</p>
+  <p>The feed gets a new address, and <strong>the old one stops working at once</strong>: every podcast
+    app following the feed (yours too) stops getting it. Afterwards, add the feed again on your
+    iPhone from the feed's page, and unfollow the old copy.</p>
+  <p>The feed's episodes and details stay as they are.</p>
+</div>
+<form method="post" action="/feeds/{{ feed.id }}/new-link" class="form-buttons">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button danger" type="submit">Make a new link</button>
+  <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
+</form>
+{% endblock %}

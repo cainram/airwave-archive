@@ -10,6 +10,9 @@
 {% elif published_now == "yes" %}
 <div class="notice success" role="status">Published. Podcast apps can read it now: see below for
   how to add it on your iPhone.</div>
+{% elif request.query_params.get("new_link") %}
+<div class="notice success" role="status">The feed has a new private address. The old one no longer
+  works{% if feed.published %}: add the feed again on your iPhone (below), and unfollow the old copy{% endif %}.</div>
 {% elif request.query_params.get("added") %}
 {% set added = request.query_params.get("added") | int(0) %}{% set already = request.query_params.get("already") | int(0) %}
 <div class="notice success" role="status">Added {{ added }} episode{{ "" if added == 1 else "s" }} to the feed.
@@ -32,6 +35,7 @@
       {% if feed.series %}Every episode of <a href="{{ feed.series | series_url }}">{{ feed.series }}</a> ·{% else %}Hand-picked ·{% endif %}
       {{ episodes }} episode{{ "" if episodes == 1 else "s" }}{% if recordings != episodes %} ({{ recordings }} recordings){% endif %}
     </p>
+    {% if feed.author %}<p class="muted small">By {{ feed.author }}</p>{% endif %}
     {% if feed.description %}<p class="feed-description">{{ feed.description }}</p>{% endif %}
   </div>
   <div class="actions">
@@ -43,7 +47,9 @@
     <details class="drop">
       <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
       <div class="drop-list">
-        <a href="/feeds/{{ feed.id }}/edit">Edit name and description</a>
+        <a href="/feeds/{{ feed.id }}/edit">Edit details…</a>
+        <a href="/feeds/{{ feed.id }}/picture">Change picture…</a>
+        <a href="/feeds/{{ feed.id }}/new-link">New private link…</a>
         {% if feed.published %}
         <form method="post" action="/feeds/{{ feed.id }}/publish">
           <button type="submit" name="published" value="0">Unpublish (back to a draft)</button>
@@ -108,7 +114,8 @@
   <p class="muted">No episodes in it. To add some, tick them in the <a href="/library">Library</a> or on a
     series' page and choose <strong>☰ With ticked → Add to a feed…</strong></p>
   {% else %}
-  <p class="muted small">Oldest first, in air-date order, as podcast apps list them. The apps show
+  <p class="muted small">{% if feed.newest_first %}Newest first{% else %}Oldest first, in air-date order{% endif %},
+    as podcast apps list them (change it in <a href="/feeds/{{ feed.id }}/edit">Edit details</a>). The apps show
     the date each one was added to the feed; the real air date is in each episode's description.</p>
   {% set picked = feed.series is none %}
   {% if picked %}
