@@ -43,7 +43,7 @@ def pretend(monkeypatch, tmp_path):
     monkeypatch.setattr(convert, "check", lambda plan, made: None)
     calls = []
 
-    def run(plan, source, target, progress=None, stop=None):
+    def run(plan, source, target, progress=None, stop=None, cover=None):
         calls.append(source.name)
         if progress:
             progress(0.5)
@@ -116,7 +116,7 @@ def test_the_converting_box_updates_itself(client, pretend):
 
 
 def test_a_failure_keeps_the_original(client, pretend, monkeypatch):
-    def broken(plan, source, target, progress=None, stop=None):
+    def broken(plan, source, target, progress=None, stop=None, cover=None):
         target.write_bytes(b"half")
         raise RuntimeError("Invalid data found when processing input")
     monkeypatch.setattr(convert, "run", broken)
@@ -154,7 +154,7 @@ def test_cancelling(client, pretend):
 
 
 def test_cancelling_midway_stops_ffmpeg(client, pretend, monkeypatch):
-    def slow(plan, source, target, progress=None, stop=None):
+    def slow(plan, source, target, progress=None, stop=None, cover=None):
         target.write_bytes(b"part")
         with Session(engine()) as session:                       # the owner presses Cancel...
             session.scalar(select(InboxItem)).convert_status = "cancelled"
@@ -229,3 +229,58 @@ def test_a_damaged_file_fails_plainly(client):
     (client.box / "Broken.webm").write_bytes(b"\x1aE\xdf\xa3 not really")
     page = client.get("/inbox").text
     assert "be read: it may be damaged" in page and item("Broken.webm").convert_status is None   # not queued
+
+
+def make_video(tmp_path, name, picture, *codecs, seconds=12):
+    """A test "video": ``picture`` is "still" (one picture), "moving",
+    or "black"."""
+    source = {"still": ["-loop", "1", "-i", str(tmp_path / "pic.png")],
+              "black": ["-f", "lavfi", "-i", f"color=c=black:s=320x180:d={seconds}"],
+              "moving": ["-f", "lavfi", "-i", f"testsrc2=s=320x180:d={seconds}"]}[picture]
+    if not (tmp_path / "pic.png").exists():
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:d=1",
+                        "-frames:v", "1", str(tmp_path / "pic.png")], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *source, "-f", "lavfi", "-i", f"sine=f=440:d={seconds}",
+                    "-map", "0:v", "-map", "1:a", "-r", "5", "-shortest", *codecs, str(name)], check=True)
+
+
+def library_picture(client, name) -> str | None:
+    with Session(engine()) as session:
+        return session.scalar(select(AudioFile.art_hash).where(AudioFile.name == name))
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("name, picture, codecs, becomes, artwork", [
+    ("Still Show.webm", "still", ["-c:v", "libvpx-vp9", "-c:a", "libopus", "-b:a", "32k"], "Still Show.mp3", True),
+    ("Still Show.mp4", "still", ["-c:v", "libx264", "-c:a", "aac", "-b:a", "48k"], "Still Show.m4a", True),
+    ("Moving Show.mp4", "moving", ["-c:v", "libx264", "-c:a", "aac", "-b:a", "48k"], "Moving Show.m4a", False),
+    ("Black Show.mkv", "black", ["-c:v", "libx264", "-c:a", "libmp3lame", "-b:a", "32k"], "Black Show.mp3", False),
+])
+def test_a_still_picture_becomes_the_artwork(client, tmp_path, name, picture, codecs, becomes, artwork):
+    make_video(tmp_path, client.box / name, picture, *codecs)
+    client.get("/inbox")
+    assert converting.convert_next(engine(), client.box) is True
+    assert [p.name for p in client.box.iterdir()] == [becomes]       # no picture files left over
+    new = item(becomes)
+    assert 11 < new.duration_seconds < 13                            # the sound is all there
+    client.post(f"/inbox/{new.id}/add", data=form(client))
+    assert (library_picture(client, becomes) is not None) == artwork
+    if artwork:
+        import mutagen
+        from app.artwork import embedded_picture
+        found = list(client.lib.rglob(becomes))[0]
+        assert embedded_picture(mutagen.File(found))[:3] == b"\xff\xd8\xff"   # a JPEG inside
+
+
+@needs_ffmpeg
+def test_spotting_still_pictures(tmp_path):
+    for picture in ("still", "moving", "black"):
+        make_video(tmp_path, tmp_path / f"{picture}.mp4", picture, "-c:v", "libx264", "-c:a", "aac")
+    plans = {p: convert.plan_for(f"{p}.mp4", convert.probe(tmp_path / f"{p}.mp4"))
+             for p in ("still", "moving", "black")}
+    assert all(plan.video and plan.picture_stream is not None for plan in plans.values())
+    assert convert.looks_still(tmp_path / "still.mp4", plans["still"])
+    assert not convert.looks_still(tmp_path / "moving.mp4", plans["moving"])
+    assert convert.looks_still(tmp_path / "black.mp4", plans["black"])          # still, but...
+    assert not convert.grab_picture(tmp_path / "black.mp4", plans["black"], tmp_path / "b.jpg")  # ...blank
+    assert convert.grab_picture(tmp_path / "still.mp4", plans["still"], tmp_path / "s.jpg")

@@ -67,6 +67,33 @@ def test_real_video_is_called_video():
     assert plan_for("show.mkv", probed(sound("mp3"))).description.startswith("MKV file.")
 
 
+def test_the_command_with_and_without_a_picture(tmp_path):
+    plan = plan_for("show.webm", probed(sound("opus", 1, "48000")))
+    plain = convert.command(plan, tmp_path / "in.webm", tmp_path / "out.mp3")
+    assert "-vn" in plain and "attached_pic" not in plain
+    with_cover = convert.command(plan, tmp_path / "in.webm", tmp_path / "out.mp3", tmp_path / "c.jpg")
+    assert "-vn" not in with_cover and "attached_pic" in with_cover and str(tmp_path / "c.jpg") in with_cover
+    assert "comment=Cover (front)" in with_cover
+
+
+def test_what_the_inbox_says_about_pictures():
+    still = plan_for("show.webm", probed({"codec_type": "video", "codec_name": "mjpeg", "index": 0,
+                                          "disposition": {"attached_pic": 1}}, sound("opus")))
+    assert still.picture_stream == 0 and still.description.endswith("Its picture becomes the episode's artwork.")
+    video = plan_for("show.mp4", probed({"codec_type": "video", "codec_name": "h264", "index": 0,
+                                         "nb_frames": "900"}, sound("aac")))
+    assert "The video is left out (if it's one picture all the way through" in video.description
+
+
+def test_the_sounds_own_length_counts():
+    plan = plan_for("show.mkv", probed({"codec_type": "video", "codec_name": "h264", "nb_frames": "900",
+                                        "duration": "22.0"},
+                                       sound("opus", tags={"DURATION": "00:00:12.040000000"}), duration="22.0"))
+    assert plan.duration == 12.04
+    assert plan_for("show.mp4", probed(sound("aac", duration="12.5"), duration="13.0")).duration == 12.5
+    assert plan_for("show.ogg", probed(sound("vorbis"), duration="9.0")).duration == 9.0
+
+
 def test_files_that_cant_be_converted():
     assert not plan_for("x.webm", None).ok
     assert "can't be read" in plan_for("x.webm", None).description
