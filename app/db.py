@@ -57,7 +57,8 @@ DB_FILENAME = "airwave.db"
 #  17: suggested groups the owner dismissed (group_dismissals table)
 #  18: suggested groups the owner has seen, for the Library's notice (group_seen table)
 #  19: Phase 13a, what converting an inbox file will do (inbox_items.convert_json)
-SCHEMA_VERSION = 19
+#  20: Phase 13b, converting inbox files (inbox_items.convert_status, _progress, _error)
+SCHEMA_VERSION = 20
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -263,6 +264,11 @@ class InboxItem(Base):
     # For a file that needs converting (video, RealAudio, WMA, Ogg, Opus):
     # what's inside it and what converting will do (app/convert.py Plan).
     convert_json: Mapped[str | None]
+    # Where it is in the queue: "waiting", "converting", "failed",
+    # "cancelled" (None: not queued). See app/converting.py.
+    convert_status: Mapped[str | None]
+    convert_progress: Mapped[float | None]   # 0 to 1, while converting
+    convert_error: Mapped[str | None]
 
     @property
     def extra(self) -> dict:
@@ -418,6 +424,12 @@ def _migrate(conn) -> None:
     # Version 19: what converting an inbox file will do.
     if "convert_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")
+    # Version 20: converting inbox files.
+    inbox_columns = _columns(conn, "inbox_items")
+    for column, kind in (("convert_status", "VARCHAR"), ("convert_progress", "FLOAT"),
+                         ("convert_error", "VARCHAR")):
+        if column not in inbox_columns:
+            conn.exec_driver_sql(f"ALTER TABLE inbox_items ADD COLUMN {column} {kind}")
 
 
 def make_engine(db_path: Path) -> Engine:

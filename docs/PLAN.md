@@ -859,13 +859,32 @@ window greys them out, because the inbox only accepts audio file types.
 - **Try it:** upload one of the Lone Ranger `.webm` files and read what
   the inbox says about it.
 
-#### 13b — Converting in the inbox
+#### 13b — Converting in the inbox ✅ *done*
 - A work queue (kept in the database, so it survives a restart) that
   converts one or two files at a time in the background; a notice on
   upload that the files need converting and will appear when ready
   (the page can be left); progress for each file; Cancel; plain error
   messages. The original is deleted once the new file has been checked.
   Converted files then join the usual inbox list (and group suggestions).
+- Notes: one file at a time (measured on the dev VM: about 32 seconds to
+  re-encode 40 minutes of Opus to MP3, under a second to copy MP3 sound
+  out of a container). Files join the queue as soon as they're in the
+  inbox (uploads, unpacked zips, and files copied into the folder: the
+  helper looks there every 30 seconds). The queue is
+  `inbox_items.convert_status` (waiting / converting / failed /
+  cancelled), with progress and the error (database version 20); a
+  restart puts a half-done file back to waiting and clears half-made
+  files. The new file is made under a hidden name, checked (it opens,
+  holds sound, and its length is within 2 seconds or 1% of the
+  original's), then takes the original's name with the new extension (a
+  number is added if taken); the original is deleted and the waiting
+  file's details, including anything typed, move to the new file. The
+  inbox shows a box that updates every 3 seconds; when it's done,
+  "Show the converted files" saves what was typed and reloads. Each file
+  has Cancel converting (or Try again after a failure or cancel); a
+  failure keeps the original and shows why. Code: `app/converting.py`
+  (the queue and helper) and `app/convert.py` (the ffmpeg command and
+  the check).
 
 #### 13c — Pictures from "videos" that are just a still image
 - That picture becomes the episode's artwork. Better still-picture

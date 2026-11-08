@@ -32,12 +32,13 @@ import os
 import re
 import secrets
 import shutil
+import threading
 from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import convert, grouping
+from app import convert, converting, grouping
 from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
 from app.episodes import (
     PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
@@ -53,6 +54,9 @@ MAX_NAME = 180
 NO_SERIES_FOLDER = "Unsorted"
 MAX_TEXT = 20_000                      # longest detail kept from an import
 UID_PATTERN = re.compile(r"^[0-9A-Za-z-]{8,64}$")
+# Held while the inbox list is brought in step with its folder, and while
+# a converted file takes its original's place, so the two never clash.
+LOCK = threading.RLock()
 
 
 def upload_accept() -> str:
@@ -194,7 +198,12 @@ def inbox_files(folder: Path) -> dict[str, Path]:
 def sync_inbox(session: Session, folder: Path) -> list[InboxItem]:
     """Bring the inbox list in step with the folder: files that appeared
     are read and get a row; rows whose file has gone are dropped. Returns
-    the items, in name order."""
+    the items, in name order. Files that need converting join the queue."""
+    with LOCK:
+        return _sync_inbox(session, folder)
+
+
+def _sync_inbox(session: Session, folder: Path) -> list[InboxItem]:
     files = inbox_files(folder)
     rows = {row.name: row for row in session.scalars(select(InboxItem))}
     for name, row in rows.items():
@@ -213,6 +222,8 @@ def sync_inbox(session: Session, folder: Path) -> list[InboxItem]:
             # Waiting since before converting was possible, or ffmpeg was missing.
             if convert.available():
                 row.convert_json = convert.plan_for(name, convert.probe(path)).to_json()
+        if convert.needs_converting(name) and convert.available():
+            converting.queue(row)
     session.commit()
     return sorted(session.scalars(select(InboxItem)), key=lambda r: r.name.lower())
 

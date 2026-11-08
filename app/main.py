@@ -32,7 +32,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, convert, csvimport, deleting, export, feeds, grouping, inbox, listening, zipimport
+from app import airdates, convert, converting, csvimport, deleting, export, feeds, grouping, inbox, listening, zipimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -178,6 +178,19 @@ templates.env.filters["fromjson"] = lambda text: json.loads(text) if text else [
 
 _engine: Engine | None = None
 _scan_lock = threading.Lock()  # only one scan at a time
+
+
+def _sync_inbox_folder(engine: Engine, folder: Path) -> None:
+    with Session(engine) as session:
+        inbox.sync_inbox(session, folder)
+
+
+@app.on_event("startup")
+def start_converting() -> None:
+    """Start the helper that converts inbox files in the background
+    (app/converting.py). It isn't started when there's no ffmpeg."""
+    if convert.available():
+        converting.start(get_engine, lambda: INBOX_DIR, _sync_inbox_folder)
 
 
 def get_engine() -> Engine:
@@ -527,6 +540,7 @@ def render_inbox(request: Request, typed=None, errors=None, problems=(), **notic
         "rows": rows, "fields": INBOX_FIELDS, "errors": errors or {},
         "duplicates": sum(1 for row in rows if row["have"]),
         "converting": sum(1 for row in rows if row["convert"] and not row["have"]),
+        "busy": [row["item"] for row in rows if row["item"].convert_status in converting.BUSY],
         "can_convert": convert.available(),
         "zips": zipimport.inbox_zips(INBOX_DIR), "problems": list(problems),
         "zone_names": TIME_ZONES, "inbox_dir": INBOX_DIR, "upload_accept": inbox.upload_accept(),
@@ -751,6 +765,33 @@ async def inbox_dismiss_group(request: Request):
             grouping.dismiss(session, sig, match.label)
             session.commit()
     return go_to(request, "/inbox?not_grouped=1" if match else "/inbox")
+
+
+@app.get("/inbox/converting", response_class=HTMLResponse)
+def inbox_converting(request: Request):
+    """The converting box at the top of the inbox, asked for every few
+    seconds while files are converting (htmx swaps it in place)."""
+    with Session(get_engine()) as session:
+        busy = session.scalars(select(InboxItem).where(InboxItem.convert_status.in_(converting.BUSY))
+                               .order_by(InboxItem.added_at, InboxItem.id)).all()
+        session.expunge_all()
+    return templates.TemplateResponse(request, "_converting.html", {
+        "busy": busy, "finished": not busy})
+
+
+@app.post("/inbox/{item_id}/convert/{action}", response_class=HTMLResponse)
+async def inbox_convert_action(request: Request, item_id: int, action: str):
+    """Cancel converting a file, or try again. What was typed is saved first."""
+    if action not in ("cancel", "retry"):
+        raise HTTPException(status_code=404)
+    typed, errors, _saved = save_inbox_details(await request.form())
+    if errors:
+        return render_inbox(request, typed, errors)
+    with Session(get_engine()) as session:
+        item = inbox_item_or_404(session, item_id)
+        (converting.cancel if action == "cancel" else converting.retry)(item)
+        session.commit()
+    return go_to(request, "/inbox")
 
 
 def inbox_item_or_404(session: Session, item_id: int) -> InboxItem:

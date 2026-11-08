@@ -1,0 +1,29 @@
+{# The converting box at the top of the inbox. While files are converting it
+   asks for itself again every few seconds (htmx), so the progress moves. #}
+{% if busy %}
+<div id="converting" class="notice converting" role="status"
+     hx-get="/inbox/converting" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
+  <p><strong>Converting {{ busy | length }} file{{ "" if busy | length == 1 else "s" }}.</strong>
+    {{ "It'll" if busy | length == 1 else "They'll" }} be ready to add when done: about a minute for each hour
+    of sound (sound that's copied unchanged takes seconds). You can leave this page and come back.</p>
+  <ul class="converting-list">
+    {% for item in busy %}
+    <li>
+      <span class="converting-name">{{ item.name }}</span>
+      {% if item.convert_status == "converting" %}
+      <progress max="100" value="{{ ((item.convert_progress or 0) * 100) | round | int }}"></progress>
+      <span class="muted small">{{ ((item.convert_progress or 0) * 100) | round | int }}%</span>
+      {% else %}
+      <span class="muted small">waiting its turn</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% elif finished %}
+<div id="converting" class="notice success" role="status">
+  Converting finished.
+  <button class="button" type="submit" form="inbox-form">Show the converted files</button>
+  <span class="muted small">(this also saves anything you've typed below)</span>
+</div>
+{% endif %}
