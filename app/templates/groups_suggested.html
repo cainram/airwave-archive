@@ -1,0 +1,59 @@
+{% extends layout %}
+{% block title %}Suggested groups · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/library">← Library</a></nav>
+{% set q = request.query_params %}
+{% if q.get("approved") %}
+{% set made = q.get("approved") | int(0) %}
+<div class="notice success" role="status">Grouped {{ made }} broadcast{{ "" if made == 1 else "s" }}.
+  Each now plays straight through as one episode.</div>
+{% elif q.get("dismissed") %}
+<div class="notice success" role="status">Dismissed. Those files won't be suggested again.</div>
+{% endif %}
+
+<h1>Suggested groups</h1>
+<p class="muted">These files look like parts of one broadcast: the same name apart from
+  "Hour 1", "Part 2", "(1 of 2)", "Side A" and so on, in the same folder. Nothing is grouped
+  until you approve it. Each group keeps the details of its first part.</p>
+
+{% if not suggestions %}
+<div class="notice">No suggestions: no more files look like parts of one broadcast.
+  You can still group files by hand from a file's page (<strong>Group with other files…</strong>).</div>
+{% else %}
+<form id="groups" method="post" action="/groups/approve">
+  <div class="pick-toolbar">
+    <label class="tick-all"><input type="checkbox" form="groups" data-select-all="group" checked> Tick all</label>
+    <button class="button primary" type="submit">Approve ticked</button>
+    <span class="muted small">{{ total }} suggestion{{ "" if total == 1 else "s" }}{% if total > suggestions | length %},
+      showing the first {{ suggestions | length }}: approve or dismiss these to see the rest{% endif %}.</span>
+  </div>
+  <ul class="suggestions">
+    {% for s in suggestions %}
+    <li class="suggestion">
+      <div class="suggestion-head">
+        <label>
+          <input type="checkbox" form="groups" name="group" value="{{ s.signature }}" checked>
+          <strong>{{ s.label }}</strong>
+        </label>
+        <button class="button" type="submit" formaction="/groups/dismiss" name="dismiss" value="{{ s.signature }}">Dismiss</button>
+      </div>
+      <p class="muted small">{{ s.files | length }} parts · {{ s.length | duration if s.length else "length unknown" }}
+        · folder <code>{{ s.folder or "(top level)" }}</code></p>
+      <ol class="suggestion-files">
+        {% for f in s.files %}
+        <li><a href="/files/{{ f.id }}">{{ f.name }}</a> <span class="muted small">{{ f.duration_seconds | duration }}</span></li>
+        {% endfor %}
+      </ol>
+      {% for f in s.typed_details %}
+      <p class="warning-text small">{{ f.name }} has details you typed
+        ({{ f.episode.title or f.episode.series or "untitled" }}). Grouping replaces them with the first part's details.</p>
+      {% endfor %}
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Approve ticked</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

@@ -14,7 +14,8 @@
     const box = event.target;
     if (box.matches("[data-select-all]")) {
       const form = box.getAttribute("form") || "pick";
-      document.querySelectorAll('input[form="' + form + '"][name="ids"]').forEach(function (other) {
+      const name = box.getAttribute("data-select-all") || "ids";   // the boxes' name
+      document.querySelectorAll('input[form="' + form + '"][name="' + name + '"]').forEach(function (other) {
         other.checked = box.checked;
       });
     }
