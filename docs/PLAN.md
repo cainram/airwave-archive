@@ -409,8 +409,9 @@ Split into five smaller steps, done in order.
   time uses the total too (owner's choice: the recordings' length decides
   the end time, even if commercials were cut; no separate "length on
   air"). Grouping counts as a manual edit, so a missing
-  part is kept (and skipped when playing). Not done: guessing groups
-  automatically from file names (could be added to the review page later).
+  part is kept (and skipped when playing). Guessing groups from file
+  names came later, as suggestions the owner approves (see "Suggested
+  groups" below, v1.1 and v1.2).
 
 ### Phase 5 — Browse like Plex
 Split into four smaller steps, done in order.
@@ -762,6 +763,38 @@ Decisions (owner, 2026-11-07):
   was opened with.
 - **Try it:** make a feed of a series, publish it, add it on the iPhone
   (QR code), and play an episode in Podcasts.
+
+### Suggested groups (v1.1 and v1.2)
+Owner's request, 2026-11-08: find files that are probably parts of one
+broadcast and suggest grouping them. **Never group without approval.**
+
+#### Step 1 (v1.1) — Find possible groups ✅ *done*
+- **Library → ☰ Actions → Find possible groups** checks the whole
+  library and opens the **Suggested groups** page (`/groups/suggested`).
+- A set is suggested when its files are in the same folder (uploads are
+  filed into their series' folder, so an upload's parts end up together),
+  with names identical (ignoring capitals) except for one part marker:
+  `Hour 1`, `Hr. 2`, `Part 3`, `Pt 4`, `Part 1 of 3`, `(1 of 2)`,
+  `Side A` / `Side B` (or `Side 1`). The numbers must run 1, 2, 3… with
+  none missing or doubled, match an "of N" total if there is one, and be
+  24 or fewer. Files' date tags, where present, must agree. Files already
+  in a group, or missing, are left out.
+- Each suggestion has a tick box (ticked to start) and a **Dismiss**
+  button; **Approve ticked** groups the ticked ones, the same as
+  grouping by hand (the first part's episode and details are kept; a
+  warning shows if a later part has details the owner typed). Dismissed
+  sets are remembered (`group_dismissals` table, database version 17) by
+  a fingerprint of folder and file names, so a set that later gains a
+  new part is suggested again. The code is in `app/grouping.py`.
+- **Try it:** split a grouped show (its page → Group with other files…,
+  untick all but one), then Find possible groups, and approve it.
+
+#### Step 2 (v1.2) — Suggestions after scans and in the inbox
+- After a scan, a notice on the Library page when there are new
+  suggestions (leading to the Suggested groups page).
+- In the inbox, files from one upload that look like parts of one
+  broadcast are shown together in the review list, so an approved group
+  goes into the library as one episode.
 
 ### Later — Converting other formats with ffmpeg (after v1.0)
 Prompted by Lone Ranger episodes in `.mkv` (2026-11-07). The Mac's upload

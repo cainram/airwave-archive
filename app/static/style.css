@@ -672,3 +672,13 @@ a.day-title:hover { text-decoration: underline; }
 .edit-form .feed-order .choice input { flex: none; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
 .feed-order .choice { align-items: flex-start; }
 .feed-order p { margin: 4px 0 0; }
+
+/* Suggested groups (files that look like parts of one broadcast). */
+.suggestions { list-style: none; padding: 0; max-width: 760px; }
+.suggestion { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.suggestion-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.suggestion-head label { display: flex; gap: 8px; align-items: center; cursor: pointer; min-height: 44px; }
+.suggestion > p { margin: 2px 0 4px 28px; }
+.suggestion-files { margin: 4px 0 0 28px; padding-left: 1.4em; }
+.suggestion-files li { margin: 2px 0; overflow-wrap: anywhere; }
+.tick-all { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }

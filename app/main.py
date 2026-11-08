@@ -32,7 +32,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, csvimport, deleting, export, feeds, inbox, listening, zipimport
+from app import airdates, csvimport, deleting, export, feeds, grouping, inbox, listening, zipimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -1146,6 +1146,44 @@ async def save_parts(request: Request, file_id: int):
         session.commit()
         first = episode.parts[0].id
     return go_to(request, f"/files/{first}")
+
+
+@app.get("/groups/suggested", response_class=HTMLResponse)
+def suggested_groups(request: Request):
+    """Files that are probably parts of one broadcast, for the owner to
+    approve or dismiss (nothing is grouped without approval)."""
+    with Session(get_engine()) as session:
+        found = grouping.suggestions(session)
+        shown = found[:grouping.SHOWN]
+        grouping.load_files(session, shown)
+        for s in shown:   # load what the page shows while the database is open
+            for f in s.files:
+                f.episode and f.episode.sources
+        return render(request, "groups_suggested.html", {
+            "suggestions": shown, "total": len(found)})
+
+
+@app.post("/groups/approve")
+async def approve_groups(request: Request):
+    form = await request.form()
+    ticked = set(form.getlist("group"))
+    with Session(get_engine()) as session:
+        made = grouping.approve(session, ticked)
+        session.commit()
+    return go_to(request, f"/groups/suggested?approved={made}")
+
+
+@app.post("/groups/dismiss")
+async def dismiss_group(request: Request):
+    form = await request.form()
+    sig = str(form.get("dismiss") or "")
+    with Session(get_engine()) as session:
+        match = next((s for s in grouping.suggestions(session) if s.signature == sig), None)
+        if match is None:
+            return go_to(request, "/groups/suggested")
+        grouping.dismiss(session, sig, match.label)
+        session.commit()
+    return go_to(request, "/groups/suggested?dismissed=1")
 
 
 # ------------------------------------------------------- file-name review

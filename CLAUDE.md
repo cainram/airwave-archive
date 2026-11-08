@@ -134,6 +134,8 @@ These come from the plan and should not be changed without the owner's OK:
   waits, guessing details, rejecting, adding approved files to the
   library next to their series; extra details from imports, spotting
   episodes already in the library by ID, rejoining parts)
+- `app/grouping.py`: suggested groups (files that look like parts of
+  one broadcast, by name), approving them, and remembering dismissed ones
 - `app/listening.py`: continue listening (where playback stopped in each
   episode, the home page's "Continue listening" row) and played / not
   played

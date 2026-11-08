@@ -54,7 +54,8 @@ DB_FILENAME = "airwave.db"
 #  14: Phase 12a, podcast feeds (feeds table)
 #  15: Phase 12b, hand-picked feeds (feed_items table)
 #  16: Phase 12c, a feed's author, own picture and order (feeds.author, art_hash, newest_first)
-SCHEMA_VERSION = 16
+#  17: suggested groups the owner dismissed (group_dismissals table)
+SCHEMA_VERSION = 17
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -315,6 +316,18 @@ class FeedItem(Base):
 WITH_PARTS = joinedload(AudioFile.episode).selectinload(Episode.files)
 # Files shown in lists: whole episodes, and the first part of grouped ones.
 FIRST_PARTS = or_(AudioFile.part_number.is_(None), AudioFile.part_number == 1)
+
+
+class GroupDismissal(Base):
+    """A suggested group (files that looked like parts of one broadcast)
+    that the owner dismissed, so it isn't suggested again. Kept by a
+    fingerprint of the folder and file names (see ``app/grouping.py``)."""
+
+    __tablename__ = "group_dismissals"
+
+    signature: Mapped[str] = mapped_column(primary_key=True)
+    label: Mapped[str] = mapped_column(default="")   # what it was called, for reference
+    dismissed_at: Mapped[datetime]   # UTC
 
 
 class ScanRun(Base):
