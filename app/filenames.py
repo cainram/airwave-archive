@@ -7,6 +7,8 @@ Many collections put the details in the file name, for example:
     Suspense_1943-xx-xx_Unknown.mp3          ("xx" = not known)
     1943-05-13 Suspense - Donovan's Brain.mp3
     Coast to Coast - Mar 01 2010 - Hour 1.mp3   (month names work too)
+    The Lone Ranger, Old Time Radio, 380411   Flaming Buildings.mp3
+                                         (380411 = 1938-04-11, run together)
 
 The reader looks for a date. What comes before it is taken as the series,
 and what comes after it as the title. These are only guesses: they're shown
@@ -44,7 +46,14 @@ DATE_PATTERNS = [
     re.compile(r"(?<![a-z])" + _MONTH + r"[ _-]+" + _DAY + r",?[ _-]+" + _YEAR + r"(?!\d)", re.I),
     # 1 March 2010, 01-Mar-2010
     re.compile(r"(?<!\d)" + _DAY + r"[ _-]+" + _MONTH + r",?[ _-]+" + _YEAR + r"(?!\d)", re.I),
+    # 380411: year, month and day run together, the year in two digits
+    # (read as 19xx, like 43-05-13 above). Common in old-time radio
+    # collections. Tried last, and only six digits that make a real date.
+    re.compile(r"(?<!\d)(?P<yy>\d\d)(?P<m>0[1-9]|1[0-2])(?P<d>0[1-9]|[12]\d|3[01])(?!\d)"),
 ]
+# Labels some collections put in names that aren't part of the series:
+# "The Lone Ranger, Old Time Radio, 380411 ..."
+LABELS = re.compile(r"^(?:old[- ]?time[- ]radio|otr|otrr)$", re.I)
 # An episode number, only when clearly marked: "#42", "Ep 42", "Episode 42", "e42".
 EPISODE_PATTERN = re.compile(r"^(?:#\s*|ep(?:isode)?\.?\s*|e)(\d+)\b\s*", re.I)
 EDGE_JUNK = " -_.,;:()[]{}"
@@ -115,6 +124,12 @@ def _find_date(stem: str):
     return None
 
 
+def _without_labels(text: str) -> str:
+    """Drop comma-separated labels such as "Old Time Radio" or "OTR"."""
+    pieces = [piece for piece in text.split(",") if not LABELS.match(piece.strip(EDGE_JUNK))]
+    return ",".join(pieces) if pieces else text
+
+
 def parse_filename(name: str) -> Guess | None:
     """Guess details from a file name, or None if it has no date in it."""
     stem = PurePath(name).stem
@@ -133,7 +148,7 @@ def parse_filename(name: str) -> Guess | None:
         after = after[number.end():]
 
     if before.strip(EDGE_JUNK):
-        guess.series = tidy(before)
+        guess.series = tidy(_without_labels(before))
         guess.title = tidy(after)
     elif " - " in after:
         # "1943-05-13 Suspense - Donovan's Brain"

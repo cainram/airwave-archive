@@ -385,7 +385,10 @@ Split into five smaller steps, done in order.
   `19430513`, `43-05-13` read as 19xx, `xx` for unknown parts); text before
   it is the series, after it the title; an episode number only when marked
   (`#42`, `Ep 42`). Month names work too (`Mar 01 2010`, `March 2nd,
-  1996`, `01-Mar-2010`, added in 4e), and a part marker at the end
+  1996`, `01-Mar-2010`, added in 4e; `380411` = 1938-04-11, six digits
+  run together with a two-digit year read as 19xx, added 2026-11-08 for
+  Lone Ranger downloads, which also taught it to drop labels such as
+  "Old Time Radio" or "OTR" from the series), and a part marker at the end
   (`Hour 1`, `Part 2`) isn't taken as a title. The review page (`/review/filenames`) shows only files
   offering something for a field the owner hasn't set; cards that would
   replace the owner's own values start unticked. Confirmed values count as

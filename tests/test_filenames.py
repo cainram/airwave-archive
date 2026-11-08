@@ -26,6 +26,15 @@ from test_scanner import add_tags, make_wav
     ("Art Bell March 2nd, 1996 Part 3.mp3", "Art Bell", None, None, (1996, 3, 2)),
     ("C2C 01-Mar-2010 hr2.mp3", "C2C", None, None, (2010, 3, 1)),
     ("Art Bell Sept 9 1997 - Area 51 Caller (Hour 2).mp3", "Art Bell", None, "Area 51 Caller", (1997, 9, 9)),
+    # Six digits run together (year, month, day), and "Old Time Radio" isn't the series.
+    ("The Lone Ranger, Old Time Radio, 380411   Flaming Buildings of the Box X Ranch.mp3",
+     "The Lone Ranger", None, "Flaming Buildings of the Box X Ranch", (1938, 4, 11)),
+    ("The Lone Ranger, Old Time Radio, 380420   The Price of Wool.m4a",
+     "The Lone Ranger", None, "The Price of Wool", (1938, 4, 20)),
+    ("Gunsmoke 520426 Billy the Kid.mp3", "Gunsmoke", None, "Billy the Kid", (1952, 4, 26)),
+    ("OTR, Fibber McGee, 400305.mp3", "Fibber McGee", None, None, (1940, 3, 5)),
+    # A dashed date still wins over a six-digit number elsewhere.
+    ("Suspense 1943-05-13 - Case 380411.mp3", "Suspense", None, "Case 380411", (1943, 5, 13)),
 ])
 def test_names_are_read(name, series, number, title, date):
     guess = parse_filename(name)
@@ -41,6 +50,9 @@ def test_names_are_read(name, series, number, title, date):
     "Marvel 12 2010.mp3",           # "Mar" inside a word
     "Show 00 Mar 2010.mp3",         # no day 0
     "Show Feb 30 1943.mp3",
+    "Show 381341.mp3",              # six digits, but no month 13
+    "Show 380230.mp3",              # no February 30th
+    "Catalog 1380411.mp3",          # seven digits: not a date
 ])
 def test_names_without_a_real_date_give_no_guess(name):
     assert parse_filename(name) is None
