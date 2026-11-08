@@ -20,7 +20,10 @@
   Added {{ added_all }} file{{ "" if added_all == 1 else "s" }} to your library{% if folders %}, in
   {{ "the folder" if folders | length == 1 else "the folders" }}
   {% for f in folders %}<strong>{{ f or "(top of the library)" }}</strong>{{ ", " if not loop.last }}{% endfor %}{% endif %}.
+  {% if grouped %}{{ "One multi-part broadcast went in as one episode" if grouped == 1 else grouped ~ " multi-part broadcasts went in as one episode each" }}.{% endif %}
   {% if skipped_have %}{{ skipped_have }} {{ "was" if skipped_have == 1 else "were" }} left in the inbox because you already have {{ "that episode" if skipped_have == 1 else "those episodes" }}.{% endif %}</div>{% endif %}
+{% if not_grouped %}<div class="notice" role="status">Those files won't be suggested as one broadcast again:
+  they'll be added one by one.</div>{% endif %}
 {% if rejected %}<div class="notice" role="status">{{ "The file was" if rejected == 1 else rejected ~ " files were" }} deleted from the inbox.</div>{% endif %}
 {% if errors %}<div class="notice error" role="alert">Nothing was saved yet: some dates need fixing. See the notes in red below.</div>{% endif %}
 
@@ -82,6 +85,19 @@
   </div>
   {% for row in rows %}
   {% set item = row.item %}
+  {% set g = row.group %}
+  {% if g and row.part == 1 %}
+  <div class="inbox-group">
+  <div class="inbox-group-head">
+    <label>
+      <input type="checkbox" name="together" value="{{ g.signature }}" checked>
+      <span><strong>Add these {{ g.file_ids | length }} files as one episode</strong>: they look like parts of one
+        broadcast, “{{ g.label }}”. They'll play in order as one episode, with part 1's details.</span>
+    </label>
+    <button class="button" type="submit" formaction="/inbox/groups/dismiss" name="dismiss" value="{{ g.signature }}">Dismiss</button>
+  </div>
+  <p class="muted small">While this is ticked, adding any of them adds all {{ g.file_ids | length }}. Untick it to add them as separate episodes.</p>
+  {% endif %}
   <section class="review-card{% if errors[item.id] %} has-error{% endif %}">
     <div class="review-file inbox-file">
       <button class="play-button" type="button" aria-label="Listen to {{ item.name }}"
@@ -91,6 +107,7 @@
       </button>
       <span>{{ item.name }}</span>
       <span class="muted small">{{ item.duration_seconds | duration }} · {{ item.size_bytes | size }}</span>
+      {% if g %}<span class="badge parts">Part {{ row.part }} of {{ g.file_ids | length }}</span>{% endif %}
     </div>
     <div class="review-fields">
       {% for key, label in fields.items() %}
@@ -123,6 +140,7 @@
       <button class="button" type="submit" form="reject-{{ item.id }}">Reject (delete)</button>
     </div>
   </section>
+  {% if g and row.part == g.file_ids | length %}</div>{% endif %}
   {% endfor %}
   <div class="form-buttons">
     <button class="button primary" type="submit">Save details</button>

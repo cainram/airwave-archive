@@ -19,6 +19,11 @@ Airwave tags. Those details (time, station, cast, notes, the episode's
 permanent ID, which part it is) wait with the file and are saved on its
 episode when it's added. The permanent ID shows when you already have an
 episode; parts of one episode are put back together.
+
+Files that look like parts of one broadcast ("Hour 1", "Hour 2"...) are
+suggested as a group (see app/grouping.py): if the owner leaves the
+suggestion ticked, they go into the library together, as one episode with
+the first part's details.
 """
 
 from __future__ import annotations
@@ -32,11 +37,13 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import grouping
 from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
 from app.episodes import (
-    TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
+    PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
 )
 from app.filenames import date_text, parse_filename
+from app.parts import set_parts
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
 from app.series import one_series, set_uploaded_picture
 from app.tagging import read_airwave_tags
@@ -272,11 +279,13 @@ def already_have(session: Session, item: InboxItem) -> AudioFile | None:
 
 
 def add_to_library(session: Session, inbox_folder: Path, library: Path,
-                   item: InboxItem, art_dir: Path | None = None) -> AudioFile | None:
+                   item: InboxItem, art_dir: Path | None = None,
+                   into: str | None = None) -> AudioFile | None:
     """Move an inbox file into the library and add it, with the details
     confirmed in the inbox and any extra ones it brought. None if the file
     isn't in the inbox any more; AlreadyHave if the library has its
-    episode already."""
+    episode already. ``into`` picks the library folder (relative to the
+    library) instead of the series' usual one."""
     source = item_path(inbox_folder, item)
     if source is None:
         return None
@@ -286,6 +295,8 @@ def add_to_library(session: Session, inbox_folder: Path, library: Path,
     joining = same_episode(session, item)           # a part of it is there
     if joining is not None and joining.files:
         folder = library / joining.parts[0].folder
+    elif into is not None:
+        folder = library / into
     else:
         folder = library / target_folder(session, item.series)
     if library.resolve() not in (folder.resolve(), *folder.resolve().parents):
@@ -314,6 +325,42 @@ def add_to_library(session: Session, inbox_folder: Path, library: Path,
     _use_picture(session, episode.series, extra.get("picture"))
     session.delete(item)
     return row
+
+
+def suggested_groups(session: Session, items: list[InboxItem]) -> list[grouping.Suggestion]:
+    """Waiting files that look like parts of one broadcast (not ones that
+    came from an Airwave export, which knows its own parts)."""
+    entries = []
+    for item in items:
+        if "part" in item.extra or "uid" in item.extra:
+            continue
+        date = date_text(item.air_year, item.air_month, item.air_day) if item.air_year else None
+        entries.append((item.id, grouping.INBOX, item.name, date))
+    return grouping.find_sets(entries, grouping.dismissed_signatures(session))
+
+
+def add_group(session: Session, inbox_folder: Path, library: Path, items: list[InboxItem],
+              art_dir: Path | None = None) -> list[AudioFile]:
+    """Add files that the owner approved as parts of one broadcast: each
+    goes into the library (all in the first one's folder), then they're
+    grouped as one episode with the first part's details. Returns the
+    files added, first part first."""
+    rows: list[AudioFile] = []
+    for item in items:
+        row = add_to_library(session, inbox_folder, library, item, art_dir,
+                             into=rows[0].folder if rows else None)
+        if row is None:            # gone from the inbox meanwhile
+            session.delete(item)
+            continue
+        rows.append(row)
+    session.flush()
+    if len(rows) > 1:
+        episode = rows[0].episode
+        set_parts(session, episode, rows)
+        # "Show - Mar 01 2010 - Hour 1" names part 1, not the whole broadcast.
+        if episode.title:
+            episode.title = _clean(PART_PATTERN.sub("", episode.title).strip(" -_,")) or episode.title
+    return rows
 
 
 def _apply_extra(episode: Episode, date: tuple, extra: dict) -> None:

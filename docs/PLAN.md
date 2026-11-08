@@ -789,12 +789,26 @@ broadcast and suggest grouping them. **Never group without approval.**
 - **Try it:** split a grouped show (its page → Group with other files…,
   untick all but one), then Find possible groups, and approve it.
 
-#### Step 2 (v1.2) — Suggestions after scans and in the inbox
+#### Step 2 (v1.2) — Suggestions after scans and in the inbox ✅ *done*
 - After a scan, a notice on the Library page when there are new
   suggestions (leading to the Suggested groups page).
-- In the inbox, files from one upload that look like parts of one
-  broadcast are shown together in the review list, so an approved group
-  goes into the library as one episode.
+- In the inbox, files that look like parts of one broadcast are shown
+  together in the review list, so an approved group goes into the
+  library as one episode.
+- Notes: "new" means not yet shown on the Suggested groups page (opening
+  it counts as seeing them; `group_seen` table, database version 18). In
+  the inbox the same rules apply, with the inbox counting as one folder
+  and the dates worked out for each file (from its name or tags) having
+  to agree; files from an Airwave export are left out (they know their
+  own parts). Each suggested group sits in a box with a tick box
+  (ticked to start) and **Dismiss**. While ticked, **Add all**, or
+  **Add to library** on any of its files, adds the whole group: all go
+  into the first part's folder, then they're grouped with part 1's
+  details (a trailing "Hour 1" is dropped from its title). Unticked or
+  dismissed, they go in one by one. A set dismissed in the inbox isn't
+  suggested again once it's in the library.
+- **Try it:** upload "Hour 1", "Hour 2", "Hour 3" of one show, leave the
+  group ticked, press Add all: one 3-part episode.
 
 ### Later — Converting other formats with ffmpeg (after v1.0)
 Prompted by Lone Ranger episodes in `.mkv` (2026-11-07). The Mac's upload

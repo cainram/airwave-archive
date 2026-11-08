@@ -2,18 +2,23 @@
 
 A long show is often saved as several files whose names are the same
 except for a part marker: "Hour 1", "Hr 2", "Part 3", "Pt 4", "(1 of 2)",
-"Side A". This finds such sets so the owner can group them in one go
-("Suggested groups" page). Nothing is ever grouped without the owner's
-approval, and a suggestion the owner dismisses isn't offered again.
+"Side A". This finds such sets so the owner can group them in one go:
+in the library ("Suggested groups" page, and a notice on the Library page
+when a scan turns up new ones), and among files waiting in the inbox
+(shown together there, so they go into the library as one episode).
+Nothing is ever grouped without the owner's approval, and a suggestion
+the owner dismisses isn't offered again.
 
 A set is suggested only if:
 
 - its files are in the same folder (uploads are filed into their series'
-  folder, so one upload's parts end up together), with the same name
-  apart from the part number, and the same kind of file;
+  folder, so one upload's parts end up together; the inbox counts as one
+  folder), with the same name apart from the part number, and the same
+  kind of file;
 - the numbers run 1, 2, 3... with none missing or doubled (and match the
   "of N" total, if the names have one);
-- the files' date tags, where they have one, agree;
+- the files' dates (date tags in the library; the dates worked out in the
+  inbox), where they have one, agree;
 - none of the files is already part of a group, or missing.
 """
 
@@ -27,7 +32,7 @@ from pathlib import PurePath
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import AudioFile, GroupDismissal, natural_key, utcnow
+from app.db import AudioFile, GroupDismissal, GroupSeen, natural_key, utcnow
 from app.parts import set_parts
 
 # A part marker anywhere in a name (not inside a longer word):
@@ -46,6 +51,7 @@ MARKER = re.compile(r"""
 
 MOST_PARTS = 24        # more than this in a set isn't one broadcast
 SHOWN = 100            # suggestions on the page at once
+INBOX = "\x00inbox"    # the inbox's "folder" in fingerprints (no real folder is named that)
 
 
 @dataclass
@@ -113,8 +119,47 @@ class Suggestion:
 
 
 def _same_date(dates: list[str | None]) -> bool:
-    found = {d.strip()[:10] for d in dates if d and d.strip()}
+    found = {d for d in dates if d}
     return len(found) <= 1
+
+
+def find_sets(entries, dismissed: set[str] = frozenset()) -> list[Suggestion]:
+    """Likely groups among ``entries``: (id, folder, name, date or None)
+    for files that are on their own. In folder and name order."""
+    sets: dict[tuple, list[tuple[Marker, tuple]]] = {}
+    for entry in entries:
+        marker = find_marker(entry[2])
+        if marker is None:
+            continue
+        key = (entry[1], marker.before.lower().strip(), marker.kind,
+               marker.after.lower().strip(), PurePath(entry[2]).suffix.lower(), marker.total)
+        sets.setdefault(key, []).append((marker, entry))
+
+    found: list[Suggestion] = []
+    for key, members in sets.items():
+        numbers = sorted(marker.number for marker, _ in members)
+        total = key[5]
+        if not 2 <= len(members) <= MOST_PARTS or numbers != list(range(1, len(members) + 1)):
+            continue
+        if total is not None and total != len(members):
+            continue
+        if not _same_date([entry[3] for _, entry in members]):
+            continue
+        members.sort(key=lambda pair: pair[0].number)
+        folder = key[0]
+        names = [entry[2] for _, entry in members]
+        sig = signature(folder, names)
+        # Dismissed here, or already in the inbox before they were added.
+        if sig in dismissed or signature(INBOX, names) in dismissed:
+            continue
+        found.append(Suggestion(sig, folder, label_for(members[0][0]),
+                                [entry[0] for _, entry in members]))
+    found.sort(key=lambda s: (natural_key(s.folder), natural_key(s.label)))
+    return found
+
+
+def dismissed_signatures(session: Session) -> set[str]:
+    return set(session.scalars(select(GroupDismissal.signature)))
 
 
 def suggestions(session: Session, include_dismissed: bool = False) -> list[Suggestion]:
@@ -125,35 +170,23 @@ def suggestions(session: Session, include_dismissed: bool = False) -> list[Sugge
         .where(AudioFile.missing.is_(False), AudioFile.part_number.is_(None),
                AudioFile.episode_id.is_not(None))
     ).all()
-    sets: dict[tuple, list[tuple[Marker, tuple]]] = {}
-    for row in rows:
-        marker = find_marker(row.name)
-        if marker is None:
-            continue
-        key = (row.folder, marker.before.lower().strip(), marker.kind,
-               marker.after.lower().strip(), PurePath(row.name).suffix.lower(), marker.total)
-        sets.setdefault(key, []).append((marker, row))
+    entries = [(r.id, r.folder, r.name, (r.tag_date or "").strip()[:10] or None) for r in rows]
+    return find_sets(entries, set() if include_dismissed else dismissed_signatures(session))
 
-    dismissed = set() if include_dismissed else set(session.scalars(select(GroupDismissal.signature)))
-    found: list[Suggestion] = []
-    for key, members in sets.items():
-        numbers = sorted(marker.number for marker, _ in members)
-        total = key[5]
-        if not 2 <= len(members) <= MOST_PARTS or numbers != list(range(1, len(members) + 1)):
-            continue
-        if total is not None and total != len(members):
-            continue
-        if not _same_date([row.tag_date for _, row in members]):
-            continue
-        members.sort(key=lambda pair: pair[0].number)
-        folder = key[0]
-        sig = signature(folder, [row.name for _, row in members])
-        if sig in dismissed:
-            continue
-        found.append(Suggestion(sig, folder, label_for(members[0][0]),
-                                [row.id for _, row in members]))
-    found.sort(key=lambda s: (natural_key(s.folder), natural_key(s.label)))
-    return found
+
+def unseen(session: Session) -> int:
+    """How many library suggestions the owner hasn't looked at yet (for
+    the notice on the Library page after a scan)."""
+    seen = set(session.scalars(select(GroupSeen.signature)))
+    return sum(1 for s in suggestions(session) if s.signature not in seen)
+
+
+def mark_seen(session: Session, shown: list[Suggestion]) -> None:
+    """The owner has seen these suggestions (on the Suggested groups page)."""
+    seen = set(session.scalars(select(GroupSeen.signature)))
+    for s in shown:
+        if s.signature not in seen:
+            session.add(GroupSeen(signature=s.signature, seen_at=utcnow()))
 
 
 def load_files(session: Session, chosen: list[Suggestion]) -> None:

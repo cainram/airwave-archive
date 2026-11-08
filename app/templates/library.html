@@ -34,6 +34,14 @@
   </div>
 </section>
 
+{% if new_groups %}
+<div class="notice" role="status">
+  {{ new_groups }} new possible group{{ "" if new_groups == 1 else "s" }}: files that look like parts of one
+  broadcast ("Hour 1", "Hour 2"…). Nothing is grouped until you approve it.
+  <a class="button" href="/groups/suggested">Review {{ "it" if new_groups == 1 else "them" }}</a>
+</div>
+{% endif %}
+
 {% if not library_exists %}
   <div class="notice">
     The library folder <code>{{ library_dir }}</code> can't be found, so the list

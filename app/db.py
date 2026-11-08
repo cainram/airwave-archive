@@ -55,7 +55,8 @@ DB_FILENAME = "airwave.db"
 #  15: Phase 12b, hand-picked feeds (feed_items table)
 #  16: Phase 12c, a feed's author, own picture and order (feeds.author, art_hash, newest_first)
 #  17: suggested groups the owner dismissed (group_dismissals table)
-SCHEMA_VERSION = 17
+#  18: suggested groups the owner has seen, for the Library's notice (group_seen table)
+SCHEMA_VERSION = 18
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -328,6 +329,16 @@ class GroupDismissal(Base):
     signature: Mapped[str] = mapped_column(primary_key=True)
     label: Mapped[str] = mapped_column(default="")   # what it was called, for reference
     dismissed_at: Mapped[datetime]   # UTC
+
+
+class GroupSeen(Base):
+    """A suggested group the owner has seen on the Suggested groups page,
+    so the Library page only mentions new ones."""
+
+    __tablename__ = "group_seen"
+
+    signature: Mapped[str] = mapped_column(primary_key=True)
+    seen_at: Mapped[datetime]   # UTC
 
 
 class ScanRun(Base):

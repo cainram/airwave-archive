@@ -276,9 +276,11 @@ def library_page(request: Request, page: int = 1):
             .offset((page - 1) * PAGE_SIZE)
             .limit(PAGE_SIZE)
         ).all()
+        new_groups = grouping.unseen(session)
 
     return render(request, "library.html", {
         "files": files,
+        "new_groups": new_groups,
         "count": count,
         "rows": rows,
         "pager_url": "/library?page=",
@@ -495,15 +497,29 @@ INBOX_FIELDS = {"series": "Series", "episode_number": "Ep.", "date": "Aired", "t
 def render_inbox(request: Request, typed=None, errors=None, problems=(), **notices):
     with Session(get_engine()) as session:
         items = inbox.sync_inbox(session, INBOX_DIR)
-        rows = []
+        groups = inbox.suggested_groups(session, items)
+        in_group = {i: (g, n) for g in groups for n, i in enumerate(g.file_ids, start=1)}
+        by_id = {item.id: item for item in items}
+        # A suggested group's files are listed together, in part order,
+        # where its first file would come.
+        ordered, placed = [], set()
         for item in items:
+            if item.id in placed:
+                continue
+            members = in_group[item.id][0].file_ids if item.id in in_group else [item.id]
+            ordered.extend(by_id[i] for i in members)
+            placed.update(members)
+        rows = []
+        for item in ordered:
             values = {"series": item.series or "", "episode_number": item.episode_number or "",
                       "title": item.title or "",
                       "date": date_text(item.air_year, item.air_month, item.air_day)}
             values.update((typed or {}).get(item.id, {}))
             have = inbox.already_have(session, item)
+            group, number = in_group.get(item.id, (None, None))
             rows.append({"item": item, "vals": values, "extra": item.extra,
-                         "have": have and {"id": have.id, "title": display_title(have)}})
+                         "have": have and {"id": have.id, "title": display_title(have)},
+                         "group": group, "part": number})
         session.expunge_all()
     return render(request, "inbox.html", {
         "rows": rows, "fields": INBOX_FIELDS, "errors": errors or {},
@@ -518,7 +534,8 @@ def inbox_page(request: Request, uploaded: int | None = None, skipped: int | Non
                saved: int | None = None, rejected: int | None = None,
                added: int | None = None, added_all: int | None = None,
                skipped_have: int | None = None, unpacked: int | None = None,
-               with_details: int | None = None, folder: list[str] = Query(default=[])):
+               with_details: int | None = None, folder: list[str] = Query(default=[]),
+               not_grouped: int | None = None, grouped: int | None = None):
     added_file = None
     if added is not None:
         with Session(get_engine()) as session:
@@ -527,7 +544,8 @@ def inbox_page(request: Request, uploaded: int | None = None, skipped: int | Non
     return render_inbox(request, uploaded=uploaded, skipped=skipped, saved=saved,
                         rejected=rejected, added=added_file, added_all=added_all,
                         skipped_have=skipped_have, unpacked=unpacked,
-                        with_details=with_details, folders=folder)
+                        with_details=with_details, folders=folder, not_grouped=not_grouped,
+                        grouped=grouped)
 
 
 @app.post("/inbox/upload", response_class=HTMLResponse)
@@ -632,11 +650,26 @@ async def inbox_save(request: Request):
 @app.post("/inbox/add-all", response_class=HTMLResponse)
 async def inbox_add_all(request: Request):
     """Save what was typed, then add every waiting file to the library."""
-    typed, errors, _saved = save_inbox_details(await request.form())
+    form = await request.form()
+    typed, errors, _saved = save_inbox_details(form)
     if errors:
         return render_inbox(request, typed, errors)
-    added, have, folders = 0, 0, []
+    added, have, grouped, folders = 0, 0, 0, []
+    together = set(form.getlist("together"))
     with Session(get_engine()) as session:
+        # Ticked suggested groups first: each goes in as one episode.
+        items = session.scalars(select(InboxItem).order_by(InboxItem.name)).all()
+        for group in inbox.suggested_groups(session, items):
+            if group.signature not in together:
+                continue
+            by_id = {item.id: item for item in items}
+            rows = inbox.add_group(session, INBOX_DIR, LIBRARY_DIR,
+                                   [by_id[i] for i in group.file_ids], art_dir())
+            added += len(rows)
+            grouped += len(rows) > 1
+            if rows and rows[0].folder not in folders:
+                folders.append(rows[0].folder)
+            session.commit()
         for item in session.scalars(select(InboxItem).order_by(InboxItem.name)).all():
             try:
                 row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
@@ -652,6 +685,7 @@ async def inbox_add_all(request: Request):
             session.commit()            # one at a time: each one done stays done
     return go_to(request, "/inbox?" + urlencode(
         [("added_all", added), *([("skipped_have", have)] if have else []),
+         *([("grouped", grouped)] if grouped else []),
          *(("folder", folder) for folder in folders)]))
 
 
@@ -659,11 +693,24 @@ async def inbox_add_all(request: Request):
 async def inbox_add(request: Request, item_id: int):
     """Save what was typed, then move this file into the library and add
     it, with its details, as an episode."""
-    typed, errors, _saved = save_inbox_details(await request.form())
+    form = await request.form()
+    typed, errors, _saved = save_inbox_details(form)
     if errors:
         return render_inbox(request, typed, errors)
+    together = set(form.getlist("together"))
     with Session(get_engine()) as session:
         item = inbox_item_or_404(session, item_id)
+        items = session.scalars(select(InboxItem)).all()
+        group = next((g for g in inbox.suggested_groups(session, items)
+                      if item_id in g.file_ids and g.signature in together), None)
+        if group is not None:   # a ticked suggested group goes in as one episode
+            by_id = {i.id: i for i in items}
+            rows = inbox.add_group(session, INBOX_DIR, LIBRARY_DIR,
+                                   [by_id[i] for i in group.file_ids], art_dir())
+            session.commit()
+            if not rows:
+                raise HTTPException(status_code=404, detail="Those files aren't in the inbox any more")
+            return go_to(request, f"/inbox?added={rows[0].id}")
         try:
             row = inbox.add_to_library(session, INBOX_DIR, LIBRARY_DIR, item, art_dir())
         except inbox.AlreadyHave:
@@ -676,6 +723,24 @@ async def inbox_add(request: Request, item_id: int):
         session.commit()
         added = row.id
     return go_to(request, f"/inbox?added={added}")
+
+
+@app.post("/inbox/groups/dismiss", response_class=HTMLResponse)
+async def inbox_dismiss_group(request: Request):
+    """Save what was typed, then stop suggesting these inbox files as one
+    broadcast (they're added one by one)."""
+    form = await request.form()
+    typed, errors, _saved = save_inbox_details(form)
+    if errors:
+        return render_inbox(request, typed, errors)
+    sig = str(form.get("dismiss") or "")
+    with Session(get_engine()) as session:
+        items = session.scalars(select(InboxItem)).all()
+        match = next((g for g in inbox.suggested_groups(session, items) if g.signature == sig), None)
+        if match is not None:
+            grouping.dismiss(session, sig, match.label)
+            session.commit()
+    return go_to(request, "/inbox?not_grouped=1" if match else "/inbox")
 
 
 def inbox_item_or_404(session: Session, item_id: int) -> InboxItem:
@@ -1159,6 +1224,8 @@ def suggested_groups(request: Request):
         for s in shown:   # load what the page shows while the database is open
             for f in s.files:
                 f.episode and f.episode.sources
+        grouping.mark_seen(session, shown)
+        session.commit()
         return render(request, "groups_suggested.html", {
             "suggestions": shown, "total": len(found)})
 

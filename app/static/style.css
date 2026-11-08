@@ -682,3 +682,10 @@ a.day-title:hover { text-decoration: underline; }
 .suggestion-files { margin: 4px 0 0 28px; padding-left: 1.4em; }
 .suggestion-files li { margin: 2px 0; overflow-wrap: anywhere; }
 .tick-all { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
+/* A suggested group of inbox files (parts of one broadcast). */
+.inbox-group { border: 2px solid var(--accent); border-radius: 10px; padding: 10px 12px 2px; margin: 14px 0; }
+.inbox-group-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.inbox-group-head label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; flex: 1 1 320px; }
+.inbox-group-head input { margin-top: 4px; }
+.inbox-group > p { margin: 4px 0 8px 26px; }
