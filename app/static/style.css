@@ -689,3 +689,8 @@ a.day-title:hover { text-decoration: underline; }
 .inbox-group-head label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; flex: 1 1 320px; }
 .inbox-group-head input { margin-top: 4px; }
 .inbox-group > p { margin: 4px 0 8px 26px; }
+
+/* An inbox file that needs converting (video, RealAudio, WMA, Ogg, Opus). */
+.inbox-convert { margin: 8px 0 0; }
+.inbox-convert .badge { margin-right: 6px; }
+.any-file { display: flex; gap: 6px; align-items: center; margin-top: 6px; cursor: pointer; font-weight: normal; }

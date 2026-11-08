@@ -7,6 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/app
 
+# ffmpeg converts recordings the browser and podcast apps can't play
+# (video files, RealAudio, WMA, Ogg, Opus) into MP3 or M4A. Only the
+# programs themselves, not the extras Debian would suggest.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

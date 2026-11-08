@@ -32,7 +32,7 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, csvimport, deleting, export, feeds, grouping, inbox, listening, zipimport
+from app import airdates, convert, csvimport, deleting, export, feeds, grouping, inbox, listening, zipimport
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -519,13 +519,18 @@ def render_inbox(request: Request, typed=None, errors=None, problems=(), **notic
             group, number = in_group.get(item.id, (None, None))
             rows.append({"item": item, "vals": values, "extra": item.extra,
                          "have": have and {"id": have.id, "title": display_title(have)},
-                         "group": group, "part": number})
+                         "group": group, "part": number,
+                         "convert": convert.needs_converting(item.name),
+                         "plan": convert.Plan.from_json(item.convert_json)})
         session.expunge_all()
     return render(request, "inbox.html", {
         "rows": rows, "fields": INBOX_FIELDS, "errors": errors or {},
         "duplicates": sum(1 for row in rows if row["have"]),
+        "converting": sum(1 for row in rows if row["convert"] and not row["have"]),
+        "can_convert": convert.available(),
         "zips": zipimport.inbox_zips(INBOX_DIR), "problems": list(problems),
-        "zone_names": TIME_ZONES, "inbox_dir": INBOX_DIR, **notices,
+        "zone_names": TIME_ZONES, "inbox_dir": INBOX_DIR, "upload_accept": inbox.upload_accept(),
+        **notices,
     }, status_code=400 if errors or problems else 200)
 
 
@@ -676,6 +681,8 @@ async def inbox_add_all(request: Request):
             except inbox.AlreadyHave:   # left in the inbox, marked
                 have += 1
                 continue
+            except inbox.NeedsConverting:   # waits in the inbox until it's converted
+                continue
             if row is None:            # gone from the inbox meanwhile
                 session.delete(item)
             else:
@@ -716,6 +723,9 @@ async def inbox_add(request: Request, item_id: int):
         except inbox.AlreadyHave:
             return render_inbox(request, problems=[
                 f"“{item.name}” wasn't added: you already have that episode."])
+        except inbox.NeedsConverting:
+            return render_inbox(request, problems=[
+                f"“{item.name}” wasn't added: it needs converting first."])
         if row is None:
             session.delete(item)
             session.commit()

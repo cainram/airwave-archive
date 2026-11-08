@@ -37,7 +37,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import grouping
+from app import convert, grouping
 from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
 from app.episodes import (
     PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
@@ -55,8 +55,19 @@ MAX_TEXT = 20_000                      # longest detail kept from an import
 UID_PATTERN = re.compile(r"^[0-9A-Za-z-]{8,64}$")
 
 
+def upload_accept() -> str:
+    """The file filter for the upload window: every extension the inbox
+    takes, plus the type names some systems go by instead (a Mac, for
+    example, greys out files that match neither)."""
+    names = sorted(AUDIO_EXTENSIONS | convert.CONVERT_EXTENSIONS)
+    return ",".join(["audio/*", *names, *convert.MEDIA_TYPES, ".zip", "application/zip"])
+
+
 def is_audio(name: str) -> bool:
-    return Path(name).suffix.lower() in AUDIO_EXTENSIONS
+    """A recording the inbox accepts: one the app plays, or one it can
+    convert (video files, RealAudio, WMA, Ogg, Opus; see app/convert.py)."""
+    suffix = Path(name).suffix.lower()
+    return suffix in AUDIO_EXTENSIONS or suffix in convert.CONVERT_EXTENSIONS
 
 
 def safe_name(name: str) -> str | None:
@@ -128,13 +139,22 @@ def airwave_details(values: dict) -> tuple[dict, dict]:
     return main, {key: value for key, value in extra.items() if value}
 
 
-def guess_details(path: Path) -> dict:
+def guess_details(path: Path, found: dict | None = None) -> dict:
     """What the file's tags and name say: series, episode number, title and
     air date. Tags come first; the name fills in what they lack, and gives
     the date if it says more (tags often have only the year). Airwave tags
-    (from an export) beat both, and bring extra details (``extra``)."""
+    (from an export) beat both, and bring extra details (``extra``).
+    ``found`` is what ffprobe saw in a file that needs converting: its
+    tags and length are used where the usual reader finds none."""
     info = read_audio(path)
     tags = info.tags
+    if found is not None:
+        tags = {**convert.tags_from(found), **{k: v for k, v in tags.items() if v}}
+        if info.duration_seconds is None:
+            try:
+                info.duration_seconds = float(found["format"]["duration"]) or None
+            except (KeyError, TypeError, ValueError):
+                pass
     guess = parse_filename(path.name)
     from_tags = (date_from_tag(tags.get("date")))
     from_name = (guess.year, guess.month, guess.day) if guess else (None, None, None)
@@ -181,10 +201,18 @@ def sync_inbox(session: Session, folder: Path) -> list[InboxItem]:
         if name not in files:
             session.delete(row)
     for name, path in files.items():
-        if name not in rows:
-            details = guess_details(path)
-            session.add(InboxItem(name=name, size_bytes=path.stat().st_size,
-                                  added_at=utcnow(), **details))
+        row = rows.get(name)
+        if row is None:
+            found = convert.probe(path) if convert.needs_converting(name) else None
+            details = guess_details(path, found)
+            row = InboxItem(name=name, size_bytes=path.stat().st_size, added_at=utcnow(), **details)
+            if convert.needs_converting(name) and convert.available():
+                row.convert_json = convert.plan_for(name, found).to_json()
+            session.add(row)
+        elif convert.needs_converting(name) and row.convert_json is None:
+            # Waiting since before converting was possible, or ffmpeg was missing.
+            if convert.available():
+                row.convert_json = convert.plan_for(name, convert.probe(path)).to_json()
     session.commit()
     return sorted(session.scalars(select(InboxItem)), key=lambda r: r.name.lower())
 
@@ -255,6 +283,10 @@ class AlreadyHave(Exception):
     """The library already has this episode (same permanent ID)."""
 
 
+class NeedsConverting(Exception):
+    """The file must be converted before it can go into the library."""
+
+
 def same_episode(session: Session, item: InboxItem) -> Episode | None:
     """The library's episode with this file's permanent ID, if any."""
     uid = item.extra.get("uid")
@@ -289,6 +321,8 @@ def add_to_library(session: Session, inbox_folder: Path, library: Path,
     source = item_path(inbox_folder, item)
     if source is None:
         return None
+    if convert.needs_converting(item.name):
+        raise NeedsConverting(item.name)
     if already_have(session, item) is not None:
         raise AlreadyHave(item.name)
     extra = item.extra
@@ -332,7 +366,7 @@ def suggested_groups(session: Session, items: list[InboxItem]) -> list[grouping.
     came from an Airwave export, which knows its own parts)."""
     entries = []
     for item in items:
-        if "part" in item.extra or "uid" in item.extra:
+        if "part" in item.extra or "uid" in item.extra or convert.needs_converting(item.name):
             continue
         date = date_text(item.air_year, item.air_month, item.air_day) if item.air_year else None
         entries.append((item.id, grouping.INBOX, item.name, date))

@@ -85,8 +85,14 @@ These come from the plan and should not be changed without the owner's OK:
   originals. The one exception: the owner can **delete** recordings
   (owner's choice, 2026-11-06; they keep backups and snapshots), only as
   an explicit action after a confirmation page listing exactly which
-  files will go (`app/deleting.py`). Nothing else ever deletes from the
-  library.
+  files will go (`app/deleting.py`). The second exception (owner's
+  choice, 2026-11-08): **converting** formats that don't play well
+  (Phase 13). The inbox converts uploads and deletes the uploaded
+  original. Files added straight to the library and found by a scan are
+  an advanced technique: they may be converted in place and the
+  original deleted, only after a confirmation page listing them and
+  warning about it, and only once the new file has been checked.
+  Nothing else ever deletes from the library.
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud
@@ -150,6 +156,9 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/feeds.py`: podcast feeds (RSS) for podcast apps: which recordings
   a feed holds, their dates (when added to the feed, never invented),
   the RSS itself, and QR codes
+- `app/convert.py`: converting formats that don't play well (video
+  files, RealAudio, WMA, Ogg, Opus) with ffmpeg: looking inside a file
+  (ffprobe) and working out the plan (copy the sound, or make an MP3)
 - `app/zipimport.py`: unpacking zips (Airwave exports or plain zips of
   recordings) into the inbox, with the details from the export's manifest
 - `app/search.py`: the search index (SQLite FTS5) and searching. The

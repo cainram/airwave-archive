@@ -56,7 +56,8 @@ DB_FILENAME = "airwave.db"
 #  16: Phase 12c, a feed's author, own picture and order (feeds.author, art_hash, newest_first)
 #  17: suggested groups the owner dismissed (group_dismissals table)
 #  18: suggested groups the owner has seen, for the Library's notice (group_seen table)
-SCHEMA_VERSION = 18
+#  19: Phase 13a, what converting an inbox file will do (inbox_items.convert_json)
+SCHEMA_VERSION = 19
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -259,6 +260,9 @@ class InboxItem(Base):
     # tags): ID, part, air time, station, cast, notes... as JSON. Saved on
     # its episode when it's added.
     extra_json: Mapped[str | None]
+    # For a file that needs converting (video, RealAudio, WMA, Ogg, Opus):
+    # what's inside it and what converting will do (app/convert.py Plan).
+    convert_json: Mapped[str | None]
 
     @property
     def extra(self) -> dict:
@@ -411,6 +415,9 @@ def _migrate(conn) -> None:
     if "newest_first" not in feed_columns:
         conn.exec_driver_sql(
             "ALTER TABLE feeds ADD COLUMN newest_first BOOLEAN NOT NULL DEFAULT 0")
+    # Version 19: what converting an inbox file will do.
+    if "convert_json" not in _columns(conn, "inbox_items"):
+        conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")
 
 
 def make_engine(db_path: Path) -> Engine:

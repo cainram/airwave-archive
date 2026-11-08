@@ -94,6 +94,16 @@ always an explicit action, after a page listing exactly which files will go,
 and only files inside the library can be deleted. The episode and its details
 are removed from the app too. Folders are left as they are.
 
+**A second exception is converting** (owner's choice, 2026-11-08). The
+inbox is the main way recordings arrive, and it converts formats that
+can't be played well before anything reaches the library. Adding files
+straight into the library folder and scanning is an **advanced
+technique**: recordings found that way in those formats can be converted
+where they sit, **and the originals deleted**, but only after a page
+listing exactly which files will be converted and warning that the
+originals go. A new file replaces the original only once it has been
+checked (it opens, and its length matches). See Phase 13.
+
 ### Where things live
 
 The recommended layout on the server is one folder, `/srv/airwave`, ideally
@@ -810,9 +820,66 @@ broadcast and suggest grouping them. **Never group without approval.**
 - **Try it:** upload "Hour 1", "Hour 2", "Hour 3" of one show, leave the
   group ticked, press Add all: one 3-part episode.
 
-### Later — Converting other formats with ffmpeg (after v1.0)
+### Phase 13 — Converting other formats with ffmpeg
 Prompted by Lone Ranger episodes in `.mkv` (2026-11-07). The Mac's upload
 window greys them out, because the inbox only accepts audio file types.
+
+**Decisions (owner, 2026-11-08):**
+- Converted: formats that can't be used or play badly: MKV/MKA, WebM,
+  MP4 video, RealAudio (`.ra`, `.rm`), WMA, Ogg (`.ogg`, `.oga`), Opus.
+  Lossless FLAC, WAV and AIFF are left alone (they play nearly everywhere;
+  converting would lose quality).
+- Sound that's already MP3 or AAC is copied unchanged into `.mp3` /
+  `.m4a`; everything else becomes MP3 (mono if the original is mono, at
+  a bitrate with a little headroom over the original's, at most 128 kbps).
+- The inbox deletes the uploaded original once its conversion succeeds.
+- Scanning files added straight to the library is an advanced technique:
+  odd formats found that way are converted in place and the originals
+  deleted, after warnings and a confirmation page (see section 3).
+- The upload window's file filter must let every one of these formats be
+  picked (extensions plus the type names systems use; and a "Let me
+  choose any file" box that turns the filter off as a fallback).
+- Converting runs in the background, and the owner is told the files
+  won't be available until it's done.
+
+#### 13a — ffmpeg in the app, and what's inside each file ✅ *done*
+- ffmpeg is in the Docker image (Debian's package: the image grew from
+  about 277 MB to 905 MB). Where it is comes from `AIRWAVE_FFMPEG` (the
+  program's full path) or the usual places; without it the app still
+  runs and says converting isn't available.
+- The inbox accepts the formats above (uploads, zips, and files copied
+  into the inbox folder). For each, ffprobe looks inside and the inbox
+  says what it is and what converting will do ("WebM file (a still
+  picture with sound). Its sound is Opus, 40 kbps, mono. It will be
+  converted to MP3 (mono, 56 kbps)."), or that it can't be read. Their
+  tags and length are read with ffprobe when the usual reader can't.
+- Until 13b they wait in the inbox: no Play or Add button, and Add all
+  leaves them. The plan is kept on the inbox item (`convert_json`,
+  database version 19). Code: `app/convert.py`.
+- **Try it:** upload one of the Lone Ranger `.webm` files and read what
+  the inbox says about it.
+
+#### 13b — Converting in the inbox
+- A work queue (kept in the database, so it survives a restart) that
+  converts one or two files at a time in the background; a notice on
+  upload that the files need converting and will appear when ready
+  (the page can be left); progress for each file; Cancel; plain error
+  messages. The original is deleted once the new file has been checked.
+  Converted files then join the usual inbox list (and group suggestions).
+
+#### 13c — Pictures from "videos" that are just a still image
+- That picture becomes the episode's artwork. Better still-picture
+  detection (some files hold a picture as an unchanging video track).
+
+#### 13d — Converting odd formats found by a scan (advanced)
+- A scan notices library files in these formats and offers to convert
+  them; a confirmation page lists each file, what it becomes, and warns
+  the original will be deleted. The same queue converts them beside the
+  original under a hidden name; once checked, the new file takes its
+  place and the original is deleted. Episode details, listening place,
+  groups and feeds move to the new file. Failures leave the original.
+
+**Background notes (2026-11-07):**
 
 Why just allowing `.mkv` isn't enough: MKV is a *container* (video, audio,
 or both). Safari, iPhones, and podcast apps can't play it, and mutagen
@@ -828,11 +895,11 @@ The plan: **ffmpeg** (the standard free converter) inside the inbox.
   original.
 - If the "video" is just a still picture (typical of YouTube downloads),
   that picture can become the episode's artwork.
-- What becomes of the original: suggested default is to remove it from the
-  inbox once conversion succeeds (the owner keeps their own copy). To be
-  confirmed when built.
-- **The ground rules stay intact:** conversion happens only in the inbox, so
-  no library file changes. New files still only arrive through the inbox.
+- What becomes of the original: *decided 2026-11-08, see above* (deleted
+  from the inbox once conversion succeeds).
+- ~~The ground rules stay intact: conversion happens only in the inbox.~~
+  *Changed 2026-11-08:* files found by a scan can be converted in place
+  (13d), as a second exception in section 3.
 - ffmpeg goes into the Docker image (a few hundred MB). It also exists for
   Windows and Mac, so desktop packaging still works, and its licence is
   compatible with GPL v3.
