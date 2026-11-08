@@ -22,6 +22,18 @@
     if (box.matches('input[form="pick"]')) countTicked();
   });
 
+  // Upload: "Let me choose any file" turns off the window's file filter
+  // (the app still checks what it's given).
+  document.addEventListener("change", function (event) {
+    const box = event.target.closest("[data-any-file]");
+    if (!box) return;
+    const input = document.querySelector(box.getAttribute("data-any-file"));
+    if (!input) return;
+    if (!input.dataset.accept) input.dataset.accept = input.getAttribute("accept") || "";
+    if (box.checked) input.removeAttribute("accept");
+    else input.setAttribute("accept", input.dataset.accept);
+  });
+
   // Bulk edit form: typing a new value picks "Change to" for that detail.
   document.addEventListener("input", function (event) {
     const field = event.target.closest("[data-bulk-field]");

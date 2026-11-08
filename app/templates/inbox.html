@@ -36,11 +36,14 @@
       enctype="multipart/form-data" data-upload-progress>
   <label for="files">Upload recordings</label>
   <input id="files" name="files" type="file" multiple required
-         accept="audio/*,.mp3,.m4a,.m4b,.aac,.flac,.ogg,.oga,.opus,.wav,.wma,.aiff,.aif,.zip,application/zip">
+         accept="{{ upload_accept }}">
   <p class="muted small">Choose one or more audio files, or a zip of them, such as an export from
-    another Airwave Archive (its episodes arrive with all their details). Big files take a while:
+    another Airwave Archive (its episodes arrive with all their details). Video files (MKV, WebM, MP4),
+    RealAudio, WMA, Ogg and Opus are fine too: the app converts them into files every player can play. Big files take a while:
     keep this page open until the upload finishes. (For a whole collection or a very big zip,
     copying it onto the server's inbox folder is faster.)</p>
+  <label class="any-file small"><input type="checkbox" data-any-file="#files"> Let me choose any file
+    (if a recording is greyed out in the window)</label>
   <progress hidden max="100" value="0"></progress>
   <div class="form-buttons"><button class="button primary" type="submit">Upload</button></div>
 </form>
@@ -66,7 +69,15 @@
 {% if not zips %}<div class="notice">The inbox is empty.</div>{% endif %}
 {% else %}
 <h2>Waiting ({{ rows | length }})</h2>
-{% set addable = rows | length - duplicates %}
+{% set addable = rows | length - duplicates - converting %}
+{% if converting %}
+<div class="notice" role="status">
+  {{ converting }} file{{ "" if converting == 1 else "s" }} below {{ "needs" if converting == 1 else "need" }} converting before
+  {{ "it" if converting == 1 else "they" }} can go into your library (marked “Needs converting”).
+  {% if not can_convert %}Converting isn't available: the program that does it (ffmpeg) isn't installed.
+  {% else %}Converting is coming in the next update; until then {{ "it waits" if converting == 1 else "they wait" }} here.{% endif %}
+</div>
+{% endif %}
 {% if duplicates %}
 <div class="notice warning" role="status">
   You already have {{ "the episode of 1 file" if duplicates == 1 else "the episodes of " ~ duplicates ~ " files" }} below
@@ -100,11 +111,13 @@
   {% endif %}
   <section class="review-card{% if errors[item.id] %} has-error{% endif %}">
     <div class="review-file inbox-file">
+      {% if not row.convert %}
       <button class="play-button" type="button" aria-label="Listen to {{ item.name }}"
               data-play data-src="/inbox/{{ item.id }}/audio" data-href="/inbox"
               data-title="{{ row.vals.title or item.name }}" data-subtitle="In the inbox">
         <span class="when-stopped">▶</span><span class="when-playing">❚❚</span>
       </button>
+      {% endif %}
       <span>{{ item.name }}</span>
       <span class="muted small">{{ item.duration_seconds | duration }} · {{ item.size_bytes | size }}</span>
       {% if g %}<span class="badge parts">Part {{ row.part }} of {{ g.file_ids | length }}</span>{% endif %}
@@ -129,13 +142,20 @@
       {% if x.picture %}<span>Series picture</span>{% endif %}
     </p>
     {% endif %}
+    {% if row.convert %}
+    <p class="inbox-convert{% if row.plan and not row.plan.ok %} warning-text{% endif %}">
+      <span class="badge">Needs converting</span>
+      {% if row.plan %}{{ row.plan.description }}{% if row.plan.ok %} You can listen once it's converted.{% endif %}
+      {% else %}What's inside can't be checked: ffmpeg isn't installed.{% endif %}
+    </p>
+    {% endif %}
     {% if errors[item.id] %}<p class="field-error">{{ errors[item.id] }}</p>{% endif %}
     {% if row.have %}
     <p class="inbox-have"><strong>Already in your library:</strong>
       <a href="/files/{{ row.have.id }}">{{ row.have.title }}</a>. This is another copy of that episode.</p>
     {% endif %}
     <div class="form-buttons">
-      {% if not row.have %}<button class="button primary" type="submit" formaction="/inbox/{{ item.id }}/add">Add to library</button>{% endif %}
+      {% if not row.have and not row.convert %}<button class="button primary" type="submit" formaction="/inbox/{{ item.id }}/add">Add to library</button>{% endif %}
       {# Belongs to its own small form below (forms can't be inside each other). #}
       <button class="button" type="submit" form="reject-{{ item.id }}">Reject (delete)</button>
     </div>
