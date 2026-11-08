@@ -130,6 +130,7 @@ class Plan:
     video: bool = False            # moving pictures (they're left out)
     duration: float | None = None
     problem: str = ""
+    stream: int | None = None      # which track holds the sound (ffprobe's number)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -222,7 +223,7 @@ def plan_for(name: str, found: dict | None) -> Plan:
         duration = None
     plan = Plan(ok=True, kind=kind, codec=CODEC_NAMES.get(codec, codec.upper() or "unknown"),
                 kbps=kbps, mono=mono, still_picture=still, video=bool(pictures) and not still,
-                duration=duration)
+                duration=duration, stream=sound.get("index"))
     if codec in COPYABLE:
         plan.copy, plan.extension = True, COPYABLE[codec]
     else:
@@ -242,3 +243,72 @@ def tags_from(found: dict | None) -> dict[str, str]:
             if isinstance(value, str) and value.strip() and key not in tags:
                 tags[key] = value.strip()
     return tags
+
+
+# ------------------------------------------------------------- converting
+
+class Stopped(Exception):
+    """Converting was cancelled."""
+
+
+def command(plan: Plan, source: Path, target: Path) -> list[str]:
+    """The ffmpeg command that makes ``target`` from ``source``: just the
+    sound (no pictures or subtitles), tags carried over."""
+    sound = f"0:{plan.stream}" if plan.stream is not None else "0:a:0"
+    cmd = [ffmpeg_path() or "ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-y",
+           "-i", str(source), "-map", sound, "-vn", "-sn", "-dn", "-map_metadata", "0",
+           "-progress", "pipe:1", "-nostats"]
+    if plan.copy:
+        cmd += ["-c:a", "copy"]
+    else:
+        cmd += ["-c:a", "libmp3lame", "-b:a", f"{plan.target_kbps}k", "-ac", "1" if plan.mono else "2"]
+    if plan.extension == ".mp3":
+        cmd += ["-f", "mp3", "-id3v2_version", "3", "-write_id3v1", "0"]
+    else:
+        cmd += ["-f", "ipod", "-movflags", "+faststart"]   # .m4a
+    return [*cmd, str(target)]
+
+
+def run(plan: Plan, source: Path, target: Path, progress=None, stop=None) -> None:
+    """Convert ``source`` into ``target``. ``progress(fraction)`` is told
+    how far it's got (0 to 1, when the length is known); ``stop()`` is
+    asked now and then whether to give up (raises Stopped). Raises
+    RuntimeError with ffmpeg's complaint if it fails."""
+    process = subprocess.Popen(command(plan, source, target), stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True)
+    try:
+        for line in process.stdout:
+            if stop is not None and stop():
+                process.kill()
+                raise Stopped()
+            if line.startswith("out_time_us=") and progress is not None and plan.duration:
+                try:
+                    done = int(line.split("=", 1)[1]) / 1_000_000
+                except ValueError:
+                    continue
+                progress(max(0.0, min(1.0, done / plan.duration)))
+        complaint = process.stderr.read()
+        if process.wait() != 0:
+            lines = [line for line in complaint.strip().splitlines() if line.strip()]
+            raise RuntimeError(lines[-1] if lines else "ffmpeg stopped with an error")
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def check(plan: Plan, made: Path) -> str | None:
+    """Is the new file all right? It must open, hold sound, and be as long
+    as the original (within a second or two). Returns what's wrong, or
+    None."""
+    found = probe(made)
+    if not found or not any(s.get("codec_type") == "audio" for s in found.get("streams") or []):
+        return "The new file couldn't be opened."
+    try:
+        length = float((found.get("format") or {}).get("duration"))
+    except (TypeError, ValueError):
+        return "The new file's length couldn't be read."
+    if plan.duration and abs(length - plan.duration) > max(2.0, plan.duration * 0.01):
+        return (f"The new file is {length:.0f} seconds long, but the original is "
+                f"{plan.duration:.0f}: something went wrong.")
+    return None

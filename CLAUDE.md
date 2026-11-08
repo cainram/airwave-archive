@@ -159,6 +159,9 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/convert.py`: converting formats that don't play well (video
   files, RealAudio, WMA, Ogg, Opus) with ffmpeg: looking inside a file
   (ffprobe) and working out the plan (copy the sound, or make an MP3)
+- `app/converting.py`: the inbox's converting queue: a background
+  helper converts waiting files one at a time, checks each new file,
+  then swaps it in for the original (deleted) and keeps the details
 - `app/zipimport.py`: unpacking zips (Airwave exports or plain zips of
   recordings) into the inbox, with the details from the export's manifest
 - `app/search.py`: the search index (SQLite FTS5) and searching. The

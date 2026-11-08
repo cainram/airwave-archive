@@ -694,3 +694,10 @@ a.day-title:hover { text-decoration: underline; }
 .inbox-convert { margin: 8px 0 0; }
 .inbox-convert .badge { margin-right: 6px; }
 .any-file { display: flex; gap: 6px; align-items: center; margin-top: 6px; cursor: pointer; font-weight: normal; }
+
+/* The converting box at the top of the inbox. */
+.converting p { margin: 0 0 6px; }
+.converting-list { list-style: none; padding: 0; margin: 0; }
+.converting-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 3px 0; }
+.converting-name { overflow-wrap: anywhere; }
+.converting-list progress { width: 160px; max-width: 100%; }

@@ -70,12 +70,14 @@
 {% else %}
 <h2>Waiting ({{ rows | length }})</h2>
 {% set addable = rows | length - duplicates - converting %}
-{% if converting %}
+{% include "_converting.html" %}
+{% set stuck = converting - busy | length %}
+{% if stuck > 0 %}
 <div class="notice" role="status">
-  {{ converting }} file{{ "" if converting == 1 else "s" }} below {{ "needs" if converting == 1 else "need" }} converting before
-  {{ "it" if converting == 1 else "they" }} can go into your library (marked “Needs converting”).
-  {% if not can_convert %}Converting isn't available: the program that does it (ffmpeg) isn't installed.
-  {% else %}Converting is coming in the next update; until then {{ "it waits" if converting == 1 else "they wait" }} here.{% endif %}
+  {{ stuck }} file{{ "" if stuck == 1 else "s" }} below {{ "needs" if stuck == 1 else "need" }} converting before
+  {{ "it" if stuck == 1 else "they" }} can go into your library, but {{ "isn't" if stuck == 1 else "aren't" }} converting
+  (see each one's note).
+  {% if not can_convert %}Converting isn't available: the program that does it (ffmpeg) isn't installed.{% endif %}
 </div>
 {% endif %}
 {% if duplicates %}
@@ -89,7 +91,7 @@
 </div>
 {% endif %}
 <p class="muted small">Dates are written like 1939-04-14, 1939-04 (day unknown), or 1939 (only the year).</p>
-<form method="post" action="/inbox">
+<form id="inbox-form" method="post" action="/inbox">
   <div class="form-buttons">
     <button class="button primary" type="submit">Save details</button>
     {% if addable %}<button class="button primary" type="submit" formaction="/inbox/add-all">{{ "Add all " ~ addable if addable > 1 else "Add it" if rows | length == 1 else "Add the 1 new one" }} to library</button>{% endif %}
@@ -143,11 +145,19 @@
     </p>
     {% endif %}
     {% if row.convert %}
-    <p class="inbox-convert{% if row.plan and not row.plan.ok %} warning-text{% endif %}">
-      <span class="badge">Needs converting</span>
-      {% if row.plan %}{{ row.plan.description }}{% if row.plan.ok %} You can listen once it's converted.{% endif %}
+    {% set status = item.convert_status %}
+    <p class="inbox-convert{% if (row.plan and not row.plan.ok) or status == "failed" %} warning-text{% endif %}">
+      {% if status == "converting" %}<span class="badge parts">Converting…</span>
+      {% elif status == "waiting" %}<span class="badge parts">Waiting to convert</span>
+      {% elif status == "failed" %}<span class="badge">Converting failed</span>
+      {% elif status == "cancelled" %}<span class="badge">Converting cancelled</span>
+      {% else %}<span class="badge">Needs converting</span>{% endif %}
+      {% if row.plan %}{{ row.plan.description }}{% if row.plan.ok and status in ("waiting", "converting") %} You can listen
+        once it's converted; the original is deleted then.{% endif %}
       {% else %}What's inside can't be checked: ffmpeg isn't installed.{% endif %}
     </p>
+    {% if status == "failed" %}<p class="field-error">What went wrong: {{ item.convert_error }}. The original is
+      still here: try again, or reject it.</p>{% endif %}
     {% endif %}
     {% if errors[item.id] %}<p class="field-error">{{ errors[item.id] }}</p>{% endif %}
     {% if row.have %}
@@ -156,6 +166,11 @@
     {% endif %}
     <div class="form-buttons">
       {% if not row.have and not row.convert %}<button class="button primary" type="submit" formaction="/inbox/{{ item.id }}/add">Add to library</button>{% endif %}
+      {% if item.convert_status in ("waiting", "converting") %}
+      <button class="button" type="submit" formaction="/inbox/{{ item.id }}/convert/cancel">Cancel converting</button>
+      {% elif item.convert_status in ("failed", "cancelled") %}
+      <button class="button primary" type="submit" formaction="/inbox/{{ item.id }}/convert/retry">Try again</button>
+      {% endif %}
       {# Belongs to its own small form below (forms can't be inside each other). #}
       <button class="button" type="submit" form="reject-{{ item.id }}">Reject (delete)</button>
     </div>

@@ -128,8 +128,8 @@ def test_a_file_to_convert_waits_in_the_inbox(client, monkeypatch, tmp_path):
     ])
     assert sent.headers["location"] == "/inbox?uploaded=2"
     page = client.get("/inbox").text
-    assert "Needs converting" in page and "It will be converted to MP3 (mono, 64 kbps)" in page
-    assert "1 file below needs converting" in page and "Add all" not in page   # just one to add
+    assert "Waiting to convert" in page and "It will be converted to MP3 (mono, 64 kbps)" in page
+    assert "Converting 1 file." in page and "Add all" not in page               # just one to add
     assert page.count(">Add to library</button>") == 1                         # the WAV's only
     assert 'data-src="/inbox/' in page and page.count("data-play") == 1          # only the WAV plays now
     import app.main as main
