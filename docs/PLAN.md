@@ -889,9 +889,19 @@ window greys them out, because the inbox only accepts audio file types.
   (the queue and helper) and `app/convert.py` (the ffmpeg command and
   the check).
 
-#### 13c — Pictures from "videos" that are just a still image
+#### 13c — Pictures from "videos" that are just a still image ✅ *done*
 - That picture becomes the episode's artwork. Better still-picture
   detection (some files hold a picture as an unchanging video track).
+- Notes: the picture is stored inside the new MP3 or M4A as its cover
+  art (front cover), so the usual artwork reading shows it once the file
+  is added; nothing else changes. A "still picture" is cover art, a
+  one-frame track, or (checked just before converting) a video whose
+  tiny grey snapshots at 10%, 50% and 90% of the way through differ by
+  less than 1.5 out of 255 on average (about a second to check).
+  Blank pictures (a black screen) are skipped; pictures wider than 1000
+  dots are made smaller. Moving video is left out, as before. Lengths
+  now come from the sound itself, not the whole file (a video track can
+  run on longer than the sound, which made the length check fail).
 
 #### 13d — Converting odd formats found by a scan (advanced)
 - A scan notices library files in these formats and offers to convert

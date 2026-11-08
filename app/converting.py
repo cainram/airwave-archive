@@ -12,6 +12,9 @@ For each file:
    files aren't listed, so a half-made file never shows).
 2. The new file is checked: it opens, holds sound, and is as long as the
    original.
+   A "video" that's really one picture (cover art, or the same picture
+   all the way through, as many uploads of radio shows are) gives that
+   picture to the new file as its cover art, so the episode shows it.
 3. It takes its proper name ("Show.webm" becomes "Show.mp3"; a number is
    added if that's taken), the uploaded original is deleted (owner's
    choice), and the waiting file's details, including anything typed in
@@ -133,8 +136,14 @@ def convert_next(engine: Engine, inbox_dir: Path) -> bool:
         asked_at[0] = time.monotonic()
         return _status(engine, item_id) != CONVERTING   # cancelled, or rejected
 
+    cover = None
+    if plan.picture_stream is not None and (plan.still_picture or convert.looks_still(source, plan)):
+        cover = inbox_dir / f"{TEMPORARY}{secrets.token_hex(6)}.jpg"
+        if not convert.grab_picture(source, plan, cover):
+            cover.unlink(missing_ok=True)
+            cover = None
     try:
-        convert.run(plan, source, made, progress, stop)
+        convert.run(plan, source, made, progress, stop, cover=cover)
         problem = convert.check(plan, made)
         if problem:
             raise RuntimeError(problem)
@@ -147,6 +156,9 @@ def convert_next(engine: Engine, inbox_dir: Path) -> bool:
         _update(engine, item_id, convert_status=FAILED, convert_progress=None,
                 convert_error=str(error)[:500])
         return True
+    finally:
+        if cover is not None:
+            cover.unlink(missing_ok=True)
 
     with LOCK:
         _finish(engine, inbox_dir, item_id, source, made, plan)

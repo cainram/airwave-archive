@@ -131,6 +131,7 @@ class Plan:
     duration: float | None = None
     problem: str = ""
     stream: int | None = None      # which track holds the sound (ffprobe's number)
+    picture_stream: int | None = None  # which track holds the picture or video
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -161,6 +162,11 @@ class Plan:
         else:
             channels = "mono" if self.mono else "stereo"
             then = f"It will be converted to MP3 ({channels}, {self.target_kbps} kbps)."
+        if self.still_picture:
+            then += " Its picture becomes the episode's artwork."
+        elif self.video:
+            then += (" The video is left out (if it's one picture all the way through, that picture "
+                     "becomes the episode's artwork).")
         return f"{what}. Its sound is {sound}. {then}"
 
 
@@ -195,6 +201,30 @@ def _is_still(stream: dict) -> bool:
     return bool(length) and length.replace("0", "").replace(":", "").replace(".", "") == ""
 
 
+def _seconds(value) -> float | None:
+    """A length from ffprobe: "1786.04" or (Matroska) "00:29:46.040000000"."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    try:
+        if ":" in text:
+            hours, minutes, seconds = text.split(":")
+            total = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+        else:
+            total = float(text)
+    except ValueError:
+        return None
+    return total if total > 0 else None
+
+
+def _best_picture(pictures: list[dict]) -> int | None:
+    """The track to take a picture from: cover art first."""
+    if not pictures:
+        return None
+    best = next((s for s in pictures if (s.get("disposition") or {}).get("attached_pic")), pictures[0])
+    return best.get("index")
+
+
 def plan_for(name: str, found: dict | None) -> Plan:
     """Work out what converting a file will do, from what ffprobe found."""
     kind = KINDS.get(Path(name).suffix.lower(), Path(name).suffix.lstrip(".").upper())
@@ -217,13 +247,13 @@ def plan_for(name: str, found: dict | None) -> Plan:
         # Some files only give the whole file's bitrate: near enough, when
         # the sound is all there is (a picture adds next to nothing).
         kbps = _kbps((found.get("format") or {}).get("bit_rate"))
-    try:
-        duration = float((found.get("format") or {}).get("duration")) or None
-    except (TypeError, ValueError):
-        duration = None
+    # The sound's own length: a video track can run on longer than the sound.
+    duration = _seconds(sound.get("duration")) or _seconds((sound.get("tags") or {}).get("DURATION")) \
+        or _seconds((found.get("format") or {}).get("duration"))
     plan = Plan(ok=True, kind=kind, codec=CODEC_NAMES.get(codec, codec.upper() or "unknown"),
                 kbps=kbps, mono=mono, still_picture=still, video=bool(pictures) and not still,
-                duration=duration, stream=sound.get("index"))
+                duration=duration, stream=sound.get("index"),
+                picture_stream=_best_picture(pictures))
     if codec in COPYABLE:
         plan.copy, plan.extension = True, COPYABLE[codec]
     else:
@@ -251,13 +281,20 @@ class Stopped(Exception):
     """Converting was cancelled."""
 
 
-def command(plan: Plan, source: Path, target: Path) -> list[str]:
-    """The ffmpeg command that makes ``target`` from ``source``: just the
-    sound (no pictures or subtitles), tags carried over."""
+def command(plan: Plan, source: Path, target: Path, cover: Path | None = None) -> list[str]:
+    """The ffmpeg command that makes ``target`` from ``source``: the sound
+    (no video or subtitles), tags carried over, and ``cover`` (a picture
+    file) stored inside as its cover art, if given."""
     sound = f"0:{plan.stream}" if plan.stream is not None else "0:a:0"
     cmd = [ffmpeg_path() or "ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-y",
-           "-i", str(source), "-map", sound, "-vn", "-sn", "-dn", "-map_metadata", "0",
-           "-progress", "pipe:1", "-nostats"]
+           "-i", str(source)]
+    if cover is not None:
+        cmd += ["-i", str(cover), "-map", sound, "-map", "1:0", "-c:v", "copy",
+                "-disposition:v", "attached_pic",
+                "-metadata:s:v", "title=Cover", "-metadata:s:v", "comment=Cover (front)"]
+    else:
+        cmd += ["-map", sound, "-vn"]
+    cmd += ["-sn", "-dn", "-map_metadata", "0", "-progress", "pipe:1", "-nostats"]
     if plan.copy:
         cmd += ["-c:a", "copy"]
     else:
@@ -269,12 +306,13 @@ def command(plan: Plan, source: Path, target: Path) -> list[str]:
     return [*cmd, str(target)]
 
 
-def run(plan: Plan, source: Path, target: Path, progress=None, stop=None) -> None:
+def run(plan: Plan, source: Path, target: Path, progress=None, stop=None,
+        cover: Path | None = None) -> None:
     """Convert ``source`` into ``target``. ``progress(fraction)`` is told
     how far it's got (0 to 1, when the length is known); ``stop()`` is
     asked now and then whether to give up (raises Stopped). Raises
     RuntimeError with ffmpeg's complaint if it fails."""
-    process = subprocess.Popen(command(plan, source, target), stdout=subprocess.PIPE,
+    process = subprocess.Popen(command(plan, source, target, cover), stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, text=True)
     try:
         for line in process.stdout:
@@ -304,11 +342,78 @@ def check(plan: Plan, made: Path) -> str | None:
     found = probe(made)
     if not found or not any(s.get("codec_type") == "audio" for s in found.get("streams") or []):
         return "The new file couldn't be opened."
-    try:
-        length = float((found.get("format") or {}).get("duration"))
-    except (TypeError, ValueError):
+    sounds = [s for s in found.get("streams") or [] if s.get("codec_type") == "audio"]
+    length = _seconds(sounds[0].get("duration")) or _seconds((found.get("format") or {}).get("duration"))
+    if length is None:
         return "The new file's length couldn't be read."
     if plan.duration and abs(length - plan.duration) > max(2.0, plan.duration * 0.01):
         return (f"The new file is {length:.0f} seconds long, but the original is "
                 f"{plan.duration:.0f}: something went wrong.")
     return None
+
+
+# ------------------------------------------------- pictures from "videos"
+
+# Snapshots are this small and grey: plenty to tell a picture from a video.
+SNAPSHOT = (32, 18)
+STILL_DIFFERENCE = 1.5     # average change per dot (out of 255) still counted as "the same"
+BLANK_SPREAD = 4.0         # less variety than this is a blank screen, not a picture
+PICTURE_WIDTH = 1000       # pictures wider than this are made smaller
+
+
+def _snapshot(source: Path, stream: int | None, at: float) -> bytes:
+    """A tiny grey snapshot of the video ``at`` seconds in ("" if none)."""
+    video = f"0:{stream}" if stream is not None else "0:v:0"
+    try:
+        done = subprocess.run(
+            [ffmpeg_path() or "ffmpeg", "-nostdin", "-v", "error", "-ss", f"{at:.2f}", "-i", str(source),
+             "-map", video, "-frames:v", "1", "-vf", f"scale={SNAPSHOT[0]}:{SNAPSHOT[1]},format=gray",
+             "-f", "rawvideo", "-"],
+            capture_output=True, timeout=PROBE_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return b""
+    return done.stdout if done.returncode == 0 else b""
+
+
+def _difference(a: bytes, b: bytes) -> float:
+    return sum(abs(x - y) for x, y in zip(a, b)) / max(1, min(len(a), len(b)))
+
+
+def _spread(shot: bytes) -> float:
+    """How varied a snapshot is (0 for a single colour)."""
+    if not shot:
+        return 0.0
+    mean = sum(shot) / len(shot)
+    return (sum((x - mean) ** 2 for x in shot) / len(shot)) ** 0.5
+
+
+def looks_still(source: Path, plan: Plan) -> bool:
+    """Is this video one picture all the way through (as many uploads of
+    radio shows are)? Three snapshots, near the start, the middle and the
+    end, are compared."""
+    if not plan.video or not plan.duration:
+        return False
+    shots = [_snapshot(source, plan.picture_stream, plan.duration * at) for at in (0.1, 0.5, 0.9)]
+    size = SNAPSHOT[0] * SNAPSHOT[1]
+    if any(len(shot) != size for shot in shots):
+        return False
+    return all(_difference(shots[0], shot) < STILL_DIFFERENCE for shot in shots[1:])
+
+
+def grab_picture(source: Path, plan: Plan, target: Path) -> bool:
+    """Save the file's picture as a JPEG (``target``), for its cover art.
+    False if there isn't a usable one (none, or a blank screen)."""
+    at = 0.0 if not plan.video else min(10.0, (plan.duration or 0) / 2)
+    if _spread(_snapshot(source, plan.picture_stream, at)) < BLANK_SPREAD:
+        return False
+    picture = f"0:{plan.picture_stream}" if plan.picture_stream is not None else "0:v:0"
+    try:
+        done = subprocess.run(
+            [ffmpeg_path() or "ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{at:.2f}",
+             "-i", str(source), "-map", picture, "-frames:v", "1",
+             "-vf", f"scale='min({PICTURE_WIDTH},iw)':-2", "-q:v", "3", "-f", "image2",
+             "-c:v", "mjpeg", str(target)],
+            capture_output=True, timeout=PROBE_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return done.returncode == 0 and target.is_file() and target.stat().st_size > 0

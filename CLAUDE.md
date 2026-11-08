@@ -158,7 +158,9 @@ These come from the plan and should not be changed without the owner's OK:
   the RSS itself, and QR codes
 - `app/convert.py`: converting formats that don't play well (video
   files, RealAudio, WMA, Ogg, Opus) with ffmpeg: looking inside a file
-  (ffprobe) and working out the plan (copy the sound, or make an MP3)
+  (ffprobe) and working out the plan (copy the sound, or make an MP3),
+  the ffmpeg command, checking the new file, and keeping a "video"'s
+  still picture as cover art
 - `app/converting.py`: the inbox's converting queue: a background
   helper converts waiting files one at a time, checks each new file,
   then swaps it in for the original (deleted) and keeps the details
