@@ -903,13 +903,34 @@ window greys them out, because the inbox only accepts audio file types.
   now come from the sound itself, not the whole file (a video track can
   run on longer than the sound, which made the length check fail).
 
-#### 13d — Converting odd formats found by a scan (advanced)
+#### 13d — Converting odd formats found by a scan (advanced) ✅ *done*
 - A scan notices library files in these formats and offers to convert
   them; a confirmation page lists each file, what it becomes, and warns
   the original will be deleted. The same queue converts them beside the
   original under a hidden name; once checked, the new file takes its
   place and the original is deleted. Episode details, listening place,
   groups and feeds move to the new file. Failures leave the original.
+- Notes: scans now include MKV/MKA, WebM, MP4 video, RealAudio, WMA, Ogg
+  and Opus files (ffprobe reads their length and tags if the usual reader
+  can't, and works out the plan: `audio_files.convert_json`). The Library
+  page says how many there are, with **Review and convert…** (also
+  **☰ Actions → Convert odd formats…**), leading to `/library/convert`:
+  a red warning, then each file, what it becomes and what happens, with
+  tick boxes (ticked to start) and **Convert the ticked files and delete
+  the originals**. The queue is the `library_conversions` table
+  (database version 21); the same helper works through it after the
+  inbox's files, one at a time. The new file is made beside the original
+  under a hidden name and checked; then, with the scan lock held (so a
+  scan never sees it halfway), it takes the original's name with its new
+  extension (a number is added if taken), the original is deleted, and
+  the app's record of the file is updated to describe the new one. The
+  record (and its number) stays the same, so the episode, its details,
+  the listening place, the file's part in a group, and feeds (whose
+  items are known by the file's number) all carry on. Nothing is
+  replaced if the original changed meanwhile. The Library page shows
+  progress (updating every 3 seconds) with **Stop converting**; failures
+  are counted there and explained on the convert page, where they can be
+  ticked to try again.
 
 **Background notes (2026-11-07):**
 

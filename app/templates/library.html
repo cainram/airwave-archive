@@ -28,12 +28,31 @@
       <div class="drop-list">
         <a href="/review/filenames">Review file names</a>
         <a href="/groups/suggested">Find possible groups</a>
+        <a href="/library/convert">Convert odd formats…</a>
         <a href="/import">Import spreadsheet…</a>
       </div>
     </details>
   </div>
 </section>
 
+{% set q = request.query_params %}
+{% if q.get("convert_queued") %}
+{% set queued = q.get("convert_queued") | int(0) %}
+<div class="notice success" role="status">{{ queued }} file{{ "" if queued == 1 else "s" }} will be converted, one at a time.
+  Each original is deleted once its new file has been checked.</div>
+{% elif q.get("convert_cancelled") %}
+<div class="notice" role="status">Stopped converting. Files that weren't finished are left as they were.</div>
+{% endif %}
+{% include "_library_converting.html" %}
+{% if to_convert or convert_failed %}
+<div class="notice warning" role="status">
+  {% if to_convert %}{{ to_convert }} file{{ "" if to_convert == 1 else "s" }} in your library {{ "is" if to_convert == 1 else "are" }}
+  in formats that don't play everywhere (video files, RealAudio, WMA, Ogg, Opus).{% endif %}
+  {% if convert_failed %}{{ convert_failed }} couldn't be converted.{% endif %}
+  {% if can_convert %}<a class="button" href="/library/convert">Review and convert…</a>
+  {% else %}Converting them isn't available: ffmpeg isn't installed.{% endif %}
+</div>
+{% endif %}
 {% if new_groups %}
 <div class="notice" role="status">
   {{ new_groups }} new possible group{{ "" if new_groups == 1 else "s" }}: files that look like parts of one

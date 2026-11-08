@@ -1,0 +1,32 @@
+{# The converting box on the Library page (advanced: converting library
+   files in place). While files are converting it asks for itself again
+   every few seconds (htmx), so the progress moves. #}
+{% if convert_busy %}
+<div id="library-converting" class="notice converting" role="status"
+     hx-get="/library/converting" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
+  <p><strong>Converting {{ convert_busy | length }} library file{{ "" if convert_busy | length == 1 else "s" }}.</strong>
+    Each one stays as it is until its new file has been made and checked; then the new file takes its place
+    and the original is deleted. About a minute for each hour of sound. You can leave this page.</p>
+  <ul class="converting-list">
+    {% for f, job in convert_busy %}
+    <li>
+      <span class="converting-name">{{ (f.folder ~ "/") if f.folder }}{{ f.name }}</span>
+      {% if job.status == "converting" %}
+      <progress max="100" value="{{ ((job.progress or 0) * 100) | round | int }}"></progress>
+      <span class="muted small">{{ ((job.progress or 0) * 100) | round | int }}%</span>
+      {% else %}
+      <span class="muted small">waiting its turn</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="/library/convert/cancel" hx-target="#content">
+    <button class="button" type="submit">Stop converting</button>
+    <span class="muted small">(files already converted stay converted; the others are left as they are)</span>
+  </form>
+</div>
+{% elif finished %}
+<div id="library-converting" class="notice success" role="status">
+  Converting finished. <a class="button" href="/library">Show the library</a>
+</div>
+{% endif %}
