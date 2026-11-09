@@ -106,6 +106,14 @@ def test_series_names_link_to_their_pages(client):
     assert href in client.get(f"/files/{client.ids['patriot.wav']}").text   # episode page
 
 
+def test_an_episodes_back_button_goes_to_its_series(client):
+    page = client.get(f"/files/{client.ids['ep2.wav']}").text
+    assert ('<nav class="back"><a class="button" href="/series/episodes?name=Escape%20%26%20Suspense%20%2F%20Mixed">'
+            '← Escape &amp; Suspense / Mixed</a></nav>') in page
+    page = client.get(f"/files/{client.ids['loose.wav']}").text
+    assert '<a class="button" href="/series/episodes">← No series yet</a>' in page
+
+
 def test_series_tiles_show_initials_without_pictures(client):
     page = client.get("/series").text
     assert '<ul class="tiles">' in page
