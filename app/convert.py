@@ -35,6 +35,7 @@ CONVERT_EXTENSIONS = {
     ".ra", ".rm",                     # RealAudio (older old-time radio sites)
     ".wma",                           # Windows Media Audio
     ".ogg", ".oga", ".opus",          # Ogg Vorbis and Opus
+    ".flac", ".wav", ".aiff", ".aif", # lossless: very big, and podcast apps can't play them
 }
 
 # The type names browsers and computers use for them (for the upload
@@ -44,25 +45,36 @@ MEDIA_TYPES = [
     "video/mp4", "audio/mp4", "video/x-m4v",
     "audio/x-pn-realaudio", "audio/vnd.rn-realaudio", "application/vnd.rn-realmedia",
     "audio/x-ms-wma", "audio/ogg", "application/ogg", "audio/opus",
+    "audio/flac", "audio/x-flac", "audio/wav", "audio/x-wav", "audio/aiff", "audio/x-aiff",
 ]
+
+# Formats that only hold sound: a picture in one is its cover art.
+SOUND_ONLY = {".mka", ".ra", ".wma", ".ogg", ".oga", ".opus", ".flac", ".wav", ".aiff", ".aif"}
 
 # Names people know these by.
 KINDS = {
     ".mkv": "MKV", ".mka": "MKA (Matroska) audio", ".webm": "WebM",
     ".mp4": "MP4", ".m4v": "MP4", ".ra": "RealAudio", ".rm": "RealMedia",
     ".wma": "WMA (Windows Media Audio)", ".ogg": "Ogg", ".oga": "Ogg", ".opus": "Opus",
+    ".flac": "FLAC", ".wav": "WAV", ".aiff": "AIFF", ".aif": "AIFF",
 }
 CODEC_NAMES = {
-    "mp3": "MP3", "aac": "AAC", "opus": "Opus", "vorbis": "Vorbis", "flac": "FLAC",
+    "mp3": "MP3", "aac": "AAC", "pcm": "uncompressed", "opus": "Opus", "vorbis": "Vorbis", "flac": "FLAC",
     "wmav1": "WMA", "wmav2": "WMA", "wmapro": "WMA Pro", "wmavoice": "WMA Voice",
     "cook": "RealAudio (Cook)", "ra_144": "RealAudio 1", "ra_288": "RealAudio 2",
     "sipr": "RealAudio (Sipro)", "atrac3": "ATRAC3", "ac3": "Dolby Digital (AC-3)",
     "eac3": "Dolby Digital Plus", "dts": "DTS", "alac": "Apple Lossless",
 }
+# Lossless sound (nothing thrown away yet). WAV and AIFF hold "PCM"
+# sound, named by its sample format: pcm_s16le, pcm_s24be, pcm_f32le...
+LOSSLESS = {"flac", "alac", "wavpack", "ape", "tta"}
 # Sound that can go into a playable file unchanged: codec -> new extension.
 COPYABLE = {"mp3": ".mp3", "aac": ".m4a"}
 MP3_RATES = [32, 40, 48, 56, 64, 80, 96, 112, 128]   # kbps
 MOST_KBPS = 128
+# Lossless sound has all its detail, and may be music or a modern
+# broadcast: it gets more room (owner's choice, 2026-11-09).
+LOSSLESS_KBPS = {True: 96, False: 192}   # mono, stereo
 # Re-encoding loses a little each time; give MP3 a bit more room than the
 # original had (newer formats such as Opus also do more with fewer bits).
 HEADROOM = 1.25
@@ -132,6 +144,7 @@ class Plan:
     problem: str = ""
     stream: int | None = None      # which track holds the sound (ffprobe's number)
     picture_stream: int | None = None  # which track holds the picture or video
+    cover_art: bool = False        # the picture is cover art, in a sound-only format
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -156,13 +169,16 @@ class Plan:
         if details:
             sound += ", " + ", ".join(details)
         what = (f"{self.kind} video file" if self.video else f"{self.kind} file"
-                + (" (a still picture with sound)" if self.still_picture else ""))
+                + (" with cover art" if self.cover_art
+                   else " (a still picture with sound)" if self.still_picture else ""))
         if self.copy:
             then = f"It will be copied into an {self.extension} file unchanged, with no loss of quality."
         else:
             channels = "mono" if self.mono else "stereo"
             then = f"It will be converted to MP3 ({channels}, {self.target_kbps} kbps)."
-        if self.still_picture:
+        if self.cover_art:
+            then += " Its cover art is kept."
+        elif self.still_picture:
             then += " Its picture becomes the episode's artwork."
         elif self.video:
             then += (" The video is left out (if it's one picture all the way through, that picture "
@@ -188,6 +204,10 @@ def mp3_rate(kbps: int | None, mono: bool) -> int:
         if rate >= wanted:
             return min(rate, MOST_KBPS)
     return MOST_KBPS
+
+
+def is_lossless(codec: str) -> bool:
+    return codec in LOSSLESS or codec.startswith("pcm_")
 
 
 def _is_still(stream: dict) -> bool:
@@ -250,14 +270,17 @@ def plan_for(name: str, found: dict | None) -> Plan:
     # The sound's own length: a video track can run on longer than the sound.
     duration = _seconds(sound.get("duration")) or _seconds((sound.get("tags") or {}).get("DURATION")) \
         or _seconds((found.get("format") or {}).get("duration"))
-    plan = Plan(ok=True, kind=kind, codec=CODEC_NAMES.get(codec, codec.upper() or "unknown"),
+    name_of = "pcm" if codec.startswith("pcm_") else codec
+    plan = Plan(ok=True, kind=kind, codec=CODEC_NAMES.get(name_of, codec.upper() or "unknown"),
                 kbps=kbps, mono=mono, still_picture=still, video=bool(pictures) and not still,
                 duration=duration, stream=sound.get("index"),
-                picture_stream=_best_picture(pictures))
+                picture_stream=_best_picture(pictures),
+                cover_art=still and Path(name).suffix.lower() in SOUND_ONLY)
     if codec in COPYABLE:
         plan.copy, plan.extension = True, COPYABLE[codec]
     else:
-        plan.extension, plan.target_kbps = ".mp3", mp3_rate(kbps, bool(mono))
+        plan.extension = ".mp3"
+        plan.target_kbps = LOSSLESS_KBPS[bool(mono)] if is_lossless(codec) else mp3_rate(kbps, bool(mono))
     return plan
 
 

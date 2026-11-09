@@ -157,7 +157,8 @@ These come from the plan and should not be changed without the owner's OK:
   a feed holds, their dates (when added to the feed, never invented),
   the RSS itself, and QR codes
 - `app/convert.py`: converting formats that don't play well (video
-  files, RealAudio, WMA, Ogg, Opus) with ffmpeg: looking inside a file
+  files, RealAudio, WMA, Ogg, Opus, and lossless FLAC, WAV and AIFF)
+  with ffmpeg: looking inside a file
   (ffprobe) and working out the plan (copy the sound, or make an MP3),
   the ffmpeg command, checking the new file, and keeping a "video"'s
   still picture as cover art
