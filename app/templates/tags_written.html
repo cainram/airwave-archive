@@ -1,0 +1,11 @@
+{% extends layout %}
+{% block title %}Write details into files · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
+<h1>Not every file could be written</h1>
+{% if written %}<div class="notice success" role="status">Wrote the details into {{ written }} file{{ "" if written == 1 else "s" }}.</div>{% endif %}
+<div class="notice error" role="alert">
+  These files were left exactly as they were:
+  <ul>{% for folder, name, problem in problems %}<li><code>{{ (folder ~ "/") if folder }}{{ name }}</code>: {{ problem }}</li>{% endfor %}</ul>
+</div>
+{% endblock %}

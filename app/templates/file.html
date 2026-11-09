@@ -7,6 +7,7 @@
 {% set grouped = parts | length > 1 %}
 {% set series_name = ep.series if ep else none %}
 <nav class="back"><a class="button" href="{{ series_name | series_url }}">← {{ series_name or "No series yet" }}</a></nav>
+{% include "_done_notice.html" %}
 
 {% if f.missing %}
 <div class="notice warning">
@@ -49,6 +50,7 @@
           {% endif %}
         </form>
         {% endif %}
+        {% if ep %}<a href="/tags/write?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Write details into the file{{ "s" if grouped }}…</a>{% endif %}
         <a href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
         {% if ep %}<a class="danger" href="/delete?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Delete…</a>{% endif %}
       </div>

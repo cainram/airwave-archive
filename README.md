@@ -57,6 +57,8 @@ library when you ask:
   Uploads are converted automatically in the inbox. Files copied straight
   into the library are converted only after a confirmation page that
   lists them and warns about it.
+- Episode details are written into a file's own tags only when you ask,
+  after a preview of every tag that will change. The sound isn't touched.
 
 Keep backups of your recordings and of the app's data folder.
 
