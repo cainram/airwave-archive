@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,7 @@ from mutagen.id3 import ID3, Frame
 from sqlalchemy import Engine, delete, exists, select
 from sqlalchemy.orm import Session
 
+from app import convert
 from app.artwork import embedded_picture, folder_image_rank, save_picture
 from app.db import AudioFile, Episode, FolderArt, ScanRun, utcnow
 from app.episodes import fill_from_tags
@@ -37,6 +39,10 @@ BATCH_SIZE = 500
 MAX_TAG_LENGTH = 10_000
 
 COMMON_TAGS = ("title", "artist", "album", "date", "genre", "track", "comment")
+
+# Held by a scan, and while a converted file takes its original's place
+# (app/converting.py), so a scan never sees a file halfway through.
+LIBRARY_LOCK = threading.RLock()
 
 # Where each common tag lives in each tag format.
 ID3_FRAMES = {"TIT2": "title", "TPE1": "artist", "TALB": "album",
@@ -170,7 +176,8 @@ def find_audio_files(root: Path, pictures: dict | None = None
             if filename.startswith("."):
                 continue
             path = Path(dirpath) / filename
-            if path.suffix.lower() not in AUDIO_EXTENSIONS:
+            suffix = path.suffix.lower()
+            if suffix not in AUDIO_EXTENSIONS and suffix not in convert.CONVERT_EXTENSIONS:
                 if pictures is not None and (rank := folder_image_rank(filename)) is not None:
                     best = pictures.get(folder)
                     if best is None or rank < folder_image_rank(best[0].name):
@@ -202,6 +209,24 @@ def _apply(row: AudioFile, info: AudioInfo, stat: os.stat_result,
     row.last_read = utcnow()
 
 
+def read_for_library(path: Path) -> tuple[AudioInfo, str | None]:
+    """Read a file found in the library. For one in a format that needs
+    converting, ffprobe also looks inside (filling in the length and tags
+    if the usual reader can't), and the plan for converting it is
+    returned (as JSON; None otherwise)."""
+    info = read_audio(path)
+    if not convert.needs_converting(path.name) or not convert.available():
+        return info, None
+    found = convert.probe(path)
+    plan = convert.plan_for(path.name, found)
+    if info.duration_seconds is None:
+        info.duration_seconds = plan.duration
+    if not any(info.tags.values()):
+        probed = convert.tags_from(found)
+        info.tags = {name: _clip(probed[name]) for name in COMMON_TAGS if probed.get(name)}
+    return info, plan.to_json()
+
+
 def _new_episode() -> Episode:
     now = utcnow()
     return Episode(created_at=now, updated_at=now)
@@ -220,6 +245,11 @@ def sync_library(engine: Engine, root: Path, art_dir: Path | None = None) -> Sca
     - A missing file that comes back, at the same place or in another folder
       with the same name and size, is reconnected to its episode.
     """
+    with LIBRARY_LOCK:
+        return _sync_library(engine, root, art_dir)
+
+
+def _sync_library(engine: Engine, root: Path, art_dir: Path | None = None) -> ScanRun:
     started = time.monotonic()
     run = ScanRun(started_at=utcnow(), seconds=0.0, added=0, changed=0,
                   removed=0, unchanged=0, library_missing=False)
@@ -267,7 +297,8 @@ def sync_library(engine: Engine, root: Path, art_dir: Path | None = None) -> Sca
                                     episode=_new_episode())
                     session.add(row)
                     run.added += 1
-                _apply(row, read_audio(path), stat, art_dir)
+                info, row.convert_json = read_for_library(path)
+                _apply(row, info, stat, art_dir)
                 if row.episode is not None:
                     fill_from_tags(row.episode, row)
                 row.missing = False

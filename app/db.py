@@ -58,7 +58,8 @@ DB_FILENAME = "airwave.db"
 #  18: suggested groups the owner has seen, for the Library's notice (group_seen table)
 #  19: Phase 13a, what converting an inbox file will do (inbox_items.convert_json)
 #  20: Phase 13b, converting inbox files (inbox_items.convert_status, _progress, _error)
-SCHEMA_VERSION = 20
+#  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
+SCHEMA_VERSION = 21
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -185,6 +186,10 @@ class AudioFile(Base):
     # The picture stored inside the file, if any: the fingerprint of the
     # app's copy in the data folder (see app/artwork.py).
     art_hash: Mapped[str | None]
+
+    # For a file in a format that doesn't play well (video, RealAudio,
+    # WMA, Ogg, Opus): what converting it would do (app/convert.py Plan).
+    convert_json: Mapped[str | None]
 
     # True if the file wasn't found by the last scan but is kept because its
     # episode has edits.
@@ -329,6 +334,20 @@ WITH_PARTS = joinedload(AudioFile.episode).selectinload(Episode.files)
 FIRST_PARTS = or_(AudioFile.part_number.is_(None), AudioFile.part_number == 1)
 
 
+class LibraryConversion(Base):
+    """A library file the owner asked to convert (Phase 13d): its place in
+    the queue. Removed once it's converted (or with its file)."""
+
+    __tablename__ = "library_conversions"
+
+    file_id: Mapped[int] = mapped_column(
+        ForeignKey("audio_files.id", ondelete="CASCADE"), primary_key=True)
+    status: Mapped[str]                    # "waiting", "converting", "failed", "cancelled"
+    progress: Mapped[float | None]         # 0 to 1, while converting
+    error: Mapped[str | None]
+    queued_at: Mapped[datetime]            # UTC
+
+
 class GroupDismissal(Base):
     """A suggested group (files that looked like parts of one broadcast)
     that the owner dismissed, so it isn't suggested again. Kept by a
@@ -424,6 +443,9 @@ def _migrate(conn) -> None:
     # Version 19: what converting an inbox file will do.
     if "convert_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")
+    # Version 21: converting library files.
+    if "convert_json" not in _columns(conn, "audio_files"):
+        conn.exec_driver_sql("ALTER TABLE audio_files ADD COLUMN convert_json VARCHAR")
     # Version 20: converting inbox files.
     inbox_columns = _columns(conn, "inbox_items")
     for column, kind in (("convert_status", "VARCHAR"), ("convert_progress", "FLOAT"),

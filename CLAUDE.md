@@ -161,9 +161,11 @@ These come from the plan and should not be changed without the owner's OK:
   (ffprobe) and working out the plan (copy the sound, or make an MP3),
   the ffmpeg command, checking the new file, and keeping a "video"'s
   still picture as cover art
-- `app/converting.py`: the inbox's converting queue: a background
-  helper converts waiting files one at a time, checks each new file,
-  then swaps it in for the original (deleted) and keeps the details
+- `app/converting.py`: the converting queue: a background helper
+  converts waiting inbox files, then library files the owner confirmed
+  (Phase 13d, advanced), one at a time; checks each new file, then swaps
+  it in for the original (deleted) and keeps the details. Library files
+  keep their database record, so episodes, groups and feeds carry on
 - `app/zipimport.py`: unpacking zips (Airwave exports or plain zips of
   recordings) into the inbox, with the details from the export's manifest
 - `app/search.py`: the search index (SQLite FTS5) and searching. The

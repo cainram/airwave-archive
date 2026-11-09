@@ -12,7 +12,7 @@ import os
 import threading
 from urllib.parse import quote, urlencode
 from datetime import date, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
@@ -22,8 +22,8 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db import (
-    DB_FILENAME, InboxItem, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, Feed, ScanRun,
-    make_engine, utcnow,
+    DB_FILENAME, InboxItem, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, Feed,
+    LibraryConversion, ScanRun, make_engine, utcnow,
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
@@ -177,7 +177,6 @@ templates.env.filters["hue"] = lambda name: sum(map(ord, name or "")) * 47 % 360
 templates.env.filters["fromjson"] = lambda text: json.loads(text) if text else []
 
 _engine: Engine | None = None
-_scan_lock = threading.Lock()  # only one scan at a time
 
 
 def _sync_inbox_folder(engine: Engine, folder: Path) -> None:
@@ -190,7 +189,8 @@ def start_converting() -> None:
     """Start the helper that converts inbox files in the background
     (app/converting.py). It isn't started when there's no ffmpeg."""
     if convert.available():
-        converting.start(get_engine, lambda: INBOX_DIR, _sync_inbox_folder)
+        converting.start(get_engine, lambda: INBOX_DIR, _sync_inbox_folder,
+                         get_library=lambda: LIBRARY_DIR, get_art_dir=art_dir)
 
 
 def get_engine() -> Engine:
@@ -250,8 +250,7 @@ def upload_dir() -> Path:
 
 
 def run_scan() -> ScanRun:
-    with _scan_lock:
-        return sync_library(get_engine(), LIBRARY_DIR, art_dir())
+    return sync_library(get_engine(), LIBRARY_DIR, art_dir())   # one at a time (LIBRARY_LOCK)
 
 
 def last_scan_or_scan() -> ScanRun:
@@ -290,10 +289,12 @@ def library_page(request: Request, page: int = 1):
             .limit(PAGE_SIZE)
         ).all()
         new_groups = grouping.unseen(session)
+        convert_info = library_convert_info(session)
 
     return render(request, "library.html", {
         "files": files,
         "new_groups": new_groups,
+        **convert_info,
         "count": count,
         "rows": rows,
         "pager_url": "/library?page=",
@@ -308,6 +309,76 @@ def library_page(request: Request, page: int = 1):
         "library_dir": LIBRARY_DIR,
         "library_exists": LIBRARY_DIR.is_dir(),
     })
+
+
+def library_convert_info(session: Session) -> dict:
+    """For the Library page: library files in formats that need converting
+    (not yet asked for), and the ones converting now or that failed."""
+    jobs = {job.file_id: job for job in session.scalars(select(LibraryConversion))}
+    odd = converting.odd_library_files(session)
+    return {
+        "to_convert": sum(1 for f in odd if f.id not in jobs or jobs[f.id].status == converting.CANCELLED),
+        "convert_busy": [(f, jobs[f.id]) for f in odd if f.id in jobs and jobs[f.id].status in converting.BUSY],
+        "convert_failed": sum(1 for job in jobs.values() if job.status == converting.FAILED),
+        "can_convert": convert.available(),
+    }
+
+
+@app.get("/library/converting", response_class=HTMLResponse)
+def library_converting(request: Request):
+    """The converting box on the Library page, asked for every few seconds
+    while library files are converting."""
+    with Session(get_engine()) as session:
+        info = library_convert_info(session)
+        session.expunge_all()
+    return templates.TemplateResponse(request, "_library_converting.html", {**info, "finished": True})
+
+
+@app.get("/library/convert", response_class=HTMLResponse)
+def library_convert_page(request: Request):
+    """Advanced: the confirmation page for converting library files in
+    formats that don't play well. Each original is deleted once its new
+    file is checked (owner's choice, 2026-11-08)."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        jobs = {job.file_id: job for job in session.scalars(select(LibraryConversion))}
+        rows = []
+        for f in converting.odd_library_files(session):
+            plan = converting.plan_library_file(f, LIBRARY_DIR)
+            job = jobs.get(f.id)
+            rows.append({"f": f, "plan": plan, "job": job,
+                         "becomes": f.name[:-len(PurePath(f.name).suffix)] + plan.extension
+                         if plan and plan.ok else None})
+        session.commit()      # keep any plans just worked out
+        for row in rows:
+            row["title"] = display_title(row["f"])
+        session.expunge_all()
+    return render(request, "library_convert.html", {
+        "rows": rows, "can_convert": convert.available(),
+        "ready": sum(1 for r in rows if r["plan"] and r["plan"].ok
+                     and not (r["job"] and r["job"].status in converting.BUSY)),
+    })
+
+
+@app.post("/library/convert")
+async def library_convert_start(request: Request):
+    """Queue the ticked library files for converting."""
+    form = await request.form()
+    ids = [int(value) for value in form.getlist("ids") if str(value).isdigit()]
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the page first")
+    with Session(get_engine()) as session:
+        files = session.scalars(select(AudioFile).where(AudioFile.id.in_(ids))).all() if ids else []
+        queued = converting.queue_library(session, list(files))
+        session.commit()
+    return go_to(request, f"/library?convert_queued={queued}")
+
+
+@app.post("/library/convert/cancel")
+def library_convert_cancel(request: Request):
+    with Session(get_engine()) as session:
+        stopped = converting.cancel_library(session)
+        session.commit()
+    return go_to(request, f"/library?convert_cancelled={stopped}")
 
 
 @app.post("/rescan")

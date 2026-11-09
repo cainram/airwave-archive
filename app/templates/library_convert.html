@@ -1,0 +1,63 @@
+{% extends layout %}
+{% block title %}Convert library files · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/library">← Back without converting</a></nav>
+<h1>Convert library files</h1>
+
+<div class="notice error" role="alert">
+  <strong>Advanced: this changes your library.</strong> Each ticked file is converted where it is, in its
+  folder. Once the new file has been made and checked, it takes the original's place and <strong>the original
+  file is deleted for good</strong>. Only your backups can bring it back, so make sure you have one.
+  The episode's details, your listening place, groups and feeds stay with the new file.
+</div>
+<p class="muted">These recordings are in formats that browsers, iPhones and podcast apps don't all play
+  (video files, RealAudio, WMA, Ogg, Opus). Sound that's already MP3 or AAC is copied unchanged; the rest
+  becomes MP3. Files you add through the <a href="/inbox">Inbox</a> are converted there instead.</p>
+
+{% if not can_convert %}
+<div class="notice">Converting isn't available: the program that does it (ffmpeg) isn't installed.</div>
+{% endif %}
+
+{% if not rows %}
+<div class="notice">No files in your library need converting.</div>
+{% else %}
+<form id="convert-library" method="post" action="/library/convert">
+  <input type="hidden" name="confirm" value="yes">
+  <div class="table-wrap">
+    <table class="files convert-table">
+      <thead><tr>
+        <th class="pick"><input type="checkbox" form="convert-library" data-select-all {% if ready %}checked{% endif %} aria-label="Tick all"></th>
+        <th>File</th><th>Becomes</th><th>What happens</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        {% set f, plan, job = row.f, row.plan, row.job %}
+        {% set busy = job and job.status in ("waiting", "converting") %}
+        <tr>
+          <td class="pick">{% if plan and plan.ok and not busy and can_convert %}
+            <input type="checkbox" form="convert-library" name="ids" value="{{ f.id }}" checked
+                   aria-label="Convert {{ f.name }}">{% endif %}</td>
+          <td><a class="title" href="/files/{{ f.id }}">{{ row.title }}</a>
+            <div class="muted small"><code>{{ (f.folder ~ "/") if f.folder }}{{ f.name }}</code> · {{ f.size_bytes | size }}</div></td>
+          <td>{% if row.becomes %}<code>{{ row.becomes }}</code>{% endif %}</td>
+          <td class="small">
+            {% if busy %}<span class="badge parts">{{ "Converting…" if job.status == "converting" else "Waiting to convert" }}</span>
+            {% elif job and job.status == "failed" %}<p class="field-error">Converting failed: {{ job.error }} The original is
+              still there; tick it to try again.</p>
+            {% elif job and job.status == "cancelled" %}<span class="badge">Cancelled</span>{% endif %}
+            {% if plan %}<span class="{% if not plan.ok %}warning-text{% endif %}">{{ plan.description }}</span>
+            {% else %}What's inside can't be checked: ffmpeg isn't installed.{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if ready and can_convert %}
+  <div class="form-buttons">
+    <button class="button danger" type="submit">Convert the ticked files and delete the originals</button>
+    <a class="button" href="/library">Cancel</a>
+  </div>
+  {% endif %}
+</form>
+{% endif %}
+{% endblock %}
