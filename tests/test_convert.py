@@ -109,6 +109,25 @@ def test_mp3_bitrates():
     assert mp3_rate(None, True) == 64 and mp3_rate(None, False) == 128
 
 
+@pytest.mark.wav_converts
+def test_lossless_sound_gets_more_room():
+    flac = plan_for("Amos and Andy 1943-10-08.flac", probed(sound("flac", 1, None), bit_rate="467802"))
+    assert (flac.kind, flac.codec, flac.extension, flac.target_kbps) == ("FLAC", "FLAC", ".mp3", 96)
+    assert flac.description == ("FLAC file. Its sound is FLAC, 468 kbps, mono. "
+                                "It will be converted to MP3 (mono, 96 kbps).")
+    wav = plan_for("show.wav", probed(sound("pcm_s16le", 2, "1411200")))
+    assert wav.target_kbps == 192 and wav.description.startswith("WAV file. Its sound is uncompressed, 1411 kbps")
+    assert plan_for("show.aif", probed(sound("pcm_s24be", 2, None))).target_kbps == 192
+    assert plan_for("show.mkv", probed(sound("flac", 2, None))).target_kbps == 192     # in any container
+    assert plan_for("show.ogg", probed(sound("vorbis", 2, "160000"))).target_kbps == 128  # lossy: as before
+    covered = plan_for("show.flac", probed(sound("flac", 1, None), {"codec_type": "video", "codec_name": "mjpeg",
+                                                                     "disposition": {"attached_pic": 1}}))
+    assert covered.description.startswith("FLAC file with cover art. Its sound is FLAC, mono.")
+    assert covered.description.endswith("(mono, 96 kbps). Its cover art is kept.")
+    assert all(convert.needs_converting(n) for n in ("a.flac", "a.FLAC", "a.wav", "a.aiff", "a.aif"))
+    assert not convert.needs_converting("a.mp3") and not convert.needs_converting("a.m4a")
+
+
 def test_plans_keep_in_the_database():
     plan = plan_for("a.wma", probed(sound("wmav2", 2, "64000")))
     assert Plan.from_json(plan.to_json()) == plan and Plan.from_json(None) is None
@@ -119,6 +138,7 @@ def test_the_upload_window_offers_every_kind():
     from app.inbox import is_audio, upload_accept
     accept = upload_accept().split(",")
     for wanted in (".mp3", ".webm", ".mkv", ".mp4", ".ra", ".wma", ".ogg", ".opus", ".zip",
+                   ".flac", ".wav", ".aiff", ".aif", "audio/flac", "audio/x-wav",
                    "audio/*", "video/webm", "video/x-matroska", "audio/x-ms-wma"):
         assert wanted in accept
     assert is_audio("Lone Ranger.webm") and is_audio("show.RA") and not is_audio("notes.txt")
@@ -208,3 +228,23 @@ def test_real_files_are_looked_inside(tmp_path):
     assert convert.tags_from(convert.probe(tmp_path / "show.webm"))["title"] == "The Tone"
     (tmp_path / "junk.webm").write_bytes(b"not really a video")
     assert convert.probe(tmp_path / "junk.webm") is None
+
+
+@needs_ffmpeg
+@pytest.mark.wav_converts
+def test_really_converting_lossless(tmp_path):
+    ffmpeg = convert.ffmpeg_path()
+    subprocess.run([ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+                    "-ac", "1", "-metadata", "title=The Tone", str(tmp_path / "show.flac")], check=True)
+    subprocess.run([ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+                    "-ac", "2", "-ar", "96000", "-c:a", "pcm_s24le", str(tmp_path / "hires.wav")], check=True)
+    for name, rate in (("show.flac", 96), ("hires.wav", 192)):
+        plan = plan_for(name, convert.probe(tmp_path / name))
+        assert plan.ok and plan.target_kbps == rate
+        made = tmp_path / (name + ".mp3")
+        convert.run(plan, tmp_path / name, made)
+        assert convert.check(plan, made) is None
+        found = convert.probe(made)
+        assert found["streams"][0]["codec_name"] == "mp3"
+        assert int(found["streams"][0]["bit_rate"]) // 1000 == rate
+    assert convert.tags_from(convert.probe(tmp_path / "show.flac.mp3"))["title"] == "The Tone"

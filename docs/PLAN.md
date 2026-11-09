@@ -830,8 +830,10 @@ window greys them out, because the inbox only accepts audio file types.
 **Decisions (owner, 2026-11-08):**
 - Converted: formats that can't be used or play badly: MKV/MKA, WebM,
   MP4 video, RealAudio (`.ra`, `.rm`), WMA, Ogg (`.ogg`, `.oga`), Opus.
-  Lossless FLAC, WAV and AIFF are left alone (they play nearly everywhere;
-  converting would lose quality).
+  ~~Lossless FLAC, WAV and AIFF are left alone (they play nearly everywhere;
+  converting would lose quality).~~ *Changed 2026-11-09 (13e):* FLAC, WAV
+  and AIFF are converted too (podcast apps can't play them, and they're
+  very big).
 - Sound that's already MP3 or AAC is copied unchanged into `.mp3` /
   `.m4a`; everything else becomes MP3 (mono if the original is mono, at
   a bitrate with a little headroom over the original's, at most 128 kbps).
@@ -931,6 +933,25 @@ window greys them out, because the inbox only accepts audio file types.
   progress (updating every 3 seconds) with **Stop converting**; failures
   are counted there and explained on the convert page, where they can be
   ticked to try again.
+
+#### 13e — Lossless FLAC, WAV and AIFF are converted too ✅ *done*
+- **Decisions (owner, 2026-11-09):** FLAC, WAV and AIFF join the
+  converted formats: Apple Podcasts and many podcast apps can't play
+  them, and they're several times bigger than they need to be. Not just
+  old-time radio: modern broadcasts and music too, so lossless sound
+  becomes MP3 at **96 kbps mono** or **192 kbps stereo** (a steady
+  bitrate, so skipping and resuming land in the right place). MP3 and
+  AAC are still never converted, and other lossy formats keep the rule
+  above (a little over the original's, at most 128 kbps: more can't
+  bring back what was lost).
+- Notes: lossless means FLAC, Apple Lossless, WavPack, Monkey's Audio,
+  TTA and uncompressed ("PCM") sound, in any container. WAV uploads are
+  now converted in the inbox like the rest. Library files are offered
+  by their file name, so ones scanned earlier (85 Amos and Andy FLACs on
+  the dev VM, 2.4 GB) show up on the Library page without a rescan; they
+  are only converted after the confirmation page. In the tests, small
+  WAVs stand in for files that play fine, so WAV isn't converted there
+  unless a test is marked `wav_converts` (`tests/conftest.py`).
 
 **Background notes (2026-11-07):**
 
