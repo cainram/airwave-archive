@@ -113,6 +113,27 @@ def test_fixing_details(client):
     assert (item.air_year, item.air_month, item.air_day) == (1943, 5, None)
 
 
+def test_a_big_inbox_can_be_saved(client):
+    """700 waiting files send 2,800 boxes: more than the web framework's
+    usual limit of 1,000 (the error was "Too many fields")."""
+    make_wav(client.box / "mystery.wav", 1)
+    client.get("/inbox")
+    item = items(client)["mystery.wav"]
+    data = {f"{key}-{n}": "" for n in range(100_000, 100_700)
+            for key in ("series", "episode_number", "date", "title")}
+    data.update({f"series-{item.id}": "Suspense", f"title-{item.id}": "Typed",
+                 f"episode_number-{item.id}": "", f"date-{item.id}": ""})
+    sent = client.post("/inbox", data=data, follow_redirects=False)
+    assert sent.status_code == 303, sent.text
+    assert items(client)["mystery.wav"].title == "Typed"
+
+
+def test_more_than_a_thousand_files_can_be_uploaded_at_once(client):
+    files = [("files", (f"notes {n}.txt", b"x")) for n in range(1001)]
+    sent = client.post("/inbox/upload", files=files, follow_redirects=False)
+    assert sent.headers["location"] == "/inbox?uploaded=0&skipped=1001"
+
+
 def test_listening_and_rejecting(client):
     make_wav(client.box / "unwanted.wav", 1)
     make_wav(client.lib / "unwanted.wav", 1)               # same name in the library
