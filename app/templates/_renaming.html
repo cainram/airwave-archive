@@ -1,0 +1,43 @@
+{# Progress of renaming the whole library; asks again every 2 seconds until it's done. #}
+<div id="renaming"{% if job and not job.finished %} hx-get="/advanced/renaming/status" hx-trigger="every 2s"
+     hx-target="this" hx-swap="outerHTML"{% endif %}>
+{% macro files(n) %}{{ n }} file{{ "" if n == 1 else "s" }}{% endmacro %}
+{% if job is none %}
+  <div class="notice">Nothing is being renamed.</div>
+{% elif not job.finished %}
+  <div class="notice" role="status">
+    <strong>{{ "Stopping after this file…" if job.stop else "Renaming…" }}</strong>
+    {% if job.total %}Renamed {{ job.moved }} of {{ files(job.total) }}{% if job.problems %}, {{ job.problems | length }} left alone{% endif %}.
+    <progress max="{{ job.total }}" value="{{ job.checked }}"></progress>
+    {% else %}Working out the new names…{% endif %}
+    <p class="muted small">You can leave this page: renaming carries on. Each file is either renamed or left as it was.</p>
+    {% if not job.stop %}
+    <form method="post" action="/advanced/renaming/stop" hx-target="#content">
+      <button class="button" type="submit">Stop renaming</button>
+    </form>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="notice{{ ' success' if job.moved and not job.problems and not job.stop }}" role="status">
+    <strong>{{ "Stopped." if job.stop else "Finished." }}</strong>
+    {% if job.moved %}Renamed {{ files(job.moved) }}{% if job.pictures %}, and moved {{ job.pictures }} folder picture{{ "" if job.pictures == 1 else "s" }} along with them{% endif %}.{% else %}No files needed renaming.{% endif %}
+    {% if job.folders_removed %}{{ job.folders_removed }} empty folder{{ " was" if job.folders_removed == 1 else "s were" }} removed.{% endif %}
+    {% if job.stop and job.checked < job.total %}The other {{ job.total - job.checked }} were left as they were; starting again carries on with them.{% endif %}
+  </div>
+  {% if job.problems %}
+  <div class="notice error" role="alert">
+    {{ "This file was" if job.problems | length == 1 else "These files were" }} left where {{ "it was" if job.problems | length == 1 else "they were" }}:
+    <ul>{% for path, what in job.problems[:200] %}<li>{% if path %}<code>{{ path }}</code>: {% endif %}{{ what }}</li>{% endfor %}
+    {% if job.problems | length > 200 %}<li>…and {{ job.problems | length - 200 }} more.</li>{% endif %}</ul>
+  </div>
+  {% endif %}
+  <form method="post" action="/organize/{{ job.batch_id }}/undo" class="form-buttons">
+    <a class="button primary" href="/advanced">Done</a>
+    {% if job.batch_id and job.moved %}
+    <input type="hidden" name="back" value="/organize/history">
+    <button class="button" type="submit">Put them back</button>
+    {% endif %}
+    <a class="button" href="/organize/history">Past renames</a>
+  </form>
+{% endif %}
+</div>

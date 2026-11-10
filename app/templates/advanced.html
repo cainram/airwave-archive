@@ -23,6 +23,19 @@
 </section>
 
 <section class="tag-plan advanced-tool">
+  <h2>Rename and organize every file</h2>
+  <p>Names each recording from its episode's details, in a folder per series, like
+    <code>Gunsmoke/Gunsmoke - 1952-09-13 - Home Surgery.mp3</code>. Files without an air date or a title
+    keep their names. Runs in the background, can be stopped, and can be put back afterwards from
+    <a href="/organize/history">Past renames</a>.</p>
+  {% if renaming %}
+  <p><a class="button" href="/advanced/renaming">Renaming now: see how it's going</a></p>
+  {% else %}
+  <p><a class="button" href="/advanced/organize">Preview…</a></p>
+  {% endif %}
+</section>
+
+<section class="tag-plan advanced-tool">
   <h2>Convert odd formats in the whole library</h2>
   <p>Converts files that don't play everywhere (video files, RealAudio, WMA, Ogg, Opus, FLAC, WAV, AIFF)
     to MP3, and deletes each original once its new file has been checked.</p>

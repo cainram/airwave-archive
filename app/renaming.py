@@ -31,10 +31,13 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import select
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app import convert
@@ -130,7 +133,6 @@ def plan(session: Session, episodes: list[Episode], library: Path) -> list[Move]
     """Where each of these episodes' files would go. Nothing is moved."""
     moves = [Move(file=f, episode=e) for e in episodes for f in e.parts]
     converting = set(session.scalars(select(LibraryConversion.file_id).where(
-        LibraryConversion.file_id.in_([m.file.id for m in moves]),
         LibraryConversion.status.in_(["waiting", "converting"]))))
     for move in moves:
         f = move.file
@@ -146,9 +148,11 @@ def plan(session: Session, episodes: list[Episode], library: Path) -> list[Move]
     # Names that are taken: by files on the disk, by other recordings the
     # app knows (even missing ones), or by another file in this batch.
     wanted = [m for m in moves if m.new_name]
-    known = set(session.execute(select(AudioFile.folder, AudioFile.name).where(
-        tuple_(AudioFile.folder, AudioFile.name).in_(
-            [(m.new_folder, m.new_name) for m in wanted]))).all()) if wanted else set()
+    known: set = set()
+    folders = sorted({m.new_folder for m in wanted})
+    for start_at in range(0, len(folders), 500):              # (in chunks: a big library)
+        known.update(session.execute(select(AudioFile.folder, AudioFile.name).where(
+            AudioFile.folder.in_(folders[start_at:start_at + 500]))).all())
     claimed: set[str] = set()
     for move in wanted:
         if move.old_path == move.new_path:
@@ -184,6 +188,10 @@ def _taken(library: Path, move: Move, name: str, known: set, claimed: set) -> bo
 @dataclass
 class Result:
     batch_id: int | None = None
+    total: int = 0                  # files to rename
+    checked: int = 0                # of those, how many have been tried
+    stop: bool = False              # asked to stop (a background run)
+    finished: bool = False
     moved: int = 0
     pictures: int = 0
     folders_removed: int = 0
@@ -194,11 +202,15 @@ class RenameError(Exception):
     """One file couldn't be moved: it's left where it was."""
 
 
-def rename(session: Session, moves: list[Move], library: Path, label: str) -> Result:
+def rename(session: Session, moves: list[Move], library: Path, label: str,
+           result: Result | None = None) -> Result:
     """Move the files, writing each move down first so the batch can be
-    put back. Then move folder pictures along and remove emptied folders."""
-    result = Result()
+    put back. Then move folder pictures along and remove emptied folders.
+    ``result`` (for a background run) shows the progress as it goes, and
+    stops it between files when its ``stop`` is set."""
+    result = result or Result()
     to_do = [m for m in moves if m.to_do]
+    result.total = len(to_do)
     for move in moves:
         if move.problem:
             result.problems.append((move.old_path, move.problem))
@@ -209,7 +221,10 @@ def rename(session: Session, moves: list[Move], library: Path, label: str) -> Re
     session.commit()
     result.batch_id = batch.id
     for move in to_do:
+        if result.stop:
+            break
         f = move.file
+        result.checked += 1
         try:
             _move(session, batch, library, f.folder, f.name, move.new_folder, move.new_name, f)
             result.moved += 1
@@ -298,6 +313,59 @@ def remove_empty(library: Path, folders) -> int:
                 break
             folder = folder.rpartition("/")[0]
     return removed
+
+
+# ------------------------------------------------------- the whole library
+
+_job: Result | None = None
+_job_lock = threading.Lock()
+
+
+def current_job() -> Result | None:
+    return _job
+
+
+def busy() -> bool:
+    return _job is not None and not _job.finished
+
+
+def start(engine: Engine, library: Path, episode_ids: list[int], label: str,
+          afterwards: Callable[[], object] | None = None) -> bool:
+    """Rename these episodes' files in the background (the Advanced page's
+    whole-library run). False if a run is still going. ``afterwards`` is
+    called when it's done (a scan, to pick up moved folder pictures)."""
+    global _job
+    with _job_lock:
+        if busy():
+            return False
+        _job = Result()
+        threading.Thread(target=_run, args=(_job, engine, library, episode_ids, label, afterwards),
+                         daemon=True, name="airwave-renaming").start()
+        return True
+
+
+def stop() -> None:
+    if _job is not None:
+        _job.stop = True
+
+
+def _run(job: Result, engine: Engine, library: Path, episode_ids: list[int], label: str,
+         afterwards) -> None:
+    try:
+        with Session(engine) as session:
+            episodes = []
+            for start_at in range(0, len(episode_ids), 500):
+                episodes += session.scalars(select(Episode).where(
+                    Episode.id.in_(episode_ids[start_at:start_at + 500]))).all()
+            moves = plan(session, episodes, library)
+            rename(session, moves, library, label, job)
+        if afterwards is not None and (job.pictures or job.folders_removed):
+            afterwards()
+    except Exception as error:                       # (never leave the run "going")
+        log.exception("Renaming stopped")
+        job.problems.append(("", f"Renaming stopped because of an error: {error}"))
+    finally:
+        job.finished = True
 
 
 # ------------------------------------------------------------ past renames

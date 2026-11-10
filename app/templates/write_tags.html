@@ -95,8 +95,8 @@
 {% endif %}
 
 {% if busy %}
-<div class="notice">Details are being written into other files right now.
-  <a href="/tags/writing">See how it's going</a>, and come back when it's finished.</div>
+<div class="notice">Files are being written or renamed right now.
+  <a href="/advanced">See the Advanced page</a>, and come back when it's finished.</div>
 {% elif whole_library %}
 <form method="post" action="/advanced/tags" class="form-buttons">
   <input type="hidden" name="confirm" value="yes">
