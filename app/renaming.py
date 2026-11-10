@@ -300,6 +300,37 @@ def remove_empty(library: Path, folders) -> int:
     return removed
 
 
+# ------------------------------------------------------------ past renames
+
+# The past renames page lists this many, newest first.
+HISTORY = 100
+
+
+@dataclass
+class Summary:
+    batch: RenameBatch
+    files: int              # recordings that moved
+    pictures: int
+    put_back: int           # recordings and pictures already put back
+    moves: list[Renamed]
+
+    @property
+    def can_put_back(self) -> bool:
+        return any(not m.undone for m in self.moves)
+
+
+def summary(batch: RenameBatch) -> Summary:
+    moves = [m for m in batch.moves if m.done]
+    return Summary(batch=batch, moves=moves,
+                   files=sum(1 for m in moves if m.file_id is not None or not _is_picture(m)),
+                   pictures=sum(1 for m in moves if m.file_id is None and _is_picture(m)),
+                   put_back=sum(1 for m in moves if m.undone))
+
+
+def _is_picture(move: Renamed) -> bool:
+    return folder_image_rank(move.old_name) is not None
+
+
 # ------------------------------------------------------------ putting back
 
 def put_back(session: Session, batch: RenameBatch, library: Path) -> Result:
