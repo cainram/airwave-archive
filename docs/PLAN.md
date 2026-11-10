@@ -652,7 +652,7 @@ Whole-library runs of both parts live on the hidden **Advanced page**
 (`/advanced`, see "Later" below). Everyday pages offer only one episode,
 ticked episodes, or a series.
 
-#### 10a — Write details into the files' tags (step 1 ✅ *done*)
+#### 10a — Write details into the files' tags ✅ *done*
 - Save the app's details into each file's own tags: the standard tags
   (title, artist/series, year...) plus the Airwave tags (section 5), so
   other players and other Airwave servers can see them.
@@ -680,9 +680,21 @@ ticked episodes, or a series.
   Hidden copies left by a restart are cleared at start-up. Checked on
   copies of real files: the sound is identical afterwards, and cover art
   and other tags (genre, the original comment) are kept.
-- **Step 2 (next): many at once.** "☰ With ticked → Write details into
-  files…" and a series page's Actions, running in the background with
-  progress and a Stop button (files are each fully done or untouched).
+- **Step 2 ✅ *done*: many at once.** **☰ With ticked → Write details
+  into files…** (series and Library pages) and a series page's **☰
+  Actions → Write details into files…** open the same preview. With more
+  than one file it starts with a summary (how many will be written, which
+  tags change and in how many files, how many are already up to date,
+  have no details, or can't be written), then shows the changes for the
+  first 50 files and counts the rest. Up to 10 files are written straight
+  away; more run in the background on a progress page (`/tags/writing`,
+  updating every 2 seconds, which can be left) with **Stop writing**.
+  Afterwards it says how many were written and lists any files left
+  alone, with why. Notes: one batch at a time (the preview says so if one
+  is running). The batch is kept in memory, not the database: after a
+  restart it's simply gone, every file it reached fully done and the rest
+  untouched; running it again skips files already up to date. Whole-library
+  runs are left for the Advanced page.
 
 #### 10b — Rename and organise files from the database
 Like the "organise my music folder" feature in classic MP3 software

@@ -1,0 +1,29 @@
+{# Progress of writing tags in the background; asks again every 2 seconds until it's done. #}
+<div id="tags-writing"{% if job and not job.finished %} hx-get="/tags/writing/status" hx-trigger="every 2s"
+     hx-target="this" hx-swap="outerHTML"{% endif %}>
+{% if job is none %}
+  <div class="notice">Nothing is being written.</div>
+{% elif not job.finished %}
+  <div class="notice" role="status">
+    <strong>{{ "Stopping after this file…" if job.stop else "Writing…" }}</strong>
+    Checked {{ job.checked }} of {{ job.files }} file{{ "" if job.files == 1 else "s" }}:
+    wrote {{ job.written }}{% if job.up_to_date %}, {{ job.up_to_date }} already up to date{% endif %}{% if job.problems %}, {{ job.problems | length }} left alone{% endif %}.
+    <progress max="{{ job.files }}" value="{{ job.checked }}"></progress>
+    <p class="muted small">You can leave this page: writing carries on. Each file is either fully written or untouched.</p>
+    {% if not job.stop %}
+    <form method="post" action="/tags/writing/stop" hx-target="#content">
+      <button class="button" type="submit">Stop writing</button>
+    </form>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="notice{{ ' success' if job.written and not job.problems and not job.stop }}" role="status">
+    <strong>{{ "Stopped." if job.stop else "Finished." }}</strong>
+    {% if job.written %}Wrote the details into {{ job.written }} file{{ "" if job.written == 1 else "s" }}.{% else %}No files needed writing.{% endif %}
+    {% if job.up_to_date %}{{ job.up_to_date }} {{ "was" if job.up_to_date == 1 else "were" }} already up to date.{% endif %}
+    {% if job.stop and job.checked < job.files %}The other {{ job.files - job.checked }} were left untouched; starting again skips the files already done.{% endif %}
+  </div>
+  {% include "_tags_result.html" %}
+  <p><a class="button" href="{{ job.back }}">← Back</a></p>
+{% endif %}
+</div>

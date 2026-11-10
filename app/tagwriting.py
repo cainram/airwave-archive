@@ -19,17 +19,25 @@ updated in the same step, so the next scan doesn't see a changed file
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import shutil
+import threading
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import mutagen
+from sqlalchemy import select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from app.db import AudioFile, Episode
 from app.scanner import LIBRARY_LOCK, _apply, read_audio
 from app.tagging import PREFIX, airwave_values, common_values, read_airwave_tags, write_tags
+
+log = logging.getLogger(__name__)
 
 # Hidden copies being written are named like this (scans skip hidden files).
 TEMPORARY = ".tagging-"
@@ -165,3 +173,98 @@ def clear_leftovers(library: Path) -> None:
                     (Path(folder) / name).unlink()
                 except OSError:
                     pass
+
+
+# ------------------------------------------------------- many at once
+
+# Bigger batches than this run in the background, with progress shown.
+AT_ONCE = 10
+# The preview shows the changes for this many files; the rest are counted.
+SHOWN = 50
+
+
+@dataclass
+class Job:
+    """Writing tags for many episodes, in the background. Kept in memory:
+    after a restart it's simply gone (every file it reached is fully done,
+    the rest untouched; starting again skips files already up to date)."""
+    episode_ids: list[int]
+    files: int                       # how many files the episodes have
+    back: str
+    checked: int = 0
+    written: int = 0
+    up_to_date: int = 0
+    problems: list[tuple[str, str, str]] = field(default_factory=list)   # folder, name, what
+    stop: bool = False
+    finished: bool = False
+
+    @property
+    def stopped(self) -> bool:
+        return self.finished and self.stop
+
+
+_job: Job | None = None
+_job_lock = threading.Lock()
+
+
+def current_job() -> Job | None:
+    return _job
+
+
+def busy() -> bool:
+    return _job is not None and not _job.finished
+
+
+def start(engine: Engine, library: Path, episode_ids: list[int], files: int, back: str) -> bool:
+    """Start writing in the background. False if a batch is still going."""
+    global _job
+    with _job_lock:
+        if busy():
+            return False
+        _job = Job(episode_ids=episode_ids, files=files, back=back)
+        threading.Thread(target=_run, args=(_job, engine, library), daemon=True,
+                         name="airwave-tags").start()
+        return True
+
+
+def stop() -> None:
+    if _job is not None:
+        _job.stop = True
+
+
+def _run(job: Job, engine: Engine, library: Path) -> None:
+    try:
+        for start_at in range(0, len(job.episode_ids), 100):
+            with Session(engine) as session:
+                episodes = session.scalars(select(Episode).where(
+                    Episode.id.in_(job.episode_ids[start_at:start_at + 100]))).all()
+                for episode in episodes:
+                    if not episode.uid:
+                        episode.uid = uuid.uuid4().hex
+                    for f in episode.parts:
+                        if job.stop:
+                            session.commit()
+                            return
+                        write_one(job, f, episode, library)
+                        session.commit()
+    except Exception as error:                       # (never leave the job "running")
+        log.exception("Writing tags stopped")
+        job.problems.append(("", "", f"Writing stopped because of an error: {error}"))
+    finally:
+        job.finished = True
+
+
+def write_one(job: Job, f: AudioFile, episode: Episode, library: Path) -> None:
+    """Check one file and write it if needed, counting what happened."""
+    plan = plan_file(f, episode, library)
+    job.checked += 1
+    if plan.problem:
+        job.problems.append((f.folder, f.name, plan.problem))
+    elif plan.up_to_date:
+        job.up_to_date += 1
+    else:
+        try:
+            write_file(f, episode, library)
+            job.written += 1
+        except TagError as error:
+            job.problems.append((f.folder, f.name, str(error)))
