@@ -1122,7 +1122,7 @@ How it works:
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
 program (a Windows installer, a Mac `.dmg`). It starts in the background,
-opens the browser to the Library page, and asks for the recordings folder
+opens the browser to the Series page, and asks for the recordings folder
 on first run. Built automatically by GitHub for each release.
 - Open question: code signing. Without it, Windows and macOS show
   "unknown publisher" warnings; signing costs roughly $100–400/yr
@@ -1130,9 +1130,8 @@ on first run. Built automatically by GitHub for each release.
   the warnings either way.
 
 ### Later — Going public
-- Make the GitHub repository public. Turn off **Issues** and
-  **Discussions** (Settings → General → Features), since there's no
-  support channel.
+- ✅ The GitHub repository is public (2026-11-10), with **Issues**,
+  **Discussions** and the **Wiki** off, since there's no support channel.
 - Publish finished versions on GitHub **Releases** (installers and
   Docker image).
 - **airwavearchive.org**: one static page covering what it is,
