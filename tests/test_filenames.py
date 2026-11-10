@@ -35,6 +35,35 @@ from test_scanner import add_tags, make_wav
     ("OTR, Fibber McGee, 400305.mp3", "Fibber McGee", None, None, (1940, 3, 5)),
     # A dashed date still wins over a six-digit number elsewhere.
     ("Suspense 1943-05-13 - Case 380411.mp3", "Suspense", None, "Case 380411", (1943, 5, 13)),
+    # Episode numbers, as collections write them (leading zeros dropped).
+    ("Dragnet 49-06-03 (001) Production 1.mp3", "Dragnet", "1", "Production 1", (1949, 6, 3)),
+    ("Suspense 43-05-13 [042] Donovans Brain.mp3", "Suspense", "42", "Donovans Brain", (1943, 5, 13)),
+    ("Gunsmoke 1952-04-26 001 Billy the Kid.mp3", "Gunsmoke", "1", "Billy the Kid", (1952, 4, 26)),
+    ("Gunsmoke_520426_123_The_Cabin.mp3", "Gunsmoke", "123", "The Cabin", (1952, 4, 26)),
+    ("Gunsmoke 1952-04-26 - 017 - Ben Thompson.mp3", "Gunsmoke", "17", "Ben Thompson", (1952, 4, 26)),
+    ("Dragnet #001 49-06-03 Production 1.mp3", "Dragnet", "1", "Production 1", (1949, 6, 3)),
+    ("Dimension X (01) 50-04-08 The Outer Limit.mp3", "Dimension X", "1", "The Outer Limit", (1950, 4, 8)),
+    ("Fibber McGee 1940-01-02 Fibber's Birthday - Episode 270.mp3",
+     "Fibber McGee", "270", "Fibber's Birthday", (1940, 1, 2)),
+    ("Fibber McGee 1940-01-02 Fibber's Birthday (Ep 270).mp3",
+     "Fibber McGee", "270", "Fibber's Birthday", (1940, 1, 2)),
+    ("Lux Radio Theatre 1938-05-02 No. 145 The Prisoner of Zenda.mp3",
+     "Lux Radio Theatre", "145", "The Prisoner of Zenda", (1938, 5, 2)),
+    ("Escape 1947-07-07 e012 Leiningen vs the Ants.mp3", "Escape", "12", "Leiningen vs the Ants", (1947, 7, 7)),
+    # Numbers that aren't episode numbers.
+    ("Box 13 48-08-22 Insurance Fraud.mp3", "Box 13", None, "Insurance Fraud", (1948, 8, 22)),
+    ("Studio One 1948-04-19 - 1984.mp3", "Studio One", None, "1984", (1948, 4, 19)),
+    ("Suspense 1943-05-13 Donovan's Brain (1).mp3", "Suspense", None, "Donovan's Brain (1)", (1943, 5, 13)),
+    ("Coast to Coast 2010-03-01 Hour 2.mp3", "Coast to Coast", None, None, (2010, 3, 1)),
+    # No date, but a clear episode number.
+    ("X Minus One - 001 - No Contact.mp3", "X Minus One", "1", "No Contact", (None, None, None)),
+    ("XMinusOne_001_NoContact.mp3", "X Minus One", "1", "No Contact", (None, None, None)),
+    ("X Minus One 001 No Contact.mp3", "X Minus One", "1", "No Contact", (None, None, None)),
+    ("X Minus One #1 - No Contact.mp3", "X Minus One", "1", "No Contact", (None, None, None)),
+    ("Dimension X Ep 12 - The Embassy.mp3", "Dimension X", "12", "The Embassy", (None, None, None)),
+    ("Box 13 (07) Double Mothers.mp3", "Box 13", "7", "Double Mothers", (None, None, None)),
+    ("Box 13 - 07 - Double Mothers.mp3", "Box 13", "7", "Double Mothers", (None, None, None)),
+    ("OTR, X Minus One, 042.mp3", "X Minus One", "42", None, (None, None, None)),
 ])
 def test_names_are_read(name, series, number, title, date):
     guess = parse_filename(name)
@@ -53,8 +82,14 @@ def test_names_are_read(name, series, number, title, date):
     "Show 381341.mp3",              # six digits, but no month 13
     "Show 380230.mp3",              # no February 30th
     "Catalog 1380411.mp3",          # seven digits: not a date
+    # ...and no clear episode number either
+    "Box 13 Double Mothers.mp3",
+    "Lux Radio Theatre 2.mp3",
+    "Suspense - Donovan's Brain (1).mp3",   # a browser's "second copy" mark
+    "Show 00.mp3",                  # never episode 0
+    "Art Bell Hour 01.mp3",         # a part, not an episode
 ])
-def test_names_without_a_real_date_give_no_guess(name):
+def test_names_without_a_date_or_number_give_no_guess(name):
     assert parse_filename(name) is None
 
 
@@ -62,6 +97,10 @@ def test_tidy_words():
     assert tidy("CampbellPlayhouse") == "Campbell Playhouse"
     assert tidy("_Donovans_Brain_") == "Donovans Brain"
     assert tidy(" - ") is None
+    assert tidy("XMinusOne") == "X Minus One"
+    assert tidy("CBSRadioWorkshop") == "CBS Radio Workshop"
+    assert tidy(" Donovan's Brain (1) ") == "Donovan's Brain (1)"
+    assert tidy("(Unknown") == "Unknown"
 
 
 def test_typed_dates():

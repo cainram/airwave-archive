@@ -9,9 +9,12 @@ Many collections put the details in the file name, for example:
     Coast to Coast - Mar 01 2010 - Hour 1.mp3   (month names work too)
     The Lone Ranger, Old Time Radio, 380411   Flaming Buildings.mp3
                                          (380411 = 1938-04-11, run together)
+    Dragnet 49-06-03 (001) Production 1.mp3     (episode 1)
+    X Minus One - 001 - No Contact.mp3          (no date: episode 1)
 
 The reader looks for a date. What comes before it is taken as the series,
-and what comes after it as the title. These are only guesses: they're shown
+and what comes after it as the title. Without a date, a clear episode
+number splits the name the same way. These are only guesses: they're shown
 on the review page and nothing is saved until the owner confirms.
 """
 
@@ -54,8 +57,30 @@ DATE_PATTERNS = [
 # Labels some collections put in names that aren't part of the series:
 # "The Lone Ranger, Old Time Radio, 380411 ..."
 LABELS = re.compile(r"^(?:old[- ]?time[- ]radio|otr|otrr)$", re.I)
-# An episode number, only when clearly marked: "#42", "Ep 42", "Episode 42", "e42".
-EPISODE_PATTERN = re.compile(r"^(?:#\s*|ep(?:isode)?\.?\s*|e)(\d+)\b\s*", re.I)
+# Episode numbers. Numbers are only taken where collections put them, so a
+# series like "Box 13" or a title like "The 39 Steps" is left alone.
+# Marked: "#42", "Ep 42", "Ep. 42", "Episode 42", "No. 42", "e042".
+_MARKED = r"(?<![a-z0-9])(?:#|(?:episode|epi|ep|no|nr)\.?\s*#?)\s*(?P<n>\d{1,5})(?!\d)"
+_MARKED_E = r"(?<![a-z0-9])e(?P<n>\d{1,5})(?!\d)"
+# In brackets: "(042)", "[42]".
+_BRACKETS = r"[(\[]\s*(?P<n>\d{1,5})\s*[)\]]"
+# Bare, right after the date: "Gunsmoke 1952-04-26 001 Billy the Kid".
+# Up to three digits (or four starting with 0), so "1984" stays a title.
+_BARE = r"(?P<n>\d{1,3}|0\d{3})(?![\d)\]])(?=[\s_.-]|$)"
+MARKED = [re.compile(_MARKED, re.I), re.compile(_MARKED_E, re.I)]
+AFTER_DATE = [re.compile(r"^(?:" + p + r")", re.I) for p in (_MARKED, _MARKED_E, _BRACKETS, _BARE)]
+BEFORE_DATE = [re.compile(r"(?:" + p + r")$", re.I) for p in (_MARKED, _MARKED_E, _BRACKETS)]
+AFTER_TITLE = [re.compile(r"(?:" + p + r")\)?$", re.I) for p in (_MARKED, _MARKED_E)]
+# Names without a date: a marked number anywhere; brackets with a title
+# after them; or a bare number between " - " marks, between "_" marks, or
+# written with a leading 0 ("X Minus One 001 No Contact").
+NO_DATE = [
+    *MARKED,
+    re.compile(_BRACKETS + r"(?=.*[a-z])", re.I),
+    re.compile(r"(?<= - )(?P<n>\d{1,4})(?= - )"),
+    re.compile(r"(?<![^\s_])(?P<n>0\d{1,3})(?=[\s_]|$)"),
+    re.compile(r"(?<=_)(?P<n>\d{1,3})(?=_)"),
+]
 EDGE_JUNK = " -_.,;:()[]{}"
 
 
@@ -88,6 +113,7 @@ def tidy(text: str) -> str | None:
     'CampbellPlayhouse' -> 'Campbell Playhouse'; 'Donovans_Brain' ->
     'Donovans Brain'; ' - Title ' -> 'Title'.
     """
+    closed = text.rstrip(" -_.,;:").endswith(")")
     text = text.strip(EDGE_JUNK)
     if not text:
         return None
@@ -96,8 +122,11 @@ def tidy(text: str) -> str | None:
         text = text.replace(".", " ")
     if " " not in text:
         # RunTogetherWords: put a space before each capital after a small letter.
-        text = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text)
+        # And before a capitalised word after a capital: "XMinusOne".
+        text = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", text)
     text = re.sub(r"\s+", " ", text).strip(EDGE_JUNK)
+    if text and closed and text.count("(") > text.count(")"):
+        text += ")"   # keep the bracket that closes "Title (1)"
     return text or None
 
 
@@ -130,22 +159,62 @@ def _without_labels(text: str) -> str:
     return ",".join(pieces) if pieces else text
 
 
+def _number(match: re.Match) -> str | None:
+    """The episode number from a match, without leading zeros ("007" -> "7").
+    None for 0, which is never an episode."""
+    number = match["n"].lstrip("0")
+    return number or None
+
+
+def _take_number(text: str, patterns) -> tuple[str | None, str]:
+    """Look for an episode number in ``text`` with the first pattern that
+    finds one: (the number, the text without it), or (None, text)."""
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            number = _number(match)
+            if number:
+                return number, text[:match.start()] + " " + text[match.end():]
+    return None, text
+
+
+def _parse_without_date(stem: str) -> Guess | None:
+    """Names with no date: a clear episode number splits the series (before
+    it) from the title (after it). None if there's no such number."""
+    stem = PART_PATTERN.sub("", stem)
+    for pattern in NO_DATE:
+        for match in pattern.finditer(stem):
+            number = _number(match)
+            if number:
+                before, after = stem[:match.start()], stem[match.end():]
+                return Guess(series=tidy(_without_labels(before)), episode_number=number,
+                             title=tidy(after))
+    return None
+
+
 def parse_filename(name: str) -> Guess | None:
-    """Guess details from a file name, or None if it has no date in it."""
+    """Guess details from a file name, or None if it has neither a date nor
+    a clear episode number in it."""
     stem = PurePath(name).stem
     found = _find_date(stem)
     if found is None:
-        return None
+        return _parse_without_date(stem)
     match, year, month, day = found
     before, after = stem[:match.start()], stem[match.end():]
     guess = Guess(year=year, month=month, day=day)
 
     # "Hour 1" names a part of a broadcast, not its title.
-    after = PART_PATTERN.sub("", after).strip(EDGE_JUNK)
-    number = EPISODE_PATTERN.match(after)
-    if number:
-        guess.episode_number = number[1]
-        after = after[number.end():]
+    after = PART_PATTERN.sub("", after).strip(" -_.,")
+    # The episode number: just after the date ("(001)", "001", "#42"), else
+    # just before it ("Dragnet #001 49-06-03"), else at the end of the title
+    # ("... - Episode 270").
+    number, after = _take_number(after, AFTER_DATE)
+    if number is None:
+        number, kept = _take_number(before.rstrip(" -_.,"), BEFORE_DATE)
+        if number:
+            before = kept
+    if number is None:
+        number, after = _take_number(after.rstrip(" -_.,"), AFTER_TITLE)
+    guess.episode_number = number
 
     if before.strip(EDGE_JUNK):
         guess.series = tidy(_without_labels(before))
