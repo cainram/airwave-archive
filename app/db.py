@@ -59,7 +59,8 @@ DB_FILENAME = "airwave.db"
 #  19: Phase 13a, what converting an inbox file will do (inbox_items.convert_json)
 #  20: Phase 13b, converting inbox files (inbox_items.convert_status, _progress, _error)
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
-SCHEMA_VERSION = 21
+#  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
+SCHEMA_VERSION = 22
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -346,6 +347,45 @@ class LibraryConversion(Base):
     progress: Mapped[float | None]         # 0 to 1, while converting
     error: Mapped[str | None]
     queued_at: Mapped[datetime]            # UTC
+
+
+class RenameBatch(Base):
+    """One go of renaming and organizing files (Phase 10b), kept so it can
+    be put back."""
+
+    __tablename__ = "rename_batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    label: Mapped[str]                      # what was renamed, e.g. "Gunsmoke"
+    made_at: Mapped[datetime]               # UTC
+    undone_at: Mapped[datetime | None]      # UTC: when it was put back
+
+    moves: Mapped[list[Renamed]] = relationship(
+        back_populates="batch", order_by="Renamed.id", cascade="all, delete-orphan",
+        passive_deletes=True)
+
+
+class Renamed(Base):
+    """One file a rename batch moved: its old and new place. A recording
+    (``file_id``), or a folder picture that moved along with them (no
+    ``file_id``). ``done`` is set once the file has really moved, so a
+    restart halfway can be tidied up (see ``app/renaming.py``)."""
+
+    __tablename__ = "renamed"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    batch_id: Mapped[int] = mapped_column(
+        ForeignKey("rename_batches.id", ondelete="CASCADE"), index=True)
+    file_id: Mapped[int | None] = mapped_column(
+        ForeignKey("audio_files.id", ondelete="SET NULL"))
+    old_folder: Mapped[str]
+    old_name: Mapped[str]
+    new_folder: Mapped[str]
+    new_name: Mapped[str]
+    done: Mapped[bool] = mapped_column(default=False)
+    undone: Mapped[bool] = mapped_column(default=False)
+
+    batch: Mapped[RenameBatch] = relationship(back_populates="moves")
 
 
 class GroupDismissal(Base):

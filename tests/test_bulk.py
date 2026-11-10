@@ -70,7 +70,7 @@ def episodes(client) -> dict[str, Episode]:
 def test_pages_offer_ticking_and_editing(client):
     page = client.get("/series/episodes?name=Coast%20to%20Coast").text
     assert page.count('form="pick" name="ids"') == 3 and "data-select-all" in page
-    assert "Edit ticked…" in page and "Edit all 3…" in page and "Rename…" in page
+    assert "Edit ticked…" in page and "Edit all 3…" in page and "Rename the series…" in page
     assert client.get("/library").text.count('form="pick" name="ids"') == 4
 
 

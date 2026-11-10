@@ -706,7 +706,7 @@ a.day-title:hover { text-decoration: underline; }
 .tag-plan { margin: 0 0 22px; }
 h2.tag-file { font-size: 1.05rem; margin: 0 0 2px; }
 .tag-plan code { word-break: break-all; }
-.tag-changes td { overflow-wrap: anywhere; vertical-align: top; }
+.tag-changes td, .rename-plan td { overflow-wrap: anywhere; vertical-align: top; }
 .tag-changes td:first-child, .tag-changes .muted { white-space: nowrap; }
 .airwave-tags { margin-top: 8px; }
 .airwave-tags summary { cursor: pointer; }

@@ -1,0 +1,77 @@
+{% extends layout %}
+{% block title %}Rename and organize files · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back without renaming</a></nav>
+<h1>Rename and organize files</h1>
+
+{% macro files(n) %}{{ n }} file{{ "" if n == 1 else "s" }}{% endmacro %}
+
+{% if not moves %}
+<div class="notice">No episodes were ticked, so there's nothing to rename.</div>
+{% else %}
+<div class="notice warning" role="note">
+  <strong>This renames and moves files in your library.</strong> Each recording is named from its
+  episode's details, in a folder named after its series, like
+  <code>Gunsmoke/Gunsmoke - 1952-09-13 - Home Surgery.mp3</code>. The files themselves aren't changed,
+  and the app keeps track of them, so details, listening and feeds carry on. Other programs that point
+  at the old names (another player's playlists, for example) will lose track of them.
+  Every rename is written down, so you can put them back afterwards.
+</div>
+
+<section class="tag-summary">
+  <h2>{% if whole_series %}{{ whole_series }}: {% endif %}{{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }}, {{ files(moves | length) }}</h2>
+  <ul>
+    {% if to_do %}<li><strong>{{ files(to_do | length) }}</strong> will be renamed{% if folders %}, into {{ folders }} folder{{ "" if folders == 1 else "s" }}{% endif %}.</li>{% endif %}
+    {% if up_to_date %}<li>{{ files(up_to_date | length) }} already named this way.</li>{% endif %}
+    {% if no_details %}<li>{{ files(no_details | length) }} of episodes with neither an air date nor a title: they'll keep their names
+      (<a href="/files/{{ no_details[0].file.id }}/edit">edit details</a> first).</li>{% endif %}
+    {% if problems %}<li class="warning-text">{{ files(problems | length) }} can't be renamed, and will be left alone (see below).</li>{% endif %}
+  </ul>
+</section>
+
+{% if shown %}
+<div class="table-wrap">
+  <table class="files rename-plan">
+    <thead><tr><th>Now</th><th>Will be</th></tr></thead>
+    <tbody>
+      {% for m in shown %}
+      <tr>
+        <td><code>{{ m.old_path }}</code></td>
+        <td><code>{{ m.new_path }}</code>
+          {% if m.numbered %}<br><span class="muted small">(a number is added: that name is taken)</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if to_do | length > shown | length %}
+<p class="muted">…and {{ files(to_do | length - shown | length) }} more, named the same way.</p>
+{% endif %}
+{% endif %}
+
+{% if problems %}
+<div class="notice error" role="alert">
+  {{ "This file" if problems | length == 1 else "These files" }} will be left where {{ "it is" if problems | length == 1 else "they are" }}:
+  <ul>{% for m in problems[:200] %}<li><code>{{ m.old_path }}</code>: {{ m.problem }}</li>{% endfor %}
+  {% if problems | length > 200 %}<li>…and {{ problems | length - 200 }} more.</li>{% endif %}</ul>
+</div>
+{% endif %}
+
+{% if busy %}
+<div class="notice">Details are being written into files right now.
+  <a href="/tags/writing">See how it's going</a>, and come back when it's finished.</div>
+{% elif to_do %}
+<form method="post" action="/organize" class="form-buttons">
+  {% if whole_series %}<input type="hidden" name="whole_series" value="{{ whole_series }}">
+  {% else %}{% for ep in episodes %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}{% endif %}
+  <input type="hidden" name="back" value="{{ back }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button primary" type="submit">Rename {{ files(to_do | length) }}</button>
+  <a class="button" href="{{ back }}">Cancel</a>
+</form>
+{% else %}
+<div class="notice">There's nothing to rename.</div>
+<p><a class="button" href="{{ back }}">← Back</a></p>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -111,6 +111,14 @@ sound; tags the app doesn't know about are kept. Each file is written as a
 hidden copy beside it, checked, and only then put in the original's place,
 so a file is never left half-written.
 
+**A fourth exception is renaming and organizing files** (Phase 10b,
+owner's go-ahead 2026-11-10). Only when asked, after a preview page listing
+every file's name and folder now and what they'll become. The files
+themselves aren't changed, only their names and folders; an existing file
+is never replaced. Every move is written down first, so a batch can be put
+back. Folder pictures move along with the recordings, and folders left
+empty are removed (nothing else is ever deleted).
+
 ### Where things live
 
 The recommended layout on the server is one folder, `/srv/airwave`, ideally
@@ -222,7 +230,7 @@ opposed to the sound itself. The app gets it from several sources:
    default; always an explicit action.
 6. **Later: rename files from their details.** File names and folders can
    follow the app's details, like classic MP3 software's "organise" feature.
-   Always previewed and undoable (Phase 10b, after v1.0).
+   Always previewed and undoable (Phase 10b).
 
 ### Airwave tags
 
@@ -696,7 +704,7 @@ ticked episodes, or a series.
   untouched; running it again skips files already up to date. Whole-library
   runs are left for the Advanced page.
 
-#### 10b — Rename and organise files from the database
+#### 10b — Rename and organise files from the database (step 1 ✅ *done*)
 Like the "organise my music folder" feature in classic MP3 software
 (Winamp, iTunes, MusicBrainz Picard): file names and folders follow the
 app's details.
@@ -725,6 +733,39 @@ app's details.
   player's playlists, for example) will lose track of them.
 - **Try it:** preview renaming one series, confirm, check the files on
   disk, then undo it.
+- **Step 1 ✅ *done*: the pattern, the preview, renaming and putting back.**
+  The pattern (owner's choice, 2026-11-10) is fixed, not a setting:
+  `<Series>/<Series> - <air date> - <title>.<ext>`, e.g.
+  `Gunsmoke/Gunsmoke - 1952-09-13 - Home Surgery.mp3`; the date is
+  year-month-day (so files sort in air-date order) and only as far as
+  known; parts end `- Part 1`; no series means no series in the name and
+  the `Unsorted` folder; an episode with neither a date nor a title is left
+  alone. Names are cleaned for Windows and Mac (`:` becomes ` - `, `/ \ |`
+  become `-`, `? * " < >` are dropped) and kept to 180 characters.
+  Offered from an episode's **☰ Actions → Rename the file from the
+  details…**, a series' **☰ Actions → Rename and organize files…** (the
+  series' own "Rename…" is now "Rename the series…"), and **☰ With ticked
+  → Rename and organize files…**. `/organize` shows a summary and a table
+  of old and new names (first 300, the rest counted); files missing,
+  waiting to be converted, already named, or without details are left
+  alone and said so. Renaming is done straight away (a rename on the same
+  disk is instant). Notes (`app/renaming.py`, database version 22:
+  `rename_batches`, `renamed`): each move is written down (`done` false),
+  then the file is renamed (never across disks, never over another
+  file), then the app's record of the file and the note are updated
+  together. At start-up, notes not marked done are tidied: the file moved
+  (record updated) or didn't (note forgotten). Taken names (a file on the
+  disk, another recording the app knows, or another file in the batch) get
+  ` (2)`, ` (3)`. Folder pictures move along only when every recording in
+  their folder went to the same new folder; folders left completely empty
+  are removed; a scan then picks up the pictures. The result page has
+  **Put them back**, which moves the batch back newest first, skipping
+  files moved again since or whose old name is taken. Checked on copies of
+  real files (RUSC.com's Gunsmoke and One Night Stand): renamed, played,
+  put back. Note: the RUSC.com files' own tags have the
+  date inside the title, so tidy details before renaming.
+- **Step 2 (next):** a list of past renames, to put back an older batch,
+  and the whole-library version for the Advanced page.
 
 ### Phase 11 — Export and import
 - 11a (export) ✅ *done*: "Export…" on a series page and "Export ticked…"

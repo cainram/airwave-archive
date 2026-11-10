@@ -25,10 +25,11 @@
       <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
       <div class="drop-list">
         <a href="/series/picture?name={{ name | urlencode }}">Change picture…</a>
-        <a href="/series/rename?name={{ name | urlencode }}">Rename…</a>
+        <a href="/series/rename?name={{ name | urlencode }}">Rename the series…</a>
         <a href="/episodes/edit?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Edit all {{ totals.episodes }}…</a>
         <a href="/export?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Export…</a>
         <a href="/tags/write?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Write details into files…</a>
+        <a href="/organize?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Rename and organize files…</a>
         <a href="/feeds/new?series={{ name | urlencode }}">Make a feed…</a>
       </div>
     </details>

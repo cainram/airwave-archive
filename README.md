@@ -59,6 +59,9 @@ library when you ask:
   lists them and warns about it.
 - Episode details are written into a file's own tags only when you ask,
   after a preview of every tag that will change. The sound isn't touched.
+- Files are renamed and sorted into a folder per series (like
+  `Gunsmoke/Gunsmoke - 1952-09-13 - Home Surgery.mp3`) only when you ask,
+  after a preview of every old and new name. Renames can be put back.
 
 Keep backups of your recordings and of the app's data folder.
 
