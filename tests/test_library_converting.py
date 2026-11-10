@@ -79,6 +79,7 @@ def test_a_scan_finds_odd_formats(client):
     assert f is not None and convert.Plan.from_json(f.convert_json).extension == ".mp3"
     page = client.get("/library").text
     assert "1 file in your library is" in page and 'href="/library/convert">Review and convert' in page
+    assert "1 file in your library is" in client.get("/series").text
     assert 'href="/library/convert">Convert odd formats' in page
 
 
@@ -102,8 +103,8 @@ def test_converting_in_place_keeps_everything(client, pretend):
         session.add(Listening(episode_id=f.episode_id, file_id=f.id, position=40.0, updated_at=f.first_seen))
         session.commit()
     sent = queue_it(client, WEBM)
-    assert sent.headers["location"] == "/library?convert_queued=1"
-    page = client.get("/library").text
+    assert sent.headers["location"] == "/series?convert_queued=1"
+    page = client.get("/series").text
     assert "Converting 1 library file." in page and 'hx-get="/library/converting"' in page
     assert "1 file in your library is" not in page                  # asked for already
 
@@ -146,7 +147,7 @@ def test_a_failure_keeps_the_original(client, monkeypatch):
 def test_stopping(client, pretend):
     queue_it(client, WEBM)
     sent = client.post("/library/convert/cancel", follow_redirects=False)
-    assert sent.headers["location"] == "/library?convert_cancelled=1"
+    assert sent.headers["location"] == "/series?convert_cancelled=1"
     assert run_queue(client) is False and pretend == []
     assert "1 file in your library is" in client.get("/library").text   # offered again
 

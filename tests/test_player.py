@@ -83,6 +83,8 @@ def test_htmx_gets_only_the_middle_of_the_page(client):
 def test_rescan_from_htmx_reloads_just_the_middle(client):
     response = client.post("/rescan", headers=HTMX, follow_redirects=False)
     assert response.status_code == 200
+    assert '"path": "/series"' in response.headers["HX-Location"]
+    response = client.post("/rescan", data={"back": "/library"}, headers=HTMX, follow_redirects=False)
     assert '"path": "/library"' in response.headers["HX-Location"]
 
 

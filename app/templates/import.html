@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Import a spreadsheet · Airwave Archive{% endblock %}
 {% block content %}
-<nav class="back"><a class="button" href="/library">← Library</a></nav>
+<nav class="back"><a class="button" href="/series">← Series</a></nav>
 <h1>Import a spreadsheet</h1>
 
 {% if saved is not none %}
@@ -32,7 +32,7 @@
     doesn't), type the series here and it's used for every row.</p>
   <div class="form-buttons">
     <button class="button primary" type="submit">Show preview</button>
-    <a class="button" href="/library">Cancel</a>
+    <a class="button" href="/series">Cancel</a>
   </div>
 </form>
 {% endblock %}

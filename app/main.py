@@ -387,7 +387,7 @@ async def library_convert_start(request: Request):
         files = session.scalars(select(AudioFile).where(AudioFile.id.in_(ids))).all() if ids else []
         queued = converting.queue_library(session, list(files))
         session.commit()
-    return go_to(request, f"/library?convert_queued={queued}")
+    return go_to(request, f"/series?convert_queued={queued}")
 
 
 @app.post("/library/convert/cancel")
@@ -395,13 +395,15 @@ def library_convert_cancel(request: Request):
     with Session(get_engine()) as session:
         stopped = converting.cancel_library(session)
         session.commit()
-    return go_to(request, f"/library?convert_cancelled={stopped}")
+    return go_to(request, f"/series?convert_cancelled={stopped}")
 
 
 @app.post("/rescan")
-def rescan(request: Request):
+async def rescan(request: Request):
+    """Scan the library now, then back to the page it was asked from."""
+    form = await request.form()
     run_scan()
-    return go_to(request, "/library")
+    return go_to(request, safe_back(form.get("back") or "/series"))
 
 
 @app.get("/files/{file_id}", response_class=HTMLResponse)
@@ -494,9 +496,12 @@ def series_list(request: Request, view: str = "tiles"):
     last_scan_or_scan()
     with Session(get_engine()) as session:
         found = all_series(session)
+        new_groups = grouping.unseen(session)
+        convert_info = library_convert_info(session)
         session.expunge_all()
     return render(request, "series.html",
-                  {"series": found, "view": "list" if view == "list" else "tiles"})
+                  {"series": found, "view": "list" if view == "list" else "tiles",
+                   "new_groups": new_groups, **convert_info})
 
 
 @app.get("/calendar", response_class=HTMLResponse)
@@ -1304,6 +1309,71 @@ async def write_tags_now(request: Request):
     if job.problems:
         return render(request, "tags_written.html", {"job": job, "back": back})
     return go_to(request, with_query(back, tags_written=str(job.written)))
+
+
+# ------------------------------------------------------------ the Advanced page
+
+def all_episodes_with_files(session: Session) -> list[Episode]:
+    """Every episode that has a recording, by series and air date."""
+    return list(session.scalars(
+        select(Episode).where(Episode.files.any(AudioFile.missing.is_(False)))
+        .order_by(Episode.series, Episode.air_year, Episode.air_month, Episode.air_day,
+                  Episode.title)))
+
+
+@app.get("/advanced", response_class=HTMLResponse)
+def advanced_page(request: Request):
+    """Power-user tools that work on the whole library at once. Reached only
+    by typing the address: nothing links here (owner's request, 2026-11-07)."""
+    with Session(get_engine()) as session:
+        files = session.scalar(select(func.count(AudioFile.id)).where(AudioFile.missing.is_(False)))
+        episodes = session.scalar(select(func.count(Episode.id))
+                                  .where(Episode.files.any(AudioFile.missing.is_(False))))
+        convert_info = library_convert_info(session)
+    return render(request, "advanced.html", {"files": files, "episodes": episodes,
+                                             "busy": tagwriting.busy(), **convert_info})
+
+
+@app.get("/advanced/tags", response_class=HTMLResponse)
+def advanced_tags_page(request: Request):
+    """Preview for writing details into every file: the totals, and the
+    changes for the first files as an example (reading every file's tags
+    first would take too long on a big library; the writing itself checks
+    each file and skips those already up to date)."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        episodes = all_episodes_with_files(session)
+        files = sum(len(e.files) for e in episodes)
+        sample, count = [], 0
+        for episode in episodes:
+            if count >= tagwriting.SHOWN:
+                break
+            sample.append(episode)
+            count += len(episode.parts)
+        plans = tagwriting.plan_episodes(sample, LIBRARY_DIR)
+        for plan in plans:
+            plan.file.episode
+        session.expunge_all()
+    return render(request, "write_tags.html", {
+        "plans": plans, "episodes": sample, "back": "/advanced", "whole_series": "",
+        "whole_library": {"episodes": len(episodes), "files": files},
+        "to_write": [p for p in plans if p.problem is None and not p.up_to_date],
+        "problems": [p for p in plans if p.problem], "changed": {},
+        "shown": [p for p in plans if not p.up_to_date],
+        "up_to_date": 0, "no_details": 0, "busy": tagwriting.busy()})
+
+
+@app.post("/advanced/tags", response_class=HTMLResponse)
+async def advanced_tags_now(request: Request):
+    """Write every episode's details into its files, in the background."""
+    form = await request.form()
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
+    if not tagwriting.busy():
+        with Session(get_engine()) as session:
+            episodes = all_episodes_with_files(session)
+            tagwriting.start(get_engine(), LIBRARY_DIR, [e.id for e in episodes],
+                             sum(len(e.files) for e in episodes), "/advanced")
+    return go_to(request, "/tags/writing")
 
 
 @app.get("/tags/writing", response_class=HTMLResponse)
