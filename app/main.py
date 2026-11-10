@@ -246,6 +246,19 @@ def get_file(file_id: int) -> AudioFile:
     return row
 
 
+# Pages such as the inbox have a few boxes per file, so a big batch sends
+# thousands of fields (700 inbox files = 2,800). The web framework's own
+# limit is 1,000 fields and 1,000 files, meant for public sites; this app
+# runs in one household, so the limits are far higher.
+FORM_LIMIT = 1_000_000
+
+
+async def read_request_form(request: Request):
+    """What a page sent (its boxes and uploaded files), without the
+    framework's low limits on how many there may be."""
+    return await request.form(max_fields=FORM_LIMIT, max_files=FORM_LIMIT)
+
+
 def go_to(request: Request, path: str) -> Response:
     """Send the browser to another page. For htmx, load just the middle of
     that page so the player bar keeps playing."""
@@ -379,7 +392,7 @@ def library_convert_page(request: Request):
 @app.post("/library/convert")
 async def library_convert_start(request: Request):
     """Queue the ticked library files for converting."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(value) for value in form.getlist("ids") if str(value).isdigit()]
     if form.get("confirm") != "yes":
         raise HTTPException(status_code=400, detail="Please confirm on the page first")
@@ -401,7 +414,7 @@ def library_convert_cancel(request: Request):
 @app.post("/rescan")
 async def rescan(request: Request):
     """Scan the library now, then back to the page it was asked from."""
-    form = await request.form()
+    form = await read_request_form(request)
     run_scan()
     return go_to(request, safe_back(form.get("back") or "/series"))
 
@@ -436,10 +449,10 @@ def edit_page(request: Request, file_id: int):
 @app.post("/files/{file_id}/edit", response_class=HTMLResponse)
 async def save_edit(request: Request, file_id: int):
     f = get_file(file_id)
-    values, errors = read_form(await request.form())
+    values, errors = read_form(await read_request_form(request))
     if errors:
         # Show the form again with what was typed, and what needs fixing.
-        form = await request.form()
+        form = await read_request_form(request)
         typed = {name: form.get(name, "") for name in values}
         return render_edit_form(request, f, typed, errors)
     with Session(get_engine()) as session:
@@ -664,7 +677,7 @@ def inbox_page(request: Request, uploaded: int | None = None, skipped: int | Non
 async def inbox_upload(request: Request):
     """Save uploaded audio files into the inbox (never into the library).
     Zips are unpacked into the inbox straight away."""
-    form = await request.form()
+    form = await read_request_form(request)
     uploaded = skipped = unpacked = with_details = 0
     problems = []
     for upload in form.getlist("files"):
@@ -705,7 +718,7 @@ def unpack_zip(path: Path) -> zipimport.Unpacked:
 @app.post("/inbox/unpack", response_class=HTMLResponse)
 async def inbox_unpack(request: Request):
     """Unpack a zip that was copied into the inbox folder."""
-    name = str((await request.form()).get("name", ""))
+    name = str((await read_request_form(request)).get("name", ""))
     path = next((p for p in zipimport.inbox_zips(INBOX_DIR) if p.name == name), None)
     if path is None:
         raise HTTPException(status_code=404, detail="That zip isn't in the inbox any more")
@@ -753,7 +766,7 @@ def save_inbox_details(form) -> tuple[dict, dict, int]:
 @app.post("/inbox", response_class=HTMLResponse)
 async def inbox_save(request: Request):
     """Save the details typed for the waiting files."""
-    typed, errors, saved = save_inbox_details(await request.form())
+    typed, errors, saved = save_inbox_details(await read_request_form(request))
     if errors:
         return render_inbox(request, typed, errors)
     return go_to(request, f"/inbox?saved={saved}")
@@ -762,7 +775,7 @@ async def inbox_save(request: Request):
 @app.post("/inbox/add-all", response_class=HTMLResponse)
 async def inbox_add_all(request: Request):
     """Save what was typed, then add every waiting file to the library."""
-    form = await request.form()
+    form = await read_request_form(request)
     typed, errors, _saved = save_inbox_details(form)
     if errors:
         return render_inbox(request, typed, errors)
@@ -807,7 +820,7 @@ async def inbox_add_all(request: Request):
 async def inbox_add(request: Request, item_id: int):
     """Save what was typed, then move this file into the library and add
     it, with its details, as an episode."""
-    form = await request.form()
+    form = await read_request_form(request)
     typed, errors, _saved = save_inbox_details(form)
     if errors:
         return render_inbox(request, typed, errors)
@@ -846,7 +859,7 @@ async def inbox_add(request: Request, item_id: int):
 async def inbox_dismiss_group(request: Request):
     """Save what was typed, then stop suggesting these inbox files as one
     broadcast (they're added one by one)."""
-    form = await request.form()
+    form = await read_request_form(request)
     typed, errors, _saved = save_inbox_details(form)
     if errors:
         return render_inbox(request, typed, errors)
@@ -877,7 +890,7 @@ async def inbox_convert_action(request: Request, item_id: int, action: str):
     """Cancel converting a file, or try again. What was typed is saved first."""
     if action not in ("cancel", "retry"):
         raise HTTPException(status_code=404)
-    typed, errors, _saved = save_inbox_details(await request.form())
+    typed, errors, _saved = save_inbox_details(await read_request_form(request))
     if errors:
         return render_inbox(request, typed, errors)
     with Session(get_engine()) as session:
@@ -951,7 +964,7 @@ def import_example():
 
 @app.post("/import", response_class=HTMLResponse)
 async def import_upload(request: Request):
-    form = await request.form()
+    form = await read_request_form(request)
     upload = form.get("spreadsheet")
     data = await upload.read(csvimport.MAX_BYTES + 1) if hasattr(upload, "read") else b""
     if not data:
@@ -1002,7 +1015,7 @@ def import_preview(request: Request, token: str, series: str = "",
 
 @app.post("/import/{token}", response_class=HTMLResponse)
 async def import_save(request: Request, token: str):
-    form = await request.form()
+    form = await read_request_form(request)
     data = load_import(token)
     columns = [c if c in csvimport.FIELDS else "" for c in form.getlist("col")]
     ticked = {int(n) for n in form.getlist("row") if str(n).isdigit()}
@@ -1096,7 +1109,7 @@ def bulk_edit_page(request: Request, ids: list[int] = Query(default=[]),
 
 @app.post("/episodes/edit", response_class=HTMLResponse)
 async def bulk_edit_save(request: Request):
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
     series, back = form.get("whole_series", ""), safe_back(form.get("back"))
     changes, time, errors = read_bulk_form(form)
@@ -1125,7 +1138,7 @@ async def bulk_edit_save(request: Request):
 async def mark_played(request: Request):
     """Mark the ticked episodes (or one) as played, or as not played
     (which also forgets where listening stopped)."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
     played, back = form.get("played") == "1", safe_back(form.get("back"))
     with Session(get_engine()) as session:
@@ -1152,7 +1165,7 @@ def dismiss_listening(request: Request, episode_id: int):
 @app.post("/listening/{episode_id}", status_code=204)
 async def save_listening_place(request: Request, episode_id: int):
     """The player bar reporting where it is (or that it reached the end)."""
-    form = await request.form()
+    form = await read_request_form(request)
     try:
         file_id, seconds = int(form.get("file", "")), float(form.get("at", 0))
     except ValueError:
@@ -1231,7 +1244,7 @@ def delete_page(request: Request, ids: list[int] = Query(default=[]), back: str 
 async def delete_episodes(request: Request):
     """Delete the episodes' files from the disk, and the episodes from the
     app. For good: only after the confirmation page."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
     back = safe_back(form.get("back"))
     if form.get("confirm") != "yes":
@@ -1285,7 +1298,7 @@ async def write_tags_now(request: Request):
     """Write the episodes' details into their files' tags: only after the
     preview page (owner's choice, 2026-11-09). A few files are written
     straight away; more go to the background, with a progress page."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
     whole_series = str(form.get("whole_series") or "")
     back = safe_back(form.get("back"))
@@ -1368,7 +1381,7 @@ def advanced_tags_page(request: Request):
 @app.post("/advanced/tags", response_class=HTMLResponse)
 async def advanced_tags_now(request: Request):
     """Write every episode's details into its files, in the background."""
-    form = await request.form()
+    form = await read_request_form(request)
     if form.get("confirm") != "yes":
         raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
     if renaming.busy():
@@ -1403,7 +1416,7 @@ def advanced_organize_page(request: Request):
 @app.post("/advanced/organize", response_class=HTMLResponse)
 async def advanced_organize_now(request: Request):
     """Rename and organize every file, in the background."""
-    form = await request.form()
+    form = await read_request_form(request)
     if form.get("confirm") != "yes":
         raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
     if tagwriting.busy():
@@ -1481,7 +1494,7 @@ def organize_page(request: Request, ids: list[int] = Query(default=[]), whole_se
 async def organize_now(request: Request):
     """Rename and move the files: only after the preview page (owner's
     choice, 2026-11-10). Every move is written down, so it can be put back."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
     whole_series = str(form.get("whole_series") or "")
     back = safe_back(form.get("back"))
@@ -1516,7 +1529,7 @@ def organize_history(request: Request):
 @app.post("/organize/{batch_id}/undo", response_class=HTMLResponse)
 async def organize_undo(request: Request, batch_id: int):
     """Put a batch of renamed files back where they were."""
-    form = await request.form()
+    form = await read_request_form(request)
     back = safe_back(form.get("back"))
     with Session(get_engine()) as session:
         batch = session.get(RenameBatch, batch_id)
@@ -1540,7 +1553,7 @@ def rename_page(request: Request, name: str = "", error: str | None = None, type
 
 @app.post("/series/rename", response_class=HTMLResponse)
 async def rename_save(request: Request, name: str = ""):
-    new = " ".join(str((await request.form()).get("new_name", "")).split())
+    new = " ".join(str((await read_request_form(request)).get("new_name", "")).split())
     if not new:
         return rename_page(request, name, "Please type the new name.", new)
     with Session(get_engine()) as session:
@@ -1575,7 +1588,7 @@ def series_picture_page(request: Request, name: str = "", error: str | None = No
 async def upload_series_picture(request: Request, name: str = ""):
     with Session(get_engine()) as session:
         series_or_404(session, name)
-    upload = (await request.form()).get("picture")
+    upload = (await read_request_form(request)).get("picture")
     data = await upload.read(MAX_PICTURE_BYTES + 1) if hasattr(upload, "read") else b""
     if not data:
         error = "Please choose a picture first."
@@ -1618,7 +1631,7 @@ def parts_page(request: Request, file_id: int, error: str | None = None):
 @app.post("/files/{file_id}/parts")
 async def save_parts(request: Request, file_id: int):
     f = get_file(file_id)
-    ids = [int(value) for value in (await request.form()).getlist("part") if value.isdigit()]
+    ids = [int(value) for value in (await read_request_form(request)).getlist("part") if value.isdigit()]
     if not ids:
         return go_to(request, f"/files/{file_id}/parts?error=none")
     with Session(get_engine()) as session:
@@ -1651,7 +1664,7 @@ def suggested_groups(request: Request):
 
 @app.post("/groups/approve")
 async def approve_groups(request: Request):
-    form = await request.form()
+    form = await read_request_form(request)
     ticked = set(form.getlist("group"))
     with Session(get_engine()) as session:
         made = grouping.approve(session, ticked)
@@ -1661,7 +1674,7 @@ async def approve_groups(request: Request):
 
 @app.post("/groups/dismiss")
 async def dismiss_group(request: Request):
-    form = await request.form()
+    form = await read_request_form(request)
     sig = str(form.get("dismiss") or "")
     with Session(get_engine()) as session:
         match = next((s for s in grouping.suggestions(session) if s.signature == sig), None)
@@ -1744,7 +1757,7 @@ def review_page(request: Request, saved: int | None = None):
 
 @app.post("/review/filenames", response_class=HTMLResponse)
 async def save_review(request: Request):
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(i) for i in str(form.get("ids", "")).split(",") if i.strip().isdigit()]
     typed: dict[int, dict] = {}
     errors: dict[int, str] = {}
@@ -1907,7 +1920,7 @@ def new_feed(request: Request, series: str = "", ids: list[int] = Query(default=
 
 @app.post("/feeds", response_class=HTMLResponse)
 async def create_feed(request: Request):
-    form = await request.form()
+    form = await read_request_form(request)
     series = str(form.get("series", ""))
     ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
     back = str(form.get("back", ""))
@@ -1950,7 +1963,7 @@ def add_to_feed_page(request: Request, ids: list[int] = Query(default=[]), back:
 @app.post("/feeds/add")
 async def add_to_feed(request: Request):
     """Add ticked episodes to the hand-picked feed chosen."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
     feed_id = int(form.get("feed", "0")) if str(form.get("feed", "")).isdigit() else 0
     with Session(get_engine()) as session:
@@ -1966,7 +1979,7 @@ async def add_to_feed(request: Request):
 @app.post("/feeds/{feed_id}/remove")
 async def remove_from_feed(request: Request, feed_id: int):
     """Take ticked episodes out of a hand-picked feed (never out of the library)."""
-    form = await request.form()
+    form = await read_request_form(request)
     ids = {int(i) for i in form.getlist("ids") if str(i).isdigit()}
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
@@ -2012,7 +2025,7 @@ def edit_feed_form(request: Request, feed_id: int):
 
 @app.post("/feeds/{feed_id}/edit", response_class=HTMLResponse)
 async def edit_feed(request: Request, feed_id: int):
-    values, errors = read_feed_form(await request.form())
+    values, errors = read_feed_form(await read_request_form(request))
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
         if errors:
@@ -2043,7 +2056,7 @@ def feed_picture_page(request: Request, feed_id: int, error: str | None = None):
 async def upload_feed_picture(request: Request, feed_id: int):
     with Session(get_engine()) as session:
         get_feed(session, feed_id)
-    upload = (await request.form()).get("picture")
+    upload = (await read_request_form(request)).get("picture")
     data = await upload.read(MAX_PICTURE_BYTES + 1) if hasattr(upload, "read") else b""
     if not data:
         error = "Please choose a picture first."
@@ -2081,7 +2094,7 @@ def new_link_page(request: Request, feed_id: int):
 async def new_link(request: Request, feed_id: int):
     """Give a feed a new private address; the old one stops working (for
     when it got out)."""
-    if str((await request.form()).get("confirm", "")) != "yes":
+    if str((await read_request_form(request)).get("confirm", "")) != "yes":
         raise HTTPException(status_code=400, detail="Not confirmed")
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
@@ -2094,7 +2107,7 @@ async def new_link(request: Request, feed_id: int):
 async def publish_feed(request: Request, feed_id: int):
     """Publish a feed (its address starts working) or take it back to a
     draft (its address stops working; podcast apps keep what they have)."""
-    publish = str((await request.form()).get("published", "")) == "1"
+    publish = str((await read_request_form(request)).get("published", "")) == "1"
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
         if publish and not feed.published:
@@ -2116,7 +2129,7 @@ def delete_feed_page(request: Request, feed_id: int):
 @app.post("/feeds/{feed_id}/delete")
 async def delete_feed(request: Request, feed_id: int):
     """Delete a feed (never its recordings). Its address stops working."""
-    if str((await request.form()).get("confirm", "")) != "yes":
+    if str((await read_request_form(request)).get("confirm", "")) != "yes":
         raise HTTPException(status_code=400, detail="Not confirmed")
     with Session(get_engine()) as session:
         session.delete(get_feed(session, feed_id))
