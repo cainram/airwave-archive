@@ -1240,49 +1240,82 @@ async def delete_episodes(request: Request):
 
 
 @app.get("/tags/write", response_class=HTMLResponse)
-def write_tags_page(request: Request, ids: list[int] = Query(default=[]), back: str = "/library"):
-    """Preview: every file of these episodes, and each tag writing their
-    details would change. Nothing is written until the button is pressed."""
+def write_tags_page(request: Request, ids: list[int] = Query(default=[]), whole_series: str = "",
+                    back: str = "/library"):
+    """Preview: every file of these episodes (ticked ones, or a whole
+    series), and each tag writing their details would change. Nothing is
+    written until the button is pressed."""
     with Session(get_engine(), expire_on_commit=False) as session:
-        episodes = chosen_episodes(session, ids, "")
+        episodes = chosen_episodes(session, ids, whole_series)
         plans = tagwriting.plan_episodes(episodes, LIBRARY_DIR)
         for plan in plans:
             plan.file.episode             # (loaded now, for the page)
         session.expunge_all()
+    to_write = [p for p in plans if p.problem is None and not p.up_to_date]
+    problems = [p for p in plans if p.problem]
+    changed: dict[str, int] = {}
+    for plan in to_write:
+        for change in plan.changes:
+            changed[change.label] = changed.get(change.label, 0) + 1
+    shown = plans if len(plans) == 1 else [p for p in plans if not p.up_to_date][:tagwriting.SHOWN]
     return render(request, "write_tags.html", {
-        "plans": plans, "episodes": episodes, "back": safe_back(back),
-        "to_write": [p for p in plans if p.problem is None and not p.up_to_date]})
+        "plans": plans, "episodes": episodes, "back": safe_back(back), "whole_series": whole_series,
+        "to_write": to_write, "problems": problems, "shown": shown, "changed": changed,
+        "up_to_date": sum(1 for p in plans if p.up_to_date and not p.no_details),
+        "no_details": sum(1 for p in plans if p.no_details),
+        "busy": tagwriting.busy()})
 
 
 @app.post("/tags/write", response_class=HTMLResponse)
 async def write_tags_now(request: Request):
     """Write the episodes' details into their files' tags: only after the
-    preview page (owner's choice, 2026-11-09)."""
+    preview page (owner's choice, 2026-11-09). A few files are written
+    straight away; more go to the background, with a progress page."""
     form = await request.form()
     ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
+    whole_series = str(form.get("whole_series") or "")
     back = safe_back(form.get("back"))
     if form.get("confirm") != "yes":
         raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
-    written, problems = 0, []
+    if tagwriting.busy():
+        return go_to(request, "/tags/writing")
     with Session(get_engine()) as session:
-        episodes = chosen_episodes(session, ids, "")
+        episodes = chosen_episodes(session, ids, whole_series)
+        files = sum(len(e.parts) for e in episodes)
+        if files > tagwriting.AT_ONCE:
+            tagwriting.start(get_engine(), LIBRARY_DIR, [e.id for e in episodes], files, back)
+            return go_to(request, "/tags/writing")
         export.give_ids(episodes)
         session.commit()
-        for plan in tagwriting.plan_episodes(episodes, LIBRARY_DIR):
-            if plan.up_to_date:
-                continue
-            try:
-                if plan.problem:
-                    raise tagwriting.TagError(plan.problem)
-                tagwriting.write_file(plan.file, plan.episode, LIBRARY_DIR)
-                written += 1
-            except tagwriting.TagError as error:
-                problems.append((plan.file.folder, plan.file.name, str(error)))
-            session.commit()
-    if problems:
-        return render(request, "tags_written.html", {"written": written, "problems": problems,
-                                                     "back": back})
-    return go_to(request, with_query(back, tags_written=str(written)))
+        job = tagwriting.Job(episode_ids=[], files=files, back=back)
+        for episode in episodes:
+            for f in episode.parts:
+                tagwriting.write_one(job, f, episode, LIBRARY_DIR)
+                session.commit()
+    if job.problems:
+        return render(request, "tags_written.html", {"job": job, "back": back})
+    return go_to(request, with_query(back, tags_written=str(job.written)))
+
+
+@app.get("/tags/writing", response_class=HTMLResponse)
+def tags_writing_page(request: Request):
+    """Progress of writing tags in the background, with Stop; then what happened."""
+    job = tagwriting.current_job()
+    if job is None:
+        return go_to(request, "/library")
+    return render(request, "tags_writing.html", {"job": job})
+
+
+@app.get("/tags/writing/status", response_class=HTMLResponse)
+def tags_writing_status(request: Request):
+    """The progress box, asked for every couple of seconds while writing."""
+    return templates.TemplateResponse(request, "_tags_writing.html", {"job": tagwriting.current_job()})
+
+
+@app.post("/tags/writing/stop", response_class=HTMLResponse)
+def tags_writing_stop(request: Request):
+    tagwriting.stop()
+    return go_to(request, "/tags/writing")
 
 
 @app.get("/series/rename", response_class=HTMLResponse)

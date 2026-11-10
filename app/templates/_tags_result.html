@@ -1,0 +1,8 @@
+{# The files writing tags left alone, and why. Needs `job`. #}
+{% if job.problems %}
+<div class="notice error" role="alert">
+  {{ "This file was" if job.problems | length == 1 else "These files were" }} left exactly as {{ "it was" if job.problems | length == 1 else "they were" }}:
+  <ul>{% for folder, name, problem in job.problems[:200] %}<li>{% if name %}<code>{{ (folder ~ "/") if folder }}{{ name }}</code>: {% endif %}{{ problem }}</li>{% endfor %}
+  {% if job.problems | length > 200 %}<li>…and {{ job.problems | length - 200 }} more.</li>{% endif %}</ul>
+</div>
+{% endif %}

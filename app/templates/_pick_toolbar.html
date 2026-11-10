@@ -1,5 +1,5 @@
 {# Tick episodes in the table below, then pick what to do with them from the
-   "With ticked" menu (edit, export, mark played or not, delete). The tick
+   "With ticked" menu (edit, export, write tags, mark played or not, delete). The tick
    boxes belong to this form (form="pick"), wherever they are on the page.
    Needs `back`: the page to return to afterwards. #}
 <form id="pick" class="pick-toolbar" method="get" action="/episodes/edit">
@@ -9,6 +9,7 @@
     <div class="drop-list">
       <button type="submit">Edit ticked…</button>
       <button type="submit" formaction="/export">Export ticked…</button>
+      <button type="submit" formaction="/tags/write">Write details into files…</button>
       <button type="submit" formmethod="post" formaction="/episodes/played"
               name="played" value="1">Mark played</button>
       <button type="submit" formmethod="post" formaction="/episodes/played"

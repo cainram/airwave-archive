@@ -148,7 +148,7 @@ def test_a_failure_leaves_the_file_as_it_was(client, monkeypatch):
     monkeypatch.setattr(tagwriting, "write_tags", broken)
     page = write(client, "Suspense 1943-05-13.mp3").text
     assert "Not every file could be written" in page and "No space left on device" in page
-    assert "left exactly as they were" in page
+    assert "left exactly as it was" in page
     assert path.read_bytes() == before
     assert [p.name for p in path.parent.iterdir()] == ["Suspense 1943-05-13.mp3"]
 
@@ -214,3 +214,116 @@ def test_other_formats(tmp_path):
     audio = mutagen.File(path)
     assert audio["TITLE"] == ["The Hitch-Hiker"] and audio["AIRWAVE_ID"] == ["abc"]
     assert tagwriting.plan_file(f, ep, tmp_path).up_to_date
+
+
+# ------------------------------------------------------- many at once
+
+import time
+
+
+@pytest.fixture
+def series(client, monkeypatch):
+    """A series of 12 episodes: more than are written straight away."""
+    monkeypatch.setattr(tagwriting, "_job", None)
+    for day in range(1, 13):
+        make_mp3(client.lib / "Escape" / f"Escape 1950-03-{day:02d}.mp3", frames=200)
+    client.post("/rescan")
+    for day in range(1, 13):
+        f = the_file(f"Escape 1950-03-{day:02d}.mp3")
+        client.post(f"/files/{f.id}/edit", data=dict(series="Escape", title=f"Story {day}",
+                                                      air_year="1950", air_month="3", air_day=str(day)))
+    return client
+
+
+def finish():
+    for _ in range(200):
+        job = tagwriting.current_job()
+        if job is not None and job.finished:
+            return job
+        time.sleep(0.05)
+    raise AssertionError("writing didn't finish")
+
+
+def written_titles(client):
+    return [read_audio(client.lib / "Escape" / f"Escape 1950-03-{day:02d}.mp3").tags.get("title")
+            for day in range(1, 13)]
+
+
+def test_the_menus_offer_it(series):
+    page = series.get("/series/episodes?name=Escape").text
+    assert 'href="/tags/write?whole_series=Escape&back=/series/episodes%3Fname%3DEscape">Write details into files…' in page
+    assert 'formaction="/tags/write">Write details into files…</button>' in page
+    assert 'formaction="/tags/write">Write details into files…</button>' in series.get("/library").text
+
+
+def test_a_big_preview_is_summed_up(series, monkeypatch):
+    monkeypatch.setattr(tagwriting, "SHOWN", 5)
+    page = series.get("/tags/write?whole_series=Escape&back=/library").text
+    assert "Escape: 12 episodes, 12 files" in page
+    assert "<strong>12 files</strong> will be written." in page
+    assert "Tags that change:" in page and "Title (12), Artist (12), Album (12), Date (12), and Airwave tags." in page
+    assert page.count('class="tag-plan"') == 5 and "…and 7 more files, with changes like the ones above." in page
+    assert '<input type="hidden" name="whole_series" value="Escape">' in page and 'name="ids"' not in page
+
+
+def test_a_whole_series_is_written_in_the_background(series):
+    sent = series.post("/tags/write", data={"whole_series": "Escape", "back": "/library", "confirm": "yes"},
+                       follow_redirects=False)
+    assert sent.headers["location"] == "/tags/writing"
+    job = finish()
+    assert (job.files, job.checked, job.written, job.problems) == (12, 12, 12, [])
+    assert written_titles(series) == [f"Story {day}" for day in range(1, 13)]
+    page = series.get("/tags/writing").text
+    assert "Finished." in page and "Wrote the details into 12 files." in page and "hx-trigger" not in page
+    # Again: everything is up to date now.
+    series.post("/tags/write", data={"whole_series": "Escape", "back": "/library", "confirm": "yes"})
+    job = finish()
+    assert (job.written, job.up_to_date) == (0, 12)
+    assert "No files needed writing." in series.get("/tags/writing/status").text
+
+
+def test_progress_and_stopping(series, monkeypatch):
+    real = tagwriting.write_file
+
+    def slow(f, episode, library):
+        real(f, episode, library)
+        if tagwriting.current_job().written == 2:
+            page = " ".join(series.get("/tags/writing/status").text.split())
+            assert "Writing…" in page and "Checked 3 of 12 files: wrote 2." in page
+            assert 'hx-trigger="every 2s"' in page and "Stop writing" in page
+            series.post("/tags/writing/stop")
+    monkeypatch.setattr(tagwriting, "write_file", slow)
+    series.post("/tags/write", data={"whole_series": "Escape", "back": "/library", "confirm": "yes"})
+    job = finish()
+    assert job.stopped and job.written == 3
+    assert sum(1 for t in written_titles(series) if t) == 3            # the rest untouched
+    page = series.get("/tags/writing").text
+    assert "Stopped." in page and "Wrote the details into 3 files." in page and "The other 9 were left untouched" in page
+
+
+def test_problems_are_listed_at_the_end(series):
+    (series.lib / "Escape" / "Escape 1950-03-05.mp3").unlink()
+    series.post("/tags/write", data={"whole_series": "Escape", "back": "/library", "confirm": "yes"})
+    job = finish()
+    assert job.written == 11
+    page = series.get("/tags/writing").text
+    assert "This file was left exactly as it was:" in page
+    assert "Escape/Escape 1950-03-05.mp3</code>: The file isn&#39;t in the library any more." in page
+
+
+def test_one_batch_at_a_time(series, monkeypatch):
+    monkeypatch.setattr(tagwriting, "_job", tagwriting.Job(episode_ids=[1], files=5000, back="/library"))
+    page = series.get("/tags/write?whole_series=Escape").text
+    assert "Details are being written into other files right now." in page and "Write the details into" not in page
+    sent = series.post("/tags/write", data={"whole_series": "Escape", "confirm": "yes"}, follow_redirects=False)
+    assert sent.headers["location"] == "/tags/writing"
+    assert written_titles(series) == [None] * 12
+
+
+def test_a_few_ticked_are_written_straight_away(series):
+    ids = [str(episode_of(f"Escape 1950-03-{day:02d}.mp3").id) for day in (1, 2, 3)]
+    sent = series.post("/tags/write", data={"ids": ids, "back": "/series/episodes?name=Escape", "confirm": "yes"},
+                       follow_redirects=False)
+    assert sent.headers["location"] == "/series/episodes?name=Escape&tags_written=3"
+    assert tagwriting.current_job() is None
+    assert "Wrote the details into 3 files." in series.get(sent.headers["location"]).text

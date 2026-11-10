@@ -5,6 +5,7 @@
 <h1>Write details into the files</h1>
 
 {% macro value(text) %}{% if text is none %}<span class="muted">(none)</span>{% else %}{{ text }}{% endif %}{% endmacro %}
+{% macro files(n) %}{{ n }} file{{ "" if n == 1 else "s" }}{% endmacro %}
 
 {% if not plans %}
 <div class="notice">No episodes were ticked, so there's nothing to write.</div>
@@ -17,7 +18,22 @@
   left half-written. Keep backups all the same.
 </div>
 
-{% for plan in plans %}
+{% if plans | length > 1 %}
+<section class="tag-summary">
+  <h2>{% if whole_series %}{{ whole_series }}: {% endif %}{{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }}, {{ files(plans | length) }}</h2>
+  <ul>
+    <li><strong>{{ files(to_write | length) }}</strong> will be written.
+      {% if changed %}<span class="muted small">Tags that change:
+        {% for label, n in changed.items() %}{{ label }} ({{ n }}){% if not loop.last %}, {% endif %}{% endfor %}{% if to_write | selectattr("airwave") | list %}, and Airwave tags{% endif %}.</span>
+      {% elif to_write %}<span class="muted small">Only their Airwave tags change.</span>{% endif %}</li>
+    {% if up_to_date %}<li>{{ files(up_to_date) }} already up to date.</li>{% endif %}
+    {% if no_details %}<li>{{ files(no_details) }} of episodes with no details yet: nothing to write.</li>{% endif %}
+    {% if problems %}<li class="warning-text">{{ files(problems | length) }} can't be written, and will be left alone (see below).</li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+
+{% for plan in shown %}
 {% set f = plan.file %}
 <section class="tag-plan">
   <h2 class="tag-file"><a href="/files/{{ f.id }}">{{ f | display_title }}</a></h2>
@@ -63,14 +79,22 @@
   {% endif %}
 </section>
 {% endfor %}
+{% set hidden = (plans | rejectattr("up_to_date") | list | length) - (shown | rejectattr("up_to_date") | list | length) %}
+{% if hidden > 0 %}
+<p class="muted">…and {{ hidden }} more file{{ "" if hidden == 1 else "s" }}, with changes like the ones above.</p>
+{% endif %}
 
-{% if to_write %}
+{% if busy %}
+<div class="notice">Details are being written into other files right now.
+  <a href="/tags/writing">See how it's going</a>, and come back when it's finished.</div>
+{% elif to_write %}
 <form method="post" action="/tags/write" class="form-buttons">
-  {% for ep in episodes %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}
+  {% if whole_series %}<input type="hidden" name="whole_series" value="{{ whole_series }}">
+  {% else %}{% for ep in episodes %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}{% endif %}
   <input type="hidden" name="back" value="{{ back }}">
   <input type="hidden" name="confirm" value="yes">
   <button class="button primary" type="submit">Write the details into
-    {{ to_write | length }} file{{ "" if to_write | length == 1 else "s" }}</button>
+    {{ files(to_write | length) }}</button>
   <a class="button" href="{{ back }}">Cancel</a>
 </form>
 {% else %}
