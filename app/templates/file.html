@@ -50,7 +50,8 @@
           {% endif %}
         </form>
         {% endif %}
-        {% if ep %}<a href="/tags/write?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Write details into the file{{ "s" if grouped }}…</a>{% endif %}
+        {% if ep %}<a href="/tags/write?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Write details into the file{{ "s" if grouped }}…</a>
+        <a href="/organize?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Rename the file{{ "s" if grouped }} from the details…</a>{% endif %}
         <a href="/files/{{ f.id }}/parts">{{ "Change parts…" if grouped else "Group with other files…" }}</a>
         {% if ep %}<a class="danger" href="/delete?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Delete…</a>{% endif %}
       </div>

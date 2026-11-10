@@ -97,6 +97,11 @@ These come from the plan and should not be changed without the owner's OK:
   the files' tags**, only after a preview page listing every file and
   each tag that will change. The sound is never touched
   (`app/tagwriting.py`).
+  The fourth exception (Phase 10b, 2026-11-10): **renaming and
+  organizing files** into `<Series>/<Series> - <date> - <title>`, only
+  after a preview listing every old and new name. Every move is written
+  down so it can be put back; an existing file is never replaced; only
+  folders left completely empty are removed (`app/renaming.py`).
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud
@@ -158,6 +163,10 @@ These come from the plan and should not be changed without the owner's OK:
   files** (Phase 10a, after the preview page): the preview of each tag
   that changes, and the safe write (a hidden copy, checked, then swapped
   in, with the app's record updated so a scan sees nothing changed)
+- `app/renaming.py`: renaming and organizing library files from their
+  details (Phase 10b): the names, the preview, the moves (each written
+  down first, so a batch can be put back and a restart halfway is tidied
+  at start-up), folder pictures moving along, emptied folders removed
 - `app/deleting.py`: deleting episodes' files from the library, for good
   (only after the confirmation page), and the episodes from the app
 - `app/export.py`: export zips (tagged copies, manifest, pictures), made

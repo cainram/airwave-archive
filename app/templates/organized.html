@@ -1,0 +1,32 @@
+{% extends layout %}
+{% block title %}Rename and organize files · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
+{% macro files(n) %}{{ n }} file{{ "" if n == 1 else "s" }}{% endmacro %}
+<h1>{{ "Put back" if undone else "Renamed" }}</h1>
+{% if result.moved or result.pictures %}
+<div class="notice success" role="status">
+  {% if undone %}Put {{ files(result.moved) }} back where {{ "it was" if result.moved == 1 else "they were" }}{% else %}Renamed {{ files(result.moved) }}{% endif %}{% if result.pictures %},
+  and moved {{ result.pictures }} folder picture{{ "" if result.pictures == 1 else "s" }} along with them{% endif %}.
+  {% if result.folders_removed %}{{ result.folders_removed }} empty folder{{ " was" if result.folders_removed == 1 else "s were" }} removed.{% endif %}
+</div>
+{% elif not result.problems %}
+<div class="notice" role="status">There was nothing to {{ "put back" if undone else "rename" }}.</div>
+{% endif %}
+
+{% if result.problems %}
+<div class="notice error" role="alert">
+  {{ "This file was" if result.problems | length == 1 else "These files were" }} left where {{ "it was" if result.problems | length == 1 else "they were" }}:
+  <ul>{% for path, what in result.problems[:200] %}<li><code>{{ path }}</code>: {{ what }}</li>{% endfor %}
+  {% if result.problems | length > 200 %}<li>…and {{ result.problems | length - 200 }} more.</li>{% endif %}</ul>
+</div>
+{% endif %}
+
+<form method="post" action="/organize/{{ result.batch_id }}/undo" class="form-buttons">
+  <a class="button primary" href="{{ back }}">Done</a>
+  {% if not undone and result.batch_id and result.moved %}
+  <input type="hidden" name="back" value="{{ back }}">
+  <button class="button" type="submit">Put {{ "it" if result.moved == 1 else "them" }} back</button>
+  {% endif %}
+</form>
+{% endblock %}

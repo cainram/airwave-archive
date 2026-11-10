@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.db import (
     DB_FILENAME, InboxItem, FIRST_PARTS, MANUAL, WITH_PARTS, AudioFile, Episode, Feed,
-    LibraryConversion, ScanRun, make_engine, utcnow,
+    LibraryConversion, RenameBatch, ScanRun, make_engine, utcnow,
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
@@ -33,7 +33,7 @@ from app.episodes import (
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
 from app import (airdates, convert, converting, csvimport, deleting, export, feeds, grouping, inbox,
-                 listening, tagwriting, zipimport)
+                 listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -190,6 +190,15 @@ def clear_tag_leftovers() -> None:
     """Hidden copies left by tag writing that a restart stopped (in the
     background: it looks through every library folder)."""
     threading.Thread(target=tagwriting.clear_leftovers, args=(LIBRARY_DIR,), daemon=True).start()
+
+
+@app.on_event("startup")
+def finish_renaming() -> None:
+    """A rename that a restart interrupted: bring the app's records in
+    line with where the files really are, before anything scans."""
+    if LIBRARY_DIR.is_dir():
+        with Session(get_engine()) as session:
+            renaming.finish_interrupted(session, LIBRARY_DIR)
 
 
 @app.on_event("startup")
@@ -1316,6 +1325,65 @@ def tags_writing_status(request: Request):
 def tags_writing_stop(request: Request):
     tagwriting.stop()
     return go_to(request, "/tags/writing")
+
+
+@app.get("/organize", response_class=HTMLResponse)
+def organize_page(request: Request, ids: list[int] = Query(default=[]), whole_series: str = "",
+                  back: str = "/library"):
+    """Preview: every file of these episodes (ticked ones, or a whole
+    series), its name and folder now, and what they'd become. Nothing is
+    moved until the button is pressed."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        episodes = chosen_episodes(session, ids, whole_series)
+        moves = renaming.plan(session, episodes, LIBRARY_DIR)
+        session.expunge_all()
+    to_do = [m for m in moves if m.to_do]
+    return render(request, "organize.html", {
+        "moves": moves, "episodes": episodes, "back": safe_back(back),
+        "whole_series": whole_series, "to_do": to_do, "shown": to_do[:renaming.SHOWN],
+        "up_to_date": [m for m in moves if m.up_to_date],
+        "no_details": [m for m in moves if m.no_details],
+        "problems": [m for m in moves if m.problem],
+        "folders": len({m.new_folder for m in to_do if m.new_folder != m.file.folder}),
+        "busy": tagwriting.busy()})
+
+
+@app.post("/organize", response_class=HTMLResponse)
+async def organize_now(request: Request):
+    """Rename and move the files: only after the preview page (owner's
+    choice, 2026-11-10). Every move is written down, so it can be put back."""
+    form = await request.form()
+    ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
+    whole_series = str(form.get("whole_series") or "")
+    back = safe_back(form.get("back"))
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
+    if tagwriting.busy():
+        return go_to(request, "/tags/writing")
+    with Session(get_engine()) as session:
+        episodes = chosen_episodes(session, ids, whole_series)
+        label = whole_series or (episodes[0].series if len(episodes) == 1 and episodes[0].series
+                                 else f"{len(episodes)} episode{'' if len(episodes) == 1 else 's'}")
+        moves = renaming.plan(session, episodes, LIBRARY_DIR)
+        result = renaming.rename(session, moves, LIBRARY_DIR, label)
+    if result.pictures or result.folders_removed:
+        run_scan()                         # (folder pictures moved: look again)
+    return render(request, "organized.html", {"result": result, "back": back, "undone": False})
+
+
+@app.post("/organize/{batch_id}/undo", response_class=HTMLResponse)
+async def organize_undo(request: Request, batch_id: int):
+    """Put a batch of renamed files back where they were."""
+    form = await request.form()
+    back = safe_back(form.get("back"))
+    with Session(get_engine()) as session:
+        batch = session.get(RenameBatch, batch_id)
+        if batch is None:
+            raise HTTPException(status_code=404, detail="No such batch of renamed files")
+        result = renaming.put_back(session, batch, LIBRARY_DIR)
+    if result.pictures or result.folders_removed:
+        run_scan()
+    return render(request, "organized.html", {"result": result, "back": back, "undone": True})
 
 
 @app.get("/series/rename", response_class=HTMLResponse)
