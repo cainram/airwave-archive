@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Suggested groups · Airwave Archive{% endblock %}
 {% block content %}
-<nav class="back"><a class="button" href="/library">← Library</a></nav>
+<nav class="back"><a class="button" href="/series">← Series</a></nav>
 {% set q = request.query_params %}
 {% if q.get("approved") %}
 {% set made = q.get("approved") | int(0) %}

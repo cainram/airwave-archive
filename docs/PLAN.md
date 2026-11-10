@@ -1065,7 +1065,7 @@ The plan: **ffmpeg** (the standard free converter) inside the inbox.
 - Meanwhile, a batch can be converted by hand with ffmpeg on the dev VM and
   then uploaded as normal.
 
-### Later — The Advanced page (`/advanced`, after v1.0)
+### Later — The Advanced page (`/advanced`, after v1.0) (step 1 ✅ *done*)
 A page of **power-user tools** that work on the whole library at once
 (owner's request, 2026-11-07). Examples:
 - converting the entire library's odd formats (see ffmpeg above)
@@ -1088,6 +1088,24 @@ How it works:
 - **Ground rules:** these tools change existing library files, so each one
   is an owner-approved exception to "never change files in the library."
   The exceptions get written into section 3 when each tool is built.
+- **Step 1 ✅ *done* (2026-11-10).** `/advanced`: the red bar, the totals,
+  and two tools. **Write details into every file**: `/advanced/tags` is
+  the preview (the totals, and the changes for the first 50 files as an
+  example, since reading every file's tags first would take too long on a
+  big library); confirming starts the background writer (Phase 10a),
+  which checks every file and skips those already up to date.
+  **Convert odd formats in the whole library** links to the existing
+  confirmation page (Phase 13d). Nothing in the app links to `/advanced`.
+- **Library off the top menu** (owner's choice, 2026-11-10, done with
+  step 1): the Series page has **☰ Actions** with Rescan, Review file
+  names, Find possible groups, Import spreadsheet, Convert odd formats,
+  Past renames and **All files (Library)**, and shows the library's
+  notices (files to convert, converting now, new possible groups). The
+  Library page still exists, with its back button to Series; the menu
+  highlights Series on it and on the tools' pages.
+- **Step 2 (next):** rename and organize every file, run in the
+  background with progress and Stop (Phase 10b's renaming, for the whole
+  library).
 - Note: an unlinked address is a **"keep out of the way" measure, not a
   lock**. Anyone on the network who knows the address can open it. That's
   fine for a single household, but it isn't security.

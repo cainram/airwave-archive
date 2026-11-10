@@ -1,0 +1,39 @@
+{% extends layout %}
+{% block title %}Advanced · Airwave Archive{% endblock %}
+{% block content %}
+{# Reached only by typing the address (owner's request): nothing links here. #}
+<div class="danger-bar" role="alert">
+  <strong>These tools change your library files, all of them at once.</strong>
+  You're on your own here: keep backups, and take a snapshot first.
+</div>
+<h1>Advanced</h1>
+<p class="muted">Tools that work on the whole library: {{ episodes }} episode{{ "" if episodes == 1 else "s" }},
+  {{ files }} file{{ "" if files == 1 else "s" }}. Each one shows what it will do and asks before it starts.
+  To work on one series or a few episodes, use the menus on the series pages instead.</p>
+
+<section class="tag-plan advanced-tool">
+  <h2>Write details into every file</h2>
+  <p>Writes each episode's details into its files' own tags, so other players can show them. The sound
+    isn't touched; files already up to date are skipped. Runs in the background, and can be stopped.</p>
+  {% if busy %}
+  <p><a class="button" href="/tags/writing">Writing now: see how it's going</a></p>
+  {% else %}
+  <p><a class="button" href="/advanced/tags">Preview…</a></p>
+  {% endif %}
+</section>
+
+<section class="tag-plan advanced-tool">
+  <h2>Convert odd formats in the whole library</h2>
+  <p>Converts files that don't play everywhere (video files, RealAudio, WMA, Ogg, Opus, FLAC, WAV, AIFF)
+    to MP3, and deletes each original once its new file has been checked.</p>
+  {% if not can_convert %}
+  <p class="muted">Not available: ffmpeg isn't installed.</p>
+  {% elif convert_busy %}
+  <p><a class="button" href="/library">Converting {{ convert_busy | length }} now: see how it's going</a></p>
+  {% elif to_convert %}
+  <p><a class="button" href="/library/convert">Review {{ to_convert }} file{{ "" if to_convert == 1 else "s" }}…</a></p>
+  {% else %}
+  <p class="muted">There's nothing to convert.</p>
+  {% endif %}
+</section>
+{% endblock %}

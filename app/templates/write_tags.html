@@ -7,7 +7,7 @@
 {% macro value(text) %}{% if text is none %}<span class="muted">(none)</span>{% else %}{{ text }}{% endif %}{% endmacro %}
 {% macro files(n) %}{{ n }} file{{ "" if n == 1 else "s" }}{% endmacro %}
 
-{% if not plans %}
+{% if not plans and not whole_library %}
 <div class="notice">No episodes were ticked, so there's nothing to write.</div>
 {% else %}
 <div class="notice warning" role="note">
@@ -18,7 +18,17 @@
   left half-written. Keep backups all the same.
 </div>
 
-{% if plans | length > 1 %}
+{% if whole_library %}
+<section class="tag-summary">
+  <h2>Your whole library: {{ whole_library.episodes }} episode{{ "" if whole_library.episodes == 1 else "s" }}, {{ files(whole_library.files) }}</h2>
+  <ul>
+    <li>Every file is checked, one at a time, in the background. Files already up to date are skipped.</li>
+    <li>Episodes with no details yet are left alone: there's nothing to write.</li>
+    <li>Files that can't be written are left as they are, and listed at the end.</li>
+  </ul>
+  <p class="muted">Below are the changes for the first files, as an example of what will happen to the rest.</p>
+</section>
+{% elif plans | length > 1 %}
 <section class="tag-summary">
   <h2>{% if whole_series %}{{ whole_series }}: {% endif %}{{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }}, {{ files(plans | length) }}</h2>
   <ul>
@@ -80,13 +90,19 @@
 </section>
 {% endfor %}
 {% set hidden = (plans | rejectattr("up_to_date") | list | length) - (shown | rejectattr("up_to_date") | list | length) %}
-{% if hidden > 0 %}
+{% if hidden > 0 and not whole_library %}
 <p class="muted">…and {{ hidden }} more file{{ "" if hidden == 1 else "s" }}, with changes like the ones above.</p>
 {% endif %}
 
 {% if busy %}
 <div class="notice">Details are being written into other files right now.
   <a href="/tags/writing">See how it's going</a>, and come back when it's finished.</div>
+{% elif whole_library %}
+<form method="post" action="/advanced/tags" class="form-buttons">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button danger" type="submit">Write the details into every file</button>
+  <a class="button" href="/advanced">Cancel</a>
+</form>
 {% elif to_write %}
 <form method="post" action="/tags/write" class="form-buttons">
   {% if whole_series %}<input type="hidden" name="whole_series" value="{{ whole_series }}">

@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block title %}Convert library files · Airwave Archive{% endblock %}
 {% block content %}
-<nav class="back"><a class="button" href="/library">← Back without converting</a></nav>
+<nav class="back"><a class="button" href="/series">← Back without converting</a></nav>
 <h1>Convert library files</h1>
 
 <div class="notice error" role="alert">
@@ -55,7 +55,7 @@
   {% if ready and can_convert %}
   <div class="form-buttons">
     <button class="button danger" type="submit">Convert the ticked files and delete the originals</button>
-    <a class="button" href="/library">Cancel</a>
+    <a class="button" href="/series">Cancel</a>
   </div>
   {% endif %}
 </form>

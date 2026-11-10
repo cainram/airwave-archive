@@ -11,16 +11,32 @@
       · {{ series | sum(attribute="seconds") | duration }} of audio
     </p>
   </div>
+  <div class="actions">
+    <details class="drop">
+      <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
+      <div class="drop-list">
+        <form method="post" action="/rescan"><input type="hidden" name="back" value="/series"><button type="submit">Rescan</button></form>
+        <a href="/review/filenames">Review file names</a>
+        <a href="/groups/suggested">Find possible groups</a>
+        <a href="/import">Import spreadsheet…</a>
+        <a href="/library/convert">Convert odd formats…</a>
+        <a href="/organize/history">Past renames</a>
+        <a href="/library">All files (Library)</a>
+      </div>
+    </details>
   {% if series %}
   <nav class="view-switch" aria-label="Show as">
     <a href="/series"{% if view == "tiles" %} aria-current="page"{% endif %}>Tiles</a>
     <a href="/series?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
   </nav>
   {% endif %}
+  </div>
 </section>
+{% include "_library_notices.html" %}
 
 {% if not series %}
-<div class="notice">No episodes yet. Add recordings to the library and press <strong>Rescan</strong>.</div>
+<div class="notice">No episodes yet. Add recordings to the library and choose <strong>☰ Actions → Rescan</strong>,
+  or upload them in the <a href="/inbox">Inbox</a>.</div>
 {% elif view == "tiles" %}
 <ul class="tiles">
   {% for s in series %}

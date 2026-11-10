@@ -327,3 +327,29 @@ def test_a_few_ticked_are_written_straight_away(series):
     assert sent.headers["location"] == "/series/episodes?name=Escape&tags_written=3"
     assert tagwriting.current_job() is None
     assert "Wrote the details into 3 files." in series.get(sent.headers["location"]).text
+
+
+# ------------------------------------------------------------ the Advanced page
+
+def test_the_advanced_page_is_only_reached_by_its_address(series):
+    page = series.get("/advanced").text
+    assert "These tools change your library files, all of them at once." in page
+    assert 'href="/advanced/tags">Preview…' in page
+    assert "15 files" in page                     # Suspense, Art Bell's 2 parts, 12 Escape
+    for address in ["/", "/series", "/library", "/series/episodes?name=Escape", "/inbox", "/feeds"]:
+        assert "/advanced" not in series.get(address).text
+
+
+def test_writing_details_into_every_file(series):
+    page = series.get("/advanced/tags").text
+    assert "Your whole library:" in page and "15 files" in page
+    assert "as an example of what will happen to the rest" in page
+    assert 'action="/advanced/tags"' in page and "Write the details into every file</button>" in page
+    assert series.post("/advanced/tags", data={}).status_code == 400
+    sent = series.post("/advanced/tags", data={"confirm": "yes"}, follow_redirects=False)
+    assert sent.headers["location"] == "/tags/writing"
+    job = finish()
+    # Escape (12) and Suspense (1) are written; Art Bell has no details yet.
+    assert (job.files, job.checked, job.written, job.up_to_date, job.problems) == (15, 15, 13, 2, [])
+    assert job.back == "/advanced"
+    assert 'href="/tags/writing">Writing now' not in series.get("/advanced").text

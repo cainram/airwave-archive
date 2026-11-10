@@ -123,17 +123,18 @@ def test_series_tiles_show_initials_without_pictures(client):
 
 def test_menu_shows_where_you_are(client):
     home = '<a href="/" data-paths="/" aria-current="page">Home</a>'
-    series = '<a href="/series" data-paths="/series" aria-current="page">Series</a>'
-    library = '<a href="/library" data-paths="/library /files /review /import" aria-current="page">Library</a>'
+    series = ('<a href="/series" data-paths="/series /library /files /review /import /groups /organize"'
+              ' aria-current="page">Series</a>')
     front = client.get("/").text
-    assert home in front and series not in front and library not in front
+    assert home in front and series not in front
     assert series in client.get("/series").text and home not in client.get("/series").text
     assert series in client.get("/series/episodes").text
-    assert library in client.get("/library").text and series not in client.get("/library").text
-    assert library in client.get(f"/files/{client.ids['patriot.wav']}").text
-    # Home, then Series, then Library.
+    # The Library isn't in the menu (owner's choice, 2026-11-10): its pages count as Series.
+    assert series in client.get("/library").text
+    assert series in client.get(f"/files/{client.ids['patriot.wav']}").text
     menu = front.split('id="menu"')[1].split("</nav>")[0]
-    assert menu.index(">Home<") < menu.index(">Series<") < menu.index(">Library<")
+    assert ">Library<" not in menu
+    assert menu.index(">Home<") < menu.index(">Series<") < menu.index(">Calendar<")
     # Pages fetched by htmx bring the menu along, to replace the old one.
     partial = client.get("/series", headers={"HX-Request": "true"}).text
     assert 'hx-swap-oob="true"' in partial and 'aria-current="page">Series' in partial
@@ -189,3 +190,13 @@ def test_an_empty_library_says_how_to_start(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "_engine", make_engine(tmp_path / "data" / "airwave.db"))
     page = TestClient(main.app).get("/").text
     assert "No episodes yet." in page and "Recently added" not in page
+
+
+def test_the_series_page_has_the_librarys_tools(client):
+    page = client.get("/series").text
+    for item in ['<input type="hidden" name="back" value="/series"><button type="submit">Rescan</button>',
+                 'href="/review/filenames">Review file names', 'href="/groups/suggested">Find possible groups',
+                 'href="/import">Import spreadsheet…', 'href="/library/convert">Convert odd formats…',
+                 'href="/organize/history">Past renames', 'href="/library">All files (Library)']:
+        assert item in page
+    assert '<a class="button" href="/series">← Series</a>' in client.get("/library").text
