@@ -1,7 +1,8 @@
 """Writing an episode's details into the tags of an audio file.
 
-Only ever used on COPIES (for exports): the library's own files are never
-changed.
+Used on copies: for exports, and by ``app/tagwriting.py``, which writes
+into a hidden copy of a library file and swaps it in only once it's checked
+(Phase 10a, after the owner's preview page).
 
 Two kinds of tags are written:
 

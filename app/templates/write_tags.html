@@ -1,0 +1,81 @@
+{% extends layout %}
+{% block title %}Write details into files · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ back }}">← Back without writing</a></nav>
+<h1>Write details into the files</h1>
+
+{% macro value(text) %}{% if text is none %}<span class="muted">(none)</span>{% else %}{{ text }}{% endif %}{% endmacro %}
+
+{% if not plans %}
+<div class="notice">No episodes were ticked, so there's nothing to write.</div>
+{% else %}
+<div class="notice warning" role="note">
+  <strong>This changes the files in your library.</strong> The episode's details are written into each
+  file's <em>tags</em> (the labels stored inside a recording, which other players such as VLC or Apple Music
+  show). The sound isn't touched. Tags not listed below are kept as they are.
+  Each file is written as a hidden copy and checked before it takes the original's place, so a file is never
+  left half-written. Keep backups all the same.
+</div>
+
+{% for plan in plans %}
+{% set f = plan.file %}
+<section class="tag-plan">
+  <h2 class="tag-file"><a href="/files/{{ f.id }}">{{ f | display_title }}</a></h2>
+  <p class="muted small"><code>{{ (f.folder ~ "/") if f.folder }}{{ f.name }}</code></p>
+  {% if plan.problem %}
+  <p class="field-error">{{ plan.problem }} It will be left alone.</p>
+  {% elif plan.no_details %}
+  <p class="muted">This episode has no details yet, so there's nothing to write.
+    <a href="/files/{{ f.id }}/edit">Edit details</a> first.</p>
+  {% elif plan.up_to_date %}
+  <p class="muted">Already up to date: nothing to write.</p>
+  {% else %}
+  {% if plan.changes %}
+  <div class="table-wrap">
+    <table class="files tag-changes">
+      <thead><tr><th>Tag</th><th>Now</th><th>Will be</th></tr></thead>
+      <tbody>
+        {% for change in plan.changes %}
+        <tr><td>{{ change.label }}</td><td>{{ value(change.now) }}</td><td>{{ value(change.will_be) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted small">The usual tags are already up to date.</p>
+  {% endif %}
+  {% if plan.airwave %}
+  <details class="airwave-tags">
+    <summary>Airwave tags: {{ plan.airwave | length }} to add or update
+      <span class="muted small">(the radio details, for another Airwave Archive)</span></summary>
+    <div class="table-wrap">
+      <table class="files tag-changes">
+        <thead><tr><th>Airwave tag</th><th>Now</th><th>Will be</th></tr></thead>
+        <tbody>
+          {% for change in plan.airwave %}
+          <tr><td>{{ change.label }}</td><td>{{ value(change.now) }}</td><td>{{ value(change.will_be) }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+  {% endif %}
+</section>
+{% endfor %}
+
+{% if to_write %}
+<form method="post" action="/tags/write" class="form-buttons">
+  {% for ep in episodes %}<input type="hidden" name="ids" value="{{ ep.id }}">{% endfor %}
+  <input type="hidden" name="back" value="{{ back }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button primary" type="submit">Write the details into
+    {{ to_write | length }} file{{ "" if to_write | length == 1 else "s" }}</button>
+  <a class="button" href="{{ back }}">Cancel</a>
+</form>
+{% else %}
+<div class="notice">There's nothing to write.</div>
+<p><a class="button" href="{{ back }}">← Back</a></p>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -93,6 +93,10 @@ These come from the plan and should not be changed without the owner's OK:
   original deleted, only after a confirmation page listing them and
   warning about it, and only once the new file has been checked.
   Nothing else ever deletes from the library.
+  The third exception (Phase 10a, 2026-11-09): **writing details into
+  the files' tags**, only after a preview page listing every file and
+  each tag that will change. The sound is never touched
+  (`app/tagwriting.py`).
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud
@@ -147,8 +151,13 @@ These come from the plan and should not be changed without the owner's OK:
   played
 - `app/airdates.py`: the calendar (episodes by air date: a month's grid
   and days, nearest months with recordings)
-- `app/tagging.py`: writes episode details into tags of **copies** only
-  (standard tags plus `AIRWAVE_*` tags), and reads Airwave tags back
+- `app/tagging.py`: writes episode details into a file's tags (standard
+  tags plus `AIRWAVE_*` tags), for export copies and for
+  `app/tagwriting.py`, and reads Airwave tags back
+- `app/tagwriting.py`: writes episode details into the **library's own
+  files** (Phase 10a, after the preview page): the preview of each tag
+  that changes, and the safe write (a hidden copy, checked, then swapped
+  in, with the app's record updated so a scan sees nothing changed)
 - `app/deleting.py`: deleting episodes' files from the library, for good
   (only after the confirmation page), and the episodes from the app
 - `app/export.py`: export zips (tagged copies, manifest, pictures), made

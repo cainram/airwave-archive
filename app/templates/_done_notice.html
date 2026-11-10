@@ -1,4 +1,4 @@
-{# After a bulk edit, a rename, marking played, or deleting: say what happened. #}
+{# After a bulk edit, a rename, marking played, deleting, or writing tags: say what happened. #}
 {% set q = request.query_params %}
 {% set changed = q.get("changed", "-1") | int(-1) %}
 {% set skipped = q.get("skipped", "0") | int(0) %}
@@ -27,4 +27,10 @@
 {% if deleted >= 0 %}
 <div class="notice success" role="status">
   {% if deleted %}Deleted {{ deleted }} recording{{ "" if deleted == 1 else "s" }} ({{ q.get("freed", "0") | int(0) | size }}) from your library.{% else %}Removed from the app (the files were already gone from the disk).{% endif %}</div>
+{% endif %}
+{% set tags_written = q.get("tags_written", "-1") | int(-1) %}
+{% if tags_written > 0 %}
+<div class="notice success" role="status">Wrote the details into {{ tags_written }} file{{ "" if tags_written == 1 else "s" }}.</div>
+{% elif tags_written == 0 %}
+<div class="notice" role="status">The files were already up to date.</div>
 {% endif %}

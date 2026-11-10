@@ -32,7 +32,8 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import airdates, convert, converting, csvimport, deleting, export, feeds, grouping, inbox, listening, zipimport
+from app import (airdates, convert, converting, csvimport, deleting, export, feeds, grouping, inbox,
+                 listening, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -182,6 +183,13 @@ _engine: Engine | None = None
 def _sync_inbox_folder(engine: Engine, folder: Path) -> None:
     with Session(engine) as session:
         inbox.sync_inbox(session, folder)
+
+
+@app.on_event("startup")
+def clear_tag_leftovers() -> None:
+    """Hidden copies left by tag writing that a restart stopped (in the
+    background: it looks through every library folder)."""
+    threading.Thread(target=tagwriting.clear_leftovers, args=(LIBRARY_DIR,), daemon=True).start()
 
 
 @app.on_event("startup")
@@ -1229,6 +1237,52 @@ async def delete_episodes(request: Request):
         return render(request, "deleted.html", {"result": result, "back": back})
     return go_to(request, with_query(back, deleted=str(result.deleted),
                                      freed=str(result.freed)))
+
+
+@app.get("/tags/write", response_class=HTMLResponse)
+def write_tags_page(request: Request, ids: list[int] = Query(default=[]), back: str = "/library"):
+    """Preview: every file of these episodes, and each tag writing their
+    details would change. Nothing is written until the button is pressed."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        episodes = chosen_episodes(session, ids, "")
+        plans = tagwriting.plan_episodes(episodes, LIBRARY_DIR)
+        for plan in plans:
+            plan.file.episode             # (loaded now, for the page)
+        session.expunge_all()
+    return render(request, "write_tags.html", {
+        "plans": plans, "episodes": episodes, "back": safe_back(back),
+        "to_write": [p for p in plans if p.problem is None and not p.up_to_date]})
+
+
+@app.post("/tags/write", response_class=HTMLResponse)
+async def write_tags_now(request: Request):
+    """Write the episodes' details into their files' tags: only after the
+    preview page (owner's choice, 2026-11-09)."""
+    form = await request.form()
+    ids = [int(v) for v in form.getlist("ids") if str(v).isdigit()]
+    back = safe_back(form.get("back"))
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
+    written, problems = 0, []
+    with Session(get_engine()) as session:
+        episodes = chosen_episodes(session, ids, "")
+        export.give_ids(episodes)
+        session.commit()
+        for plan in tagwriting.plan_episodes(episodes, LIBRARY_DIR):
+            if plan.up_to_date:
+                continue
+            try:
+                if plan.problem:
+                    raise tagwriting.TagError(plan.problem)
+                tagwriting.write_file(plan.file, plan.episode, LIBRARY_DIR)
+                written += 1
+            except tagwriting.TagError as error:
+                problems.append((plan.file.folder, plan.file.name, str(error)))
+            session.commit()
+    if problems:
+        return render(request, "tags_written.html", {"written": written, "problems": problems,
+                                                     "back": back})
+    return go_to(request, with_query(back, tags_written=str(written)))
 
 
 @app.get("/series/rename", response_class=HTMLResponse)

@@ -701,3 +701,12 @@ a.day-title:hover { text-decoration: underline; }
 .converting-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 3px 0; }
 .converting-name { overflow-wrap: anywhere; }
 .converting-list progress { width: 160px; max-width: 100%; }
+
+/* ---- Writing details into files' tags ----------------------------------- */
+.tag-plan { margin: 0 0 22px; }
+h2.tag-file { font-size: 1.05rem; margin: 0 0 2px; }
+.tag-plan code { word-break: break-all; }
+.tag-changes td { overflow-wrap: anywhere; vertical-align: top; }
+.tag-changes td:first-child, .tag-changes .muted { white-space: nowrap; }
+.airwave-tags { margin-top: 8px; }
+.airwave-tags summary { cursor: pointer; }

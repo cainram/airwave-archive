@@ -104,6 +104,13 @@ listing exactly which files will be converted and warning that the
 originals go. A new file replaces the original only once it has been
 checked (it opens, and its length matches). See Phase 13.
 
+**A third exception is writing details into the files' tags** (Phase 10a,
+owner's go-ahead 2026-11-09). Only when asked, after a preview page listing
+every file and each tag that will change. Only the tags change, never the
+sound; tags the app doesn't know about are kept. Each file is written as a
+hidden copy beside it, checked, and only then put in the original's place,
+so a file is never left half-written.
+
 ### Where things live
 
 The recommended layout on the server is one folder, `/srv/airwave`, ideally
@@ -645,7 +652,7 @@ Whole-library runs of both parts live on the hidden **Advanced page**
 (`/advanced`, see "Later" below). Everyday pages offer only one episode,
 ticked episodes, or a series.
 
-#### 10a — Write details into the files' tags
+#### 10a — Write details into the files' tags (step 1 ✅ *done*)
 - Save the app's details into each file's own tags: the standard tags
   (title, artist/series, year...) plus the Airwave tags (section 5), so
   other players and other Airwave servers can see them.
@@ -655,6 +662,27 @@ ticked episodes, or a series.
   the owner's edits (manual details still win, section 5).
 - **Try it:** write tags to one episode, open the file in another player
   (VLC, iTunes/Music), see the new details.
+- **Step 1 ✅ *done*: one episode.** On an episode's page, **☰ Actions →
+  Write details into the file…** (or "files…" for an episode in parts)
+  opens `/tags/write`, a preview: each file, and a table of each usual tag
+  (title, artist, album, date, comment, track) as it is now and as it
+  will be, with the Airwave tags in a fold-out. Files already up to date,
+  missing, or that can't hold tags are said so and left alone; an episode
+  with no details has nothing to write (a lone ID would be no use).
+  **Write the details into N files** does it. Notes (`app/tagwriting.py`):
+  the episode gets its permanent ID first (as exports do). Each file is
+  copied to a hidden `.tagging-…` file beside it, the tags are written
+  into the copy, the copy is checked (it opens, and is as long as the
+  original), and it replaces the original only if the original hasn't
+  changed meanwhile; all with the scan lock held. The app's record of the
+  file (size, time, tags) is updated in the same step, so the next scan
+  doesn't see a changed file and nothing the owner typed is undone.
+  Hidden copies left by a restart are cleared at start-up. Checked on
+  copies of real files: the sound is identical afterwards, and cover art
+  and other tags (genre, the original comment) are kept.
+- **Step 2 (next): many at once.** "☰ With ticked → Write details into
+  files…" and a series page's Actions, running in the background with
+  progress and a Stop button (files are each fully done or untouched).
 
 #### 10b — Rename and organise files from the database
 Like the "organise my music folder" feature in classic MP3 software
