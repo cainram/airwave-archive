@@ -704,7 +704,7 @@ ticked episodes, or a series.
   untouched; running it again skips files already up to date. Whole-library
   runs are left for the Advanced page.
 
-#### 10b — Rename and organise files from the database (step 1 ✅ *done*)
+#### 10b — Rename and organise files from the database ✅ *done*
 Like the "organise my music folder" feature in classic MP3 software
 (Winamp, iTunes, MusicBrainz Picard): file names and folders follow the
 app's details.
@@ -764,8 +764,12 @@ app's details.
   real files (RUSC.com's Gunsmoke and One Night Stand): renamed, played,
   put back. Note: the RUSC.com files' own tags have the
   date inside the title, so tidy details before renaming.
-- **Step 2 (next):** a list of past renames, to put back an older batch,
-  and the whole-library version for the Advanced page.
+- **Step 2 ✅ *done*: past renames.** `/organize/history` (Library's **☰
+  Actions → Past renames**, and linked from the rename pages) lists the
+  last 100 batches, newest first: what was renamed and when, the files in a
+  fold-out (old and new names, those put back marked), and **Put them
+  back** for any batch not fully put back yet. The whole-library version
+  is left for the Advanced page.
 
 ### Phase 11 — Export and import
 - 11a (export) ✅ *done*: "Export…" on a series page and "Export ticked…"

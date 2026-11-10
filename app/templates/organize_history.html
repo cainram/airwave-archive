@@ -1,0 +1,48 @@
+{% extends layout %}
+{% block title %}Past renames · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/library">← Library</a></nav>
+<h1>Past renames</h1>
+<p class="muted">Each time files were renamed and organized, newest first. Putting a batch back moves its
+  files to their old names and folders. A file that has been moved or renamed again since, or whose old
+  name is taken now, is left where it is.</p>
+
+{% macro files(n) %}{{ n }} file{{ "" if n == 1 else "s" }}{% endmacro %}
+{% if not rows %}
+<div class="notice">No files have been renamed yet.</div>
+{% endif %}
+{% for row in rows %}
+<section class="tag-plan rename-batch">
+  <h2>{{ row.batch.label }}</h2>
+  <p class="muted small">Renamed {{ files(row.files) }}{% if row.pictures %} and {{ row.pictures }} folder picture{{ "" if row.pictures == 1 else "s" }}{% endif %},
+    {{ row.batch.made_at | ago }}.
+    {% if not row.can_put_back %}<strong>Put back {{ row.batch.undone_at | ago if row.batch.undone_at else "" }}.</strong>
+    {% elif row.put_back %}<strong>{{ row.put_back }} put back already.</strong>{% endif %}</p>
+  {% if row.moves %}
+  <details>
+    <summary>Show the files</summary>
+    <div class="table-wrap">
+      <table class="files rename-plan">
+        <thead><tr><th>Was</th><th>Renamed to</th></tr></thead>
+        <tbody>
+          {% for m in row.moves[:300] %}
+          <tr{% if m.undone %} class="muted"{% endif %}>
+            <td><code>{{ (m.old_folder ~ "/") if m.old_folder }}{{ m.old_name }}</code></td>
+            <td><code>{{ (m.new_folder ~ "/") if m.new_folder }}{{ m.new_name }}</code>{% if m.undone %} <span class="small">(put back)</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if row.moves | length > 300 %}<p class="muted">…and {{ row.moves | length - 300 }} more.</p>{% endif %}
+  </details>
+  {% endif %}
+  {% if row.can_put_back %}
+  <form method="post" action="/organize/{{ row.batch.id }}/undo" class="form-buttons">
+    <input type="hidden" name="back" value="/organize/history">
+    <button class="button" type="submit">Put {{ "it" if row.files - row.put_back == 1 else "them" }} back</button>
+  </form>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

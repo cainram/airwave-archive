@@ -276,3 +276,28 @@ def test_a_restart_halfway_is_tidied_up(client):
         assert (f.folder, f.name) == ("Gunsmoke", "Home Surgery.mp3")
         records = session.scalars(select(Renamed)).all()
         assert [(r.new_name, r.done) for r in records] == [("Home Surgery.mp3", True)]
+
+
+# ------------------------------------------------------------ past renames
+
+def test_past_renames_lists_batches_and_puts_an_older_one_back(client):
+    assert "No files have been renamed yet." in text(client.get("/organize/history"))
+    assert 'href="/organize/history">Past renames' in client.get("/library").text
+    organize(client, {"whole_series": "Gunsmoke"})
+    organize(client, {"whole_series": "One Night Stand"})
+    page = text(client.get("/organize/history"))
+    # Newest first, with the files in a fold-out.
+    assert page.index("<h2>One Night Stand</h2>") < page.index("<h2>Gunsmoke</h2>")
+    assert "Renamed 2 files," in page and "Renamed 1 file and 1 folder picture," in page
+    assert "<code>RUSC.com/guns.1952.09.13_Home_Surgery.mp3</code>" in page
+    assert "<code>Gunsmoke/Gunsmoke - 1952-09-13 - Home Surgery.mp3</code>" in page
+    with Session(engine()) as session:
+        first = session.scalar(select(func.min(RenameBatch.id)))
+    assert page.count("Put them back</button>") == 1 and page.count("Put it back</button>") == 1
+    # Put the older one back, from here.
+    done = text(client.post(f"/organize/{first}/undo", data={"back": "/organize/history"}))
+    assert "Put 2 files back where they were." in done and 'href="/organize/history">Done' in done
+    assert "RUSC.com/guns.1952.09.13_Home_Surgery.mp3" in files_on_disk(client.lib)
+    page = text(client.get("/organize/history"))
+    assert "<strong>Put back " in page and "(put back)" in page
+    assert page.count("back</button>") == 1          # only One Night Stand's is left

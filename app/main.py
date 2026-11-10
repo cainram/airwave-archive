@@ -1371,6 +1371,17 @@ async def organize_now(request: Request):
     return render(request, "organized.html", {"result": result, "back": back, "undone": False})
 
 
+@app.get("/organize/history", response_class=HTMLResponse)
+def organize_history(request: Request):
+    """Past renames, newest first, each with a button to put it back."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        batches = session.scalars(select(RenameBatch).order_by(RenameBatch.id.desc())
+                                  .limit(renaming.HISTORY)).all()
+        rows = [renaming.summary(batch) for batch in batches]
+        session.expunge_all()
+    return render(request, "organize_history.html", {"rows": rows})
+
+
 @app.post("/organize/{batch_id}/undo", response_class=HTMLResponse)
 async def organize_undo(request: Request, batch_id: int):
     """Put a batch of renamed files back where they were."""

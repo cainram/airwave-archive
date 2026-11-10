@@ -28,5 +28,6 @@
   <input type="hidden" name="back" value="{{ back }}">
   <button class="button" type="submit">Put {{ "it" if result.moved == 1 else "them" }} back</button>
   {% endif %}
+  <a class="button" href="/organize/history">Past renames</a>
 </form>
 {% endblock %}
