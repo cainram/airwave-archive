@@ -13,9 +13,11 @@ it up to date if a decision changes.
 ## Guiding principle: a personal project
 
 The owner is building Airwave Archive **for themselves**. The GitHub
-repository is **private** for now. If it's ever shared, others are welcome to
-use it under the GPL v3, but the owner is **not running a
-community project**. In practice:
+repository is **public** (since 2026-11-10; Issues, Discussions and the
+Wiki are off). Others are welcome to use it under the GPL v3, but the
+owner is **not running a community project**. Everything committed is
+visible to anyone: never commit the owner's addresses, names of their
+machines, or personal details. In practice:
 
 - Make decisions that suit the owner's setup and needs. Don't add options,
   settings, or support for other platforms "in case someone wants them."
