@@ -301,3 +301,75 @@ def test_past_renames_lists_batches_and_puts_an_older_one_back(client):
     page = text(client.get("/organize/history"))
     assert "<strong>Put back " in page and "(put back)" in page
     assert page.count("back</button>") == 1          # only One Night Stand's is left
+
+
+# ------------------------------------------------------------ the whole library
+
+@pytest.fixture
+def no_job(monkeypatch):
+    monkeypatch.setattr(renaming, "_job", None)
+
+
+def finish():
+    import time
+    for _ in range(500):
+        job = renaming.current_job()
+        if job is not None and job.finished:
+            return job
+        time.sleep(0.01)
+    raise AssertionError("renaming didn't finish")
+
+
+def test_the_advanced_page_offers_it(client, no_job):
+    page = client.get("/advanced").text
+    assert "Rename and organize every file" in page and 'href="/advanced/organize">Preview…' in page
+    page = text(client.get("/advanced/organize"))
+    assert "Your whole library: 3 episodes, 3 files" in page and "will be renamed, into 2 folders" in page
+    assert 'action="/advanced/organize"' in page and "Rename 3 files in the whole library</button>" in page
+    assert len(files_on_disk(client.lib)) == 4                     # nothing moved yet
+
+
+def test_renaming_the_whole_library_in_the_background(client, no_job):
+    assert client.post("/advanced/organize", data={}).status_code == 400
+    sent = client.post("/advanced/organize", data={"confirm": "yes"}, follow_redirects=False)
+    assert sent.headers["location"] == "/advanced/renaming"
+    job = finish()
+    assert (job.total, job.checked, job.moved, job.pictures, job.folders_removed, job.problems) == (
+        3, 3, 3, 0, 0, [])
+    assert files_on_disk(client.lib) == [
+        "Gunsmoke/Gunsmoke - 1952-04-26 - Billy the Kid.mp3",
+        "Gunsmoke/Gunsmoke - 1952-09-13 - Home Surgery.mp3",
+        "One Night Stand/One Night Stand - 1941-03-25 - Love and Gazozza.mp3",
+        "RUSC.com/cover.jpg",      # its recordings went to two series: which one's picture is it?
+    ]
+    page = text(client.get("/advanced/renaming"))
+    assert "<strong>Finished.</strong> Renamed 3 files." in page
+    assert "hx-trigger" not in page and "Put them back</button>" in page
+    assert "<h2>The whole library</h2>" in text(client.get("/organize/history"))
+    # Put back, from the result.
+    text(client.post(f"/organize/{job.batch_id}/undo", data={"back": "/organize/history"}))
+    assert len([n for n in files_on_disk(client.lib) if n.startswith("RUSC.com/")]) == 4
+    assert not (client.lib / "Gunsmoke").exists()
+
+
+def test_stopping_partway(client, no_job, monkeypatch):
+    real = renaming._move
+
+    def slow(session, batch, library, *args):
+        real(session, batch, library, *args)
+        if renaming.current_job().moved == 0 and args[-1] is not None:
+            page = text(client.get("/advanced/renaming/status"))
+            assert "Renaming…" in page and 'hx-trigger="every 2s"' in page and "Stop renaming" in page
+            client.post("/advanced/renaming/stop")
+    monkeypatch.setattr(renaming, "_move", slow)
+    client.post("/advanced/organize", data={"confirm": "yes"})
+    job = finish()
+    assert job.stop and (job.checked, job.moved) == (1, 1)
+    page = text(client.get("/advanced/renaming/status"))
+    assert "<strong>Stopped.</strong> Renamed 1 file." in page and "The other 2 were left as they were" in page
+    # One at a time: nothing else renames or writes while a run is going.
+    job.finished = False
+    assert client.post("/organize", data={"whole_series": "Gunsmoke", "back": BACK, "confirm": "yes"},
+                       follow_redirects=False).headers["location"] == "/advanced/renaming"
+    assert "Files are being written or renamed right now." in text(client.get("/organize?whole_series=Gunsmoke"))
+    job.finished = True

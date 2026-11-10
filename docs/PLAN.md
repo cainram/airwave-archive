@@ -1065,7 +1065,7 @@ The plan: **ffmpeg** (the standard free converter) inside the inbox.
 - Meanwhile, a batch can be converted by hand with ffmpeg on the dev VM and
   then uploaded as normal.
 
-### Later — The Advanced page (`/advanced`, after v1.0) (step 1 ✅ *done*)
+### Later — The Advanced page (`/advanced`, after v1.0) ✅ *done*
 A page of **power-user tools** that work on the whole library at once
 (owner's request, 2026-11-07). Examples:
 - converting the entire library's odd formats (see ffmpeg above)
@@ -1103,9 +1103,18 @@ How it works:
   notices (files to convert, converting now, new possible groups). The
   Library page still exists, with its back button to Series; the menu
   highlights Series on it and on the tools' pages.
-- **Step 2 (next):** rename and organize every file, run in the
-  background with progress and Stop (Phase 10b's renaming, for the whole
-  library).
+- **Step 2 ✅ *done*: rename and organize every file.** `/advanced/organize`
+  previews it (the totals, and the first 300 old and new names; working
+  out every name is quick, it only checks each file is there). Confirming
+  runs it in the background (`renaming.start`, one run at a time), on
+  `/advanced/renaming` (updating every 2 seconds, can be left) with **Stop
+  renaming**: every file is then renamed or left as it was. The run is one
+  batch in Past renames ("The whole library"), so it can be put back. A
+  scan afterwards picks up moved folder pictures. Only one thing changes
+  files at a time: while tags are being written or files renamed, the
+  other tools' previews say so and their buttons wait. Note: a folder
+  whose recordings go to several series folders keeps its picture (it's
+  unclear whose it is), so it isn't removed.
 - Note: an unlinked address is a **"keep out of the way" measure, not a
   lock**. Anyone on the network who knows the address can open it. That's
   fine for a single household, but it isn't security.

@@ -314,7 +314,7 @@ def test_problems_are_listed_at_the_end(series):
 def test_one_batch_at_a_time(series, monkeypatch):
     monkeypatch.setattr(tagwriting, "_job", tagwriting.Job(episode_ids=[1], files=5000, back="/library"))
     page = series.get("/tags/write?whole_series=Escape").text
-    assert "Details are being written into other files right now." in page and "Write the details into" not in page
+    assert "Files are being written or renamed right now." in page and "Write the details into" not in page
     sent = series.post("/tags/write", data={"whole_series": "Escape", "confirm": "yes"}, follow_redirects=False)
     assert sent.headers["location"] == "/tags/writing"
     assert written_titles(series) == [None] * 12

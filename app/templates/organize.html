@@ -20,7 +20,7 @@
 </div>
 
 <section class="tag-summary">
-  <h2>{% if whole_series %}{{ whole_series }}: {% endif %}{{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }}, {{ files(moves | length) }}</h2>
+  <h2>{% if whole_library %}Your whole library: {% elif whole_series %}{{ whole_series }}: {% endif %}{{ episodes | length }} episode{{ "" if episodes | length == 1 else "s" }}, {{ files(moves | length) }}</h2>
   <ul>
     {% if to_do %}<li><strong>{{ files(to_do | length) }}</strong> will be renamed{% if folders %}, into {{ folders }} folder{{ "" if folders == 1 else "s" }}{% endif %}.</li>{% endif %}
     {% if up_to_date %}<li>{{ files(up_to_date | length) }} already named this way.</li>{% endif %}
@@ -59,8 +59,16 @@
 {% endif %}
 
 {% if busy %}
-<div class="notice">Details are being written into files right now.
-  <a href="/tags/writing">See how it's going</a>, and come back when it's finished.</div>
+<div class="notice">Files are being written or renamed right now.
+  <a href="/advanced">See the Advanced page</a>, and come back when it's finished.</div>
+{% elif to_do and whole_library %}
+<p class="muted">Renaming runs in the background, with its progress shown, and can be stopped partway:
+  every file is then either renamed or left as it was.</p>
+<form method="post" action="/advanced/organize" class="form-buttons">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button danger" type="submit">Rename {{ files(to_do | length) }} in the whole library</button>
+  <a class="button" href="/advanced">Cancel</a>
+</form>
 {% elif to_do %}
 <form method="post" action="/organize" class="form-buttons">
   {% if whole_series %}<input type="hidden" name="whole_series" value="{{ whole_series }}">

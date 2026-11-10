@@ -1277,7 +1277,7 @@ def write_tags_page(request: Request, ids: list[int] = Query(default=[]), whole_
         "to_write": to_write, "problems": problems, "shown": shown, "changed": changed,
         "up_to_date": sum(1 for p in plans if p.up_to_date and not p.no_details),
         "no_details": sum(1 for p in plans if p.no_details),
-        "busy": tagwriting.busy()})
+        "busy": tagwriting.busy() or renaming.busy()})
 
 
 @app.post("/tags/write", response_class=HTMLResponse)
@@ -1293,6 +1293,8 @@ async def write_tags_now(request: Request):
         raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
     if tagwriting.busy():
         return go_to(request, "/tags/writing")
+    if renaming.busy():
+        return go_to(request, "/advanced/renaming")
     with Session(get_engine()) as session:
         episodes = chosen_episodes(session, ids, whole_series)
         files = sum(len(e.parts) for e in episodes)
@@ -1331,7 +1333,8 @@ def advanced_page(request: Request):
                                   .where(Episode.files.any(AudioFile.missing.is_(False))))
         convert_info = library_convert_info(session)
     return render(request, "advanced.html", {"files": files, "episodes": episodes,
-                                             "busy": tagwriting.busy(), **convert_info})
+                                             "busy": tagwriting.busy(), "renaming": renaming.busy(),
+                                             **convert_info})
 
 
 @app.get("/advanced/tags", response_class=HTMLResponse)
@@ -1359,7 +1362,7 @@ def advanced_tags_page(request: Request):
         "to_write": [p for p in plans if p.problem is None and not p.up_to_date],
         "problems": [p for p in plans if p.problem], "changed": {},
         "shown": [p for p in plans if not p.up_to_date],
-        "up_to_date": 0, "no_details": 0, "busy": tagwriting.busy()})
+        "up_to_date": 0, "no_details": 0, "busy": tagwriting.busy() or renaming.busy()})
 
 
 @app.post("/advanced/tags", response_class=HTMLResponse)
@@ -1368,12 +1371,68 @@ async def advanced_tags_now(request: Request):
     form = await request.form()
     if form.get("confirm") != "yes":
         raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
+    if renaming.busy():
+        return go_to(request, "/advanced/renaming")
     if not tagwriting.busy():
         with Session(get_engine()) as session:
             episodes = all_episodes_with_files(session)
             tagwriting.start(get_engine(), LIBRARY_DIR, [e.id for e in episodes],
                              sum(len(e.files) for e in episodes), "/advanced")
     return go_to(request, "/tags/writing")
+
+
+@app.get("/advanced/organize", response_class=HTMLResponse)
+def advanced_organize_page(request: Request):
+    """Preview for renaming and organizing every file: the totals, and the
+    first files' old and new names."""
+    with Session(get_engine(), expire_on_commit=False) as session:
+        episodes = all_episodes_with_files(session)
+        moves = renaming.plan(session, episodes, LIBRARY_DIR)
+        session.expunge_all()
+    to_do = [m for m in moves if m.to_do]
+    return render(request, "organize.html", {
+        "moves": moves, "episodes": episodes, "back": "/advanced", "whole_series": "",
+        "whole_library": True, "to_do": to_do, "shown": to_do[:renaming.SHOWN],
+        "up_to_date": [m for m in moves if m.up_to_date],
+        "no_details": [m for m in moves if m.no_details],
+        "problems": [m for m in moves if m.problem],
+        "folders": len({m.new_folder for m in to_do if m.new_folder != m.file.folder}),
+        "busy": tagwriting.busy() or renaming.busy()})
+
+
+@app.post("/advanced/organize", response_class=HTMLResponse)
+async def advanced_organize_now(request: Request):
+    """Rename and organize every file, in the background."""
+    form = await request.form()
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
+    if tagwriting.busy():
+        return go_to(request, "/tags/writing")
+    if not renaming.busy():
+        with Session(get_engine()) as session:
+            ids = [e.id for e in all_episodes_with_files(session)]
+        renaming.start(get_engine(), LIBRARY_DIR, ids, "The whole library", afterwards=run_scan)
+    return go_to(request, "/advanced/renaming")
+
+
+@app.get("/advanced/renaming", response_class=HTMLResponse)
+def advanced_renaming_page(request: Request):
+    """Progress of renaming the whole library, with Stop; then what happened."""
+    if renaming.current_job() is None:
+        return go_to(request, "/advanced")
+    return render(request, "renaming.html", {"job": renaming.current_job()})
+
+
+@app.get("/advanced/renaming/status", response_class=HTMLResponse)
+def advanced_renaming_status(request: Request):
+    """The progress box, asked for every couple of seconds while renaming."""
+    return templates.TemplateResponse(request, "_renaming.html", {"job": renaming.current_job()})
+
+
+@app.post("/advanced/renaming/stop", response_class=HTMLResponse)
+def advanced_renaming_stop(request: Request):
+    renaming.stop()
+    return go_to(request, "/advanced/renaming")
 
 
 @app.get("/tags/writing", response_class=HTMLResponse)
@@ -1415,7 +1474,7 @@ def organize_page(request: Request, ids: list[int] = Query(default=[]), whole_se
         "no_details": [m for m in moves if m.no_details],
         "problems": [m for m in moves if m.problem],
         "folders": len({m.new_folder for m in to_do if m.new_folder != m.file.folder}),
-        "busy": tagwriting.busy()})
+        "busy": tagwriting.busy() or renaming.busy()})
 
 
 @app.post("/organize", response_class=HTMLResponse)
@@ -1430,6 +1489,8 @@ async def organize_now(request: Request):
         raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
     if tagwriting.busy():
         return go_to(request, "/tags/writing")
+    if renaming.busy():
+        return go_to(request, "/advanced/renaming")
     with Session(get_engine()) as session:
         episodes = chosen_episodes(session, ids, whole_series)
         label = whole_series or (episodes[0].series if len(episodes) == 1 and episodes[0].series

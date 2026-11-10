@@ -167,7 +167,8 @@ These come from the plan and should not be changed without the owner's OK:
   details (Phase 10b): the names, the preview, the moves (each written
   down first, so a batch can be put back and a restart halfway is tidied
   at start-up), folder pictures moving along, emptied folders removed,
-  and the past renames page's summaries
+  the past renames page's summaries, and the Advanced page's
+  whole-library run in the background (one at a time, with Stop)
 - `app/deleting.py`: deleting episodes' files from the library, for good
   (only after the confirmation page), and the episodes from the app
 - `app/export.py`: export zips (tagged copies, manifest, pictures), made
