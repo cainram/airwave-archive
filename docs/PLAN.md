@@ -414,7 +414,10 @@ Split into five smaller steps, done in order.
   read too when they hold a clear number: marked, in brackets with a title
   after, between ` - ` or `_` marks, or with a leading 0 (`X Minus One -
   001 - No Contact`); before it is the series, after it the title. A
-  series like `Box 13` or a browser's `Title (1)` isn't taken as a number. The review page (`/review/filenames`) shows only files
+  series like `Box 13` or a browser's `Title (1)` isn't taken as a number.
+  The inbox also takes a marked number from the album or title tag
+  (`xx/xx/1952 episode 09`), and fills in a blank number for files that
+  were already waiting (never replacing one that is there). The review page (`/review/filenames`) shows only files
   offering something for a field the owner hasn't set; cards that would
   replace the owner's own values start unticked. Confirmed values count as
   manual. Pulling cast lists out of comments is not done (could be a later

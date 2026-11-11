@@ -43,7 +43,7 @@ from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
 from app.episodes import (
     PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
 )
-from app.filenames import date_text, parse_filename
+from app.filenames import date_text, marked_number, parse_filename
 from app.parts import set_parts
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
 from app.series import one_series, set_uploaded_picture
@@ -165,7 +165,9 @@ def guess_details(path: Path, found: dict | None = None) -> dict:
     date = from_name if _known_parts(from_name) > _known_parts(from_tags) else from_tags
     details = {
         "series": _clean(tags.get("artist")) or _clean(tags.get("album")) or (guess and guess.series),
-        "episode_number": guess.episode_number if guess else None,
+        # From the name, else a tag that says "episode 9".
+        "episode_number": (guess and guess.episode_number) or marked_number(tags.get("album"))
+                          or marked_number(tags.get("title")),
         "title": _clean(tags.get("title")) or (guess and guess.title),
         "air_year": date[0], "air_month": date[1], "air_day": date[2],
         "duration_seconds": info.duration_seconds,
@@ -218,10 +220,17 @@ def _sync_inbox(session: Session, folder: Path) -> list[InboxItem]:
             if convert.needs_converting(name) and convert.available():
                 row.convert_json = convert.plan_for(name, found).to_json()
             session.add(row)
-        elif convert.needs_converting(name) and row.convert_json is None:
-            # Waiting since before converting was possible, or ffmpeg was missing.
-            if convert.available():
-                row.convert_json = convert.plan_for(name, convert.probe(path)).to_json()
+        else:
+            if row.episode_number is None:
+                # Waiting since before episode numbers were read from names
+                # like "Series - 01 - Title". Only a blank number is filled
+                # in: what's there may be the owner's own edit.
+                guess = parse_filename(name)
+                row.episode_number = guess.episode_number if guess else None
+            if convert.needs_converting(name) and row.convert_json is None:
+                # Waiting since before converting was possible, or ffmpeg was missing.
+                if convert.available():
+                    row.convert_json = convert.plan_for(name, convert.probe(path)).to_json()
         if convert.needs_converting(name) and convert.available():
             converting.queue(row)
     session.commit()

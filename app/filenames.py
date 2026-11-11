@@ -177,6 +177,13 @@ def _take_number(text: str, patterns) -> tuple[str | None, str]:
     return None, text
 
 
+def marked_number(text: str | None) -> str | None:
+    """A clearly marked episode number anywhere in some text, such as a
+    tag ("xx/xx/1952 episode 09" -> "9"), or None."""
+    number, _ = _take_number(text or "", MARKED)
+    return number
+
+
 def _parse_without_date(stem: str) -> Guess | None:
     """Names with no date: a clear episode number splits the series (before
     it) from the title (after it). None if there's no such number."""

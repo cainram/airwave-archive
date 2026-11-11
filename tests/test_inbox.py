@@ -4,7 +4,7 @@ import io
 
 import pytest
 from fastapi.testclient import TestClient
-from mutagen.id3 import TDRC, TIT2, TPE1
+from mutagen.id3 import TALB, TDRC, TIT2, TPE1
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -95,6 +95,33 @@ def test_files_copied_in_by_hand_appear_and_gone_ones_disappear(client):
     (client.box / "copied.wav").unlink()
     assert "copied.wav" not in client.get("/inbox").text
     assert items(client) == {}
+
+
+def test_episode_numbers_come_from_names_and_tags(client):
+    make_wav(client.box / "Black Museum - 07 - A Can Of Weedkiller.wav", 1)
+    tagged = client.box / "Black Museum Weedkiller.wav"
+    make_wav(tagged, 1)
+    add_tags(tagged, album=TALB(encoding=3, text="xx/xx/1952 episode 09"))
+    client.get("/inbox")
+    found = items(client)
+    named = found["Black Museum - 07 - A Can Of Weedkiller.wav"]
+    assert (named.series, named.episode_number, named.title) == ("Black Museum", "7", "A Can Of Weedkiller")
+    assert found["Black Museum Weedkiller.wav"].episode_number == "9"
+
+
+def test_a_blank_episode_number_is_filled_in_but_a_typed_one_is_kept(client):
+    import app.main as main
+    make_wav(client.box / "Black Museum - 07 - A Can Of Weedkiller.wav", 1)
+    make_wav(client.box / "Black Museum - 08 - The Canvas Bag.wav", 1)
+    client.get("/inbox")
+    with Session(main._engine) as session:   # as if read before numbers were understood
+        for item in session.scalars(select(InboxItem)):
+            item.episode_number = None if "07" in item.name else "108"
+        session.commit()
+    client.get("/inbox")
+    found = items(client)
+    assert found["Black Museum - 07 - A Can Of Weedkiller.wav"].episode_number == "7"
+    assert found["Black Museum - 08 - The Canvas Bag.wav"].episode_number == "108"
 
 
 def test_fixing_details(client):
