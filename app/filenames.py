@@ -130,26 +130,34 @@ def tidy(text: str) -> str | None:
     return text or None
 
 
+def _read_date(match: re.Match):
+    """The (year, month, day) a date match stands for, or None if it isn't
+    a sensible date."""
+    parts = match.groupdict()
+    year = int(parts["y"]) if parts.get("y") else 1900 + int(parts["yy"])
+    if parts.get("mon"):
+        month = MONTH_NAMES[parts["mon"].lower()]
+    else:
+        month = None if parts["m"].lower() == "xx" else int(parts["m"])
+    day = None if parts["d"].lower() == "xx" else int(parts["d"])
+    if not EARLIEST_YEAR <= year <= LATEST_YEAR:
+        return None
+    if month is not None and not 1 <= month <= 12:
+        return None
+    if month is None:
+        day = None   # a day without a month means nothing
+    if day is not None and not 1 <= day <= calendar.monthrange(year, month)[1]:
+        return None
+    return year, month, day
+
+
 def _find_date(stem: str):
     """Find the first sensible date in a name: (match, year, month, day)."""
     for pattern in DATE_PATTERNS:
         for match in pattern.finditer(stem):
-            parts = match.groupdict()
-            year = int(parts["y"]) if parts.get("y") else 1900 + int(parts["yy"])
-            if parts.get("mon"):
-                month = MONTH_NAMES[parts["mon"].lower()]
-            else:
-                month = None if parts["m"].lower() == "xx" else int(parts["m"])
-            day = None if parts["d"].lower() == "xx" else int(parts["d"])
-            if not EARLIEST_YEAR <= year <= LATEST_YEAR:
-                continue
-            if month is not None and not 1 <= month <= 12:
-                continue
-            if month is None:
-                day = None   # a day without a month means nothing
-            if day is not None and not 1 <= day <= calendar.monthrange(year, month)[1]:
-                continue
-            return match, year, month, day
+            date = _read_date(match)
+            if date:
+                return match, *date
     return None
 
 
@@ -182,6 +190,86 @@ def marked_number(text: str | None) -> str | None:
     tag ("xx/xx/1952 episode 09" -> "9"), or None."""
     number, _ = _take_number(text or "", MARKED)
     return number
+
+
+# Marks between the parts of a title tag: "1943-05-13 - Donovan's Brain".
+TITLE_JUNK = " -_.,;:|~/"
+TITLE_END_JUNK = " -_,;:|~/"   # a full stop at the end may be "Inc."
+
+
+def _without_series(title: str, names) -> str:
+    """``title`` without a series name at its start ("Suspense - Donovan's
+    Brain" -> "Donovan's Brain"). Only the whole name, followed by a mark
+    or a date: "The Shadow Knows" keeps its words when the series is "The
+    Shadow". Never the whole title."""
+    for name in names:
+        name = (name or "").strip()
+        if not name or not title.lower().startswith(name.lower()):
+            continue
+        rest = title[len(name):]
+        if not rest or rest[0].isalnum() or rest[0] in "'’":
+            continue   # "The Shadows...", "Suspense's..."
+        after_space = rest.lstrip(" ")
+        if after_space and after_space[0] not in TITLE_JUNK \
+                and _date_at(after_space, start=True) is None:
+            continue   # only a space, then words: may be part of the title
+        rest = rest.lstrip(TITLE_JUNK)
+        if rest:
+            return rest
+    return title
+
+
+def _date_at(text: str, start: bool):
+    """A sensible date right at the start (or end) of ``text``, give or
+    take marks and brackets: (the text without it, (year, month, day)), or
+    None. At the end, six digits run together aren't taken: "Case 380411"
+    is more likely a title than April 11th, 1938."""
+    patterns = DATE_PATTERNS if start else DATE_PATTERNS[:-1]
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            before, after = text[:match.start()], text[match.end():]
+            if start:
+                if before.strip(TITLE_JUNK + "(["):
+                    continue
+                if before.rstrip()[-1:] in ("(", "["):
+                    after = after.lstrip(" ")
+                    after = after[1:] if after[:1] in (")", "]") else after
+                rest = after.lstrip(TITLE_JUNK)
+            else:
+                if after.strip(TITLE_JUNK + ")]"):
+                    continue
+                rest = before.rstrip(TITLE_END_JUNK)
+                if rest[-1:] in ("(", "["):
+                    rest = rest[:-1].rstrip(TITLE_END_JUNK)
+            date = _read_date(match)
+            if date:
+                return rest, date
+    return None
+
+
+def clean_title(title: str | None, series=()) -> tuple[str | None, tuple]:
+    """Take a date and the series name off a title tag, so the title is
+    just the episode's own name: (the title, (year, month, day) of the date
+    taken off, or three Nones).
+
+    "1943-05-13 - Donovan's Brain" -> ("Donovan's Brain", (1943, 5, 13))
+    "Suspense - 1943-05-13 - Donovan's Brain" (series "Suspense") -> the same
+    "Donovan's Brain (May 13, 1943)" -> the same
+
+    Only a date at the very start or end is taken off: one in the middle
+    may belong to the title. If nothing would be left, the title is None
+    (the date is still given).
+    """
+    none = (None, None, None)
+    if not title:
+        return title, none
+    text = _without_series(title.strip(), series)
+    found = _date_at(text, start=True) or _date_at(text, start=False)
+    if found is None:
+        return text, none
+    text, date = found
+    text = _without_series(text, series).strip() or None
+    return text, date
 
 
 def _parse_without_date(stem: str) -> Guess | None:

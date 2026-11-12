@@ -41,9 +41,10 @@ from sqlalchemy.orm import Session
 from app import convert, converting, grouping
 from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
 from app.episodes import (
-    PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, read_date_text,
+    PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, known_parts,
+    read_date_text,
 )
-from app.filenames import date_text, marked_number, parse_filename
+from app.filenames import clean_title, date_text, marked_number, parse_filename
 from app.parts import set_parts
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
 from app.series import one_series, set_uploaded_picture
@@ -107,10 +108,6 @@ def save_upload(source, folder: Path, name: str) -> str:
     return final
 
 
-def _known_parts(date: tuple) -> int:
-    return sum(part is not None for part in date)
-
-
 def _text(value, limit: int = MAX_TEXT) -> str | None:
     return _clean(str(value)[:limit]) if value is not None else None
 
@@ -160,15 +157,21 @@ def guess_details(path: Path, found: dict | None = None) -> dict:
             except (KeyError, TypeError, ValueError):
                 pass
     guess = parse_filename(path.name)
-    from_tags = (date_from_tag(tags.get("date")))
-    from_name = (guess.year, guess.month, guess.day) if guess else (None, None, None)
-    date = from_name if _known_parts(from_name) > _known_parts(from_tags) else from_tags
+    series = _clean(tags.get("artist")) or _clean(tags.get("album")) or (guess and guess.series)
+    # A date or the series name in the title tag is taken off the title.
+    title, from_title = clean_title(_clean(tags.get("title")),
+                                    (series, _clean(tags.get("album")), guess and guess.series))
+    # The date that says the most: the date tag, else the title's, else the name's.
+    date = date_from_tag(tags.get("date"))
+    for other in (from_title, (guess.year, guess.month, guess.day) if guess else (None,) * 3):
+        if known_parts(other) > known_parts(date):
+            date = other
     details = {
-        "series": _clean(tags.get("artist")) or _clean(tags.get("album")) or (guess and guess.series),
+        "series": series,
         # From the name, else a tag that says "episode 9".
         "episode_number": (guess and guess.episode_number) or marked_number(tags.get("album"))
                           or marked_number(tags.get("title")),
-        "title": _clean(tags.get("title")) or (guess and guess.title),
+        "title": title or (guess and guess.title),
         "air_year": date[0], "air_month": date[1], "air_day": date[2],
         "duration_seconds": info.duration_seconds,
     }

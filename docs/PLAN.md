@@ -387,6 +387,17 @@ Split into five smaller steps, done in order.
   zone), and the whole comment goes into Notes (owner's choice). Pulling
   cast and exact dates out of comments is left for 4c, where guesses are
   confirmed first. Database version 3 fills in existing episodes once.
+- **Clean titles** (owner's choice, 2026-11-12): many title tags carry the
+  air date and series too (`Suspense - 1943-05-13 - Donovan's Brain`). In
+  the scan and the inbox, a date at the very start or end of the title
+  tag, and the series name at its start (followed by a mark or a date), are
+  taken off, so the title is just `Donovan's Brain` in the listings, the
+  player and podcast apps (`clean_title` in `app/filenames.py`). The
+  title's date is used when it says more than the date tag (`1943`); if
+  they're as full, the date tag wins. A date in the middle (`The
+  1943-05-13 Affair`) and six run-together digits at the end (`Case
+  380411`) are left alone. Only new or changed files are affected:
+  existing episodes keep their titles (owner's choice: no clean-up run).
 
 #### 4c — Filename parser with a confirm screen ✅ *done*
 - Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's

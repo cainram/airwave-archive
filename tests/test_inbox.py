@@ -109,6 +109,17 @@ def test_episode_numbers_come_from_names_and_tags(client):
     assert found["Black Museum Weedkiller.wav"].episode_number == "9"
 
 
+def test_dates_and_series_names_come_off_title_tags(client):
+    tagged = client.box / "upload.wav"
+    make_wav(tagged, 1)
+    add_tags(tagged, title=TIT2(encoding=3, text="Suspense 1943-05-13 - Donovan's Brain"),
+             artist=TPE1(encoding=3, text="Suspense"), date=TDRC(encoding=3, text="1943"))
+    client.get("/inbox")
+    item = items(client)["upload.wav"]
+    assert (item.series, item.title) == ("Suspense", "Donovan's Brain")
+    assert (item.air_year, item.air_month, item.air_day) == (1943, 5, 13)
+
+
 def test_a_blank_episode_number_is_filled_in_but_a_typed_one_is_kept(client):
     import app.main as main
     make_wav(client.box / "Black Museum - 07 - A Can Of Weedkiller.wav", 1)

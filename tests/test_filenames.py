@@ -216,3 +216,31 @@ def test_a_corrected_card_does_not_come_back(client):
     client.post("/review/filenames", data=data)
     # The name still says "Campbell Playhouse", but the owner chose otherwise.
     assert "CampbellPlayhouse39-04-14ThePatriot.wav" not in client.get("/review/filenames").text
+
+
+# ------------------------------------------- dates and series in title tags
+
+from app.filenames import clean_title  # noqa: E402
+
+
+@pytest.mark.parametrize("title, series, cleaned, date", [
+    ("1943-05-13 - Donovan's Brain", (), "Donovan's Brain", (1943, 5, 13)),
+    ("Suspense - 1943-05-13 - Donovan's Brain", ("Suspense",), "Donovan's Brain", (1943, 5, 13)),
+    ("1943-05-13 Suspense - Donovan's Brain", ("Suspense",), "Donovan's Brain", (1943, 5, 13)),
+    ("Gunsmoke 52-04-26 Billy the Kid", ("Gunsmoke",), "Billy the Kid", (1952, 4, 26)),
+    ("Donovan's Brain (May 13, 1943)", (), "Donovan's Brain", (1943, 5, 13)),
+    ("Donovan's Brain [1943-05-13]", (), "Donovan's Brain", (1943, 5, 13)),
+    ("(1943-05-13) Donovan's Brain", (), "Donovan's Brain", (1943, 5, 13)),
+    ("1943-xx-xx - Unknown Episode", (), "Unknown Episode", (1943, None, None)),
+    ("Gunsmoke: Billy the Kid", ("Gunsmoke",), "Billy the Kid", (None, None, None)),
+    ("1943-05-13", (), None, (1943, 5, 13)),                     # only a date
+    # Left alone:
+    ("The Shadow Knows", ("The Shadow",), "The Shadow Knows", (None, None, None)),
+    ("Suspense's Best", ("Suspense",), "Suspense's Best", (None, None, None)),
+    ("Suspense", ("Suspense",), "Suspense", (None, None, None)),  # nothing would be left
+    ("The 1943-05-13 Affair", (), "The 1943-05-13 Affair", (None, None, None)),   # date in the middle
+    ("Case 380411", (), "Case 380411", (None, None, None)),     # a number, not a date
+    ("Mr. Ace and Jane, Inc.", (), "Mr. Ace and Jane, Inc.", (None, None, None)),
+])
+def test_dates_and_series_names_come_off_titles(title, series, cleaned, date):
+    assert clean_title(title, series) == (cleaned, date)
