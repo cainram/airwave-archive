@@ -200,3 +200,60 @@ def test_the_series_page_has_the_librarys_tools(client):
                  'href="/organize/history">Past renames', 'href="/library">All files (Library)']:
         assert item in page
     assert '<a class="button" href="/series">← Series</a>' in client.get("/library").text
+
+
+# ------------------------------------------------------------------ genres
+
+CAMPBELL = "/series/genres?name=The%20Campbell%20Playhouse"
+
+
+def test_a_series_starts_without_genres_and_can_be_given_some(client):
+    page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
+    assert 'class="genre"' not in page
+    assert "Edit genres…" in page
+    form = client.get(CAMPBELL).text
+    assert "Genres you've used" not in form   # nothing used yet
+    client.post(CAMPBELL, data={"new_genres": " Drama ,  anthology  drama, "})
+    page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
+    assert re.findall(r'<span class="genre">([^<]+)</span>', page) == ["anthology drama", "Drama"]
+    tiles = client.get("/series").text
+    assert '<span class="tile-genres small">anthology drama · Drama</span>' in tiles
+    assert client.get("/series?view=list").text.count("anthology drama · Drama") == 1
+
+
+def test_genres_used_before_are_offered_and_keep_their_spelling(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama"})
+    abbott = "/series/genres?name=Abbott%20and%20Costello"
+    form = client.get(abbott).text
+    assert 'name="genre" value="Drama"' in form
+    assert not re.search(r'value="Drama"\s+checked', form)
+    client.post(abbott, data={"new_genres": "COMEDY, drama"})
+    client.post(abbott, data={"genre": ["Drama", "COMEDY"], "new_genres": "comedy"})
+    tiles = client.get("/series").text
+    assert "COMEDY · Drama" in tiles   # "drama" took the spelling already in use
+    assert "comedy" not in tiles.replace("COMEDY", "")
+
+
+def test_unticking_takes_a_genre_off(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama, Mystery"})
+    assert re.search(r'value="Mystery"\s+checked', client.get(CAMPBELL).text)
+    client.post(CAMPBELL, data={"genre": "Drama"})
+    tiles = client.get("/series").text
+    assert "Mystery" not in tiles and "Drama" in tiles
+    client.post(CAMPBELL, data={})
+    assert 'class="tile-genres' not in client.get("/series").text
+
+
+def test_genres_follow_a_renamed_series_and_join_when_merged(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama"})
+    client.post("/series/genres?name=Abbott%20and%20Costello", data={"new_genres": "Comedy, drama"})
+    client.post("/series/rename?name=The%20Campbell%20Playhouse",
+                data={"new_name": "Abbott and Costello"})
+    page = client.get("/series/episodes", params={"name": "Abbott and Costello"}).text
+    assert re.findall(r'<span class="genre">([^<]+)</span>', page) == ["Comedy", "Drama"]
+    assert "Genres you've used" in client.get("/series/genres?name=Abbott%20and%20Costello").text
+
+
+def test_genres_page_for_a_missing_series_is_not_found(client):
+    assert client.get("/series/genres?name=Nobody").status_code == 404
+    assert client.post("/series/genres?name=Nobody", data={"new_genres": "X"}).status_code == 404

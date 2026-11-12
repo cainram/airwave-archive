@@ -44,6 +44,7 @@
     <a class="tile" href="{{ s.name | series_url }}">
       {{ picture(s.art, s.name or "?") }}
       <span class="tile-name">{{ s.name or "No series yet" }}</span>
+      {% if s.genres %}<span class="tile-genres small">{{ s.genres | join(" · ") }}</span>{% endif %}
       <span class="muted small">{{ s.episodes }} episode{{ "" if s.episodes == 1 else "s" }}{% if s.years %} · {{ s.years }}{% endif %}</span>
     </a>
   </li>
@@ -71,6 +72,7 @@
         <td class="name">
           <a class="title" href="{{ s.name | series_url }}">{{ s.name or "No series yet" }}</a>
           {% if s.name is none %}<div class="muted small">episodes without a Series name</div>{% endif %}
+          {% if s.genres %}<div class="tile-genres small">{{ s.genres | join(" · ") }}</div>{% endif %}
         </td>
         <td class="num">{{ s.episodes }}</td>
         <td class="date">{{ s.years }}</td>

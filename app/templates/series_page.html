@@ -14,6 +14,9 @@
       · {{ totals.seconds | duration }} of audio
       · {{ totals.bytes | size }}
     </p>
+    {% if totals.genres %}
+    <p class="genres" aria-label="Genres">{% for genre in totals.genres %}<span class="genre">{{ genre }}</span>{% endfor %}</p>
+    {% endif %}
     {% if name is none %}
     <p class="muted small">These episodes have no Series name yet. Open one and press
       <strong>Edit details</strong> to give it one.</p>
@@ -25,6 +28,7 @@
       <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
       <div class="drop-list">
         <a href="/series/picture?name={{ name | urlencode }}">Change picture…</a>
+        <a href="/series/genres?name={{ name | urlencode }}">Edit genres…</a>
         <a href="/series/rename?name={{ name | urlencode }}">Rename the series…</a>
         <a href="/episodes/edit?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Edit all {{ totals.episodes }}…</a>
         <a href="/export?whole_series={{ name | urlencode }}&back={{ name | series_url | urlencode }}">Export…</a>

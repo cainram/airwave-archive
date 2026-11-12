@@ -32,8 +32,8 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import (airdates, convert, converting, csvimport, deleting, export, feeds, grouping, inbox,
-                 listening, renaming, tagwriting, zipimport)
+from app import (airdates, convert, converting, csvimport, deleting, export, feeds, genres, grouping,
+                 inbox, listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
@@ -1609,6 +1609,28 @@ def remove_series_picture(request: Request, name: str = ""):
     with Session(get_engine()) as session:
         series_or_404(session, name)
         set_uploaded_picture(session, name, None)
+        session.commit()
+    return go_to(request, series_url(name))
+
+
+@app.get("/series/genres", response_class=HTMLResponse)
+def series_genres_page(request: Request, name: str = ""):
+    """Tick a series' genres, or type new ones."""
+    with Session(get_engine()) as session:
+        totals = series_or_404(session, name)
+        known = genres.genres_in_use(session)
+    return render(request, "series_genres.html",
+                  {"name": name, "totals": totals, "known": known})
+
+
+@app.post("/series/genres")
+async def save_series_genres(request: Request, name: str = ""):
+    form = await read_request_form(request)
+    wanted = [str(g) for g in form.getlist("genre")]
+    wanted += genres.parse_typed(str(form.get("new_genres", "")))
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+        genres.set_genres(session, name, wanted)
         session.commit()
     return go_to(request, series_url(name))
 
