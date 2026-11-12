@@ -83,7 +83,7 @@ def test_grouping_makes_one_episode_that_plays_straight_through(client):
     assert len({p.episode_id for p in parts}) == 1
     assert episode_count(client) == 2          # the empty ones are gone
     assert parts[0].episode.sources["parts"] == MANUAL
-    assert parts[0].episode.title == "Art Bell - May 2 1996"  # first part's tag, less "Hour 1"
+    assert parts[0].episode.title == "Art Bell"   # first part's tag, less "Hour 1" and the date
 
     # The library shows the broadcast once, with its total length.
     library = client.get("/library").text
@@ -113,7 +113,7 @@ def test_later_parts_tags_are_not_used(client):
     make_wav(path, 2.5)
     add_tags(path, title=TIT2(encoding=3, text="Hour 2 (new)"))
     client.post("/rescan")
-    assert by_name(client)[SHOW.format(2)].episode.title == "Art Bell - May 2 1996"
+    assert by_name(client)[SHOW.format(2)].episode.title == "Art Bell"   # the date is taken off
 
 
 def test_splitting_gives_each_file_its_own_details_again(client):

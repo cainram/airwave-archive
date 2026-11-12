@@ -153,6 +153,11 @@ def date_from_tag(text: str | None) -> tuple[int | None, int | None, int | None]
     return year, month, day
 
 
+def known_parts(date: tuple) -> int:
+    """How much of a (year, month, day) date is known: 0 to 3."""
+    return sum(part is not None for part in date)
+
+
 def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
     """Fill in episode details from a file's tags.
 
@@ -174,10 +179,15 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
         notes = combined_notes(parts)
     else:
         notes = _clean(f.tag_comment)
+    # A date or the series name in the title tag ("Suspense - 1943-05-13 -
+    # Donovan's Brain") is taken off, so the title is just the episode's.
+    from app.filenames import clean_title   # here: that module imports this one
+    series = _clean(f.tag_artist) or _clean(f.tag_album)
+    title, title_date = clean_title(title, (series, _clean(f.tag_album), episode.series))
     sources = episode.sources
     changed = False
     found = {
-        "series": _clean(f.tag_artist) or _clean(f.tag_album),
+        "series": series,
         "title": title,
         "notes": notes,
     }
@@ -195,6 +205,8 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
 
     source = sources.get("air_date")
     year, month, day = date_from_tag(f.tag_date)
+    if known_parts(title_date) > known_parts((year, month, day)):
+        year, month, day = title_date   # the title's date says more
     if source != MANUAL and (year is not None or source == TAGS):
         new = {"air_year": year, "air_month": month, "air_day": day,
                "air_time": None, "air_timezone": None}

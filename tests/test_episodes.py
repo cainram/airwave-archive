@@ -308,6 +308,22 @@ def test_scan_fills_in_details_from_tags(tmp_path, engine):
     assert not ep.has_manual_edits
 
 
+def test_dates_and_series_names_come_off_title_tags(tmp_path, engine):
+    lib = tmp_path / "library"
+    tagged_wav(lib / "brain.wav", title="Suspense - 1943-05-13 - Donovan's Brain",
+               artist="Suspense", date="1943")
+    tagged_wav(lib / "other.wav", title="1943-05-13 - The Other Date", artist="Suspense",
+               date="1944-01-06")
+    sync_library(engine, lib)
+    found = files(engine)
+    brain = found["brain.wav"].episode
+    assert brain.title == "Donovan's Brain"
+    assert (brain.air_year, brain.air_month, brain.air_day) == (1943, 5, 13)   # says more than "1943"
+    other = found["other.wav"].episode
+    assert other.title == "The Other Date"
+    assert (other.air_year, other.air_month, other.air_day) == (1944, 1, 6)   # the date tag is as full
+
+
 def test_manual_edits_win_over_tags(tmp_path, engine):
     lib = tmp_path / "library"
     tagged_wav(lib / "patriot.wav")
