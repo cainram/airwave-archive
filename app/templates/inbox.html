@@ -141,6 +141,7 @@
       {% if x.host %}<span>Host: {{ x.host }}</span>{% endif %}
       {% if x.cast %}<span>Cast: {{ x.cast | truncate(120) }}</span>{% endif %}
       {% if x.notes %}<span>Notes: {{ x.notes | truncate(160) }}</span>{% endif %}
+      {% if x.genres %}<span>Genres: {{ x.genres | join(", ") }}</span>{% endif %}
       {% if x.picture %}<span>Series picture</span>{% endif %}
     </p>
     {% endif %}

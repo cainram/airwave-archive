@@ -38,7 +38,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import convert, converting, grouping
+from app import convert, converting, genres, grouping
 from app.db import MANUAL, AudioFile, Episode, InboxItem, SeriesArt, utcnow
 from app.episodes import (
     PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, known_parts,
@@ -137,6 +137,7 @@ def airwave_details(values: dict) -> tuple[dict, dict]:
     part = re.match(r"^\s*(\d{1,3})\s*/\s*(\d{1,3})\s*$", str(values.get("PART") or ""))
     if part and 1 <= int(part[1]) <= int(part[2]) and int(part[2]) > 1:
         extra["part"], extra["parts"] = int(part[1]), int(part[2])
+    extra["genres"] = genres.read_list(values.get("GENRES"))
     return main, {key: value for key, value in extra.items() if value}
 
 
@@ -380,6 +381,7 @@ def add_to_library(session: Session, inbox_folder: Path, library: Path,
         episode.sources = sources
         episode.updated_at = utcnow()
     _use_picture(session, episode.series, extra.get("picture"))
+    genres.use_imported(session, episode.series, extra.get("genres"))
     session.delete(item)
     return row
 

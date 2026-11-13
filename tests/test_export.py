@@ -60,6 +60,23 @@ def test_writing_tags_in_each_format(tmp_path, make):
     assert str(mutagen.File(path).tags).count("Orson Welles") == 0
 
 
+@pytest.mark.parametrize("make", [make_wav, make_mp3, make_flac])
+def test_the_series_genres_go_in_the_genre_tag(tmp_path, make):
+    from app.scanner import read_audio
+    suffix = {make_wav: ".wav", make_mp3: ".mp3", make_flac: ".flac"}[make]
+    path = tmp_path / ("show" + suffix)
+    make(path, 1) if make is make_wav else make(path)
+    write_tags(path, episode(), genres=["Drama", "Mystery"])
+    assert read_audio(path).tags["genre"] == "Drama; Mystery"     # two values, shown together
+    assert read_airwave_tags(path)["GENRES"] == "Drama; Mystery"
+    write_tags(path, episode(), genres=["Thriller"])
+    assert read_audio(path).tags["genre"] == "Thriller"
+    # A series without genres leaves the file's own genre as it was.
+    write_tags(path, episode())
+    assert read_audio(path).tags["genre"] == "Thriller"
+    assert "GENRES" not in read_airwave_tags(path)
+
+
 def test_partial_dates_stay_partial(tmp_path):
     path = tmp_path / "show.mp3"
     make_mp3(path)
@@ -129,6 +146,18 @@ def test_exporting_a_series(client):
     again = json.loads(unzip(client.get("/export/download?whole_series=Suspense")).read("manifest.json"))
     assert again["episodes"][0]["id"] == first["id"]
     assert not list((client.lib.parent / "data" / "export-temp").iterdir())   # nothing left behind
+
+
+def test_exports_carry_the_series_genres(client):
+    from app.scanner import read_audio
+    client.post("/series/genres?name=Suspense", data={"new_genres": "Thriller, Mystery"})
+    zf = unzip(client.get("/export/download?whole_series=Suspense"))
+    found = json.loads(zf.read("manifest.json"))
+    assert found["series"] == [{"name": "Suspense", "picture": None, "genres": ["Mystery", "Thriller"]}]
+    copy = client.lib.parent / "copy.mp3"
+    copy.write_bytes(zf.read("Suspense/Suspense 1942-10-08.mp3"))
+    assert read_audio(copy).tags["genre"] == "Mystery; Thriller"
+    assert "genre" not in read_audio(client.lib / "otr" / "Suspense 1942-10-08.mp3").tags
 
 
 def test_exporting_ticked_episodes_with_parts(client):

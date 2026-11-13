@@ -5,16 +5,22 @@ none). The list of genres is free: the owner makes one up by typing it,
 and from then on it's offered as a tick box. A genre is "in use" while a
 series that still has episodes has it; once no such series has it, it
 drops off the list by itself.
+
+Exports and "Write details into the files" put a series' genres into the
+files' genre tag (several are kept apart as "Western; Drama"), and an
+imported export brings them back for a series that has none yet.
 """
 
 from __future__ import annotations
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.db import Episode, SeriesGenre
 
 MAX_LENGTH = 40   # characters in one genre's name
+SEPARATOR = "; "  # between genres in one tag ("Western; Drama")
+MAX_IMPORTED = 20  # genres taken from one imported series
 
 
 def tidy(text: str) -> str:
@@ -124,3 +130,40 @@ def with_counts(session: Session) -> list[tuple[str, int]]:
         select(SeriesGenre.genre, func.count()).where(SeriesGenre.series.in_(_with_episodes()))
         .group_by(SeriesGenre.genre)).all()
     return sorted(((g, n) for g, n in rows), key=lambda row: _order(row[0]))
+
+
+def of_episode(episode: Episode) -> list[str]:
+    """The genres of an episode's series (A–Z), for writing into its
+    files' tags. The episode must still be in an open session."""
+    if not episode.series:
+        return []
+    session = object_session(episode)
+    if session is None:
+        raise ValueError("The episode isn't in an open session")
+    return genres_of(session, [episode.series]).get(episode.series, [])
+
+
+def read_list(value) -> list[str]:
+    """Genres that came with an imported file: a list (from an export's
+    manifest) or text like "Western; Drama" (from an Airwave tag). Tidied,
+    without doubles; anything else gives none."""
+    if isinstance(value, str):
+        value = value.split(";")
+    if not isinstance(value, list):
+        return []
+    found: dict[str, str] = {}
+    for genre in value:
+        if isinstance(genre, str) and (genre := tidy(genre)):
+            found.setdefault(genre.casefold(), genre)
+    return list(found.values())[:MAX_IMPORTED]
+
+
+def use_imported(session: Session, name: str | None, wanted: list[str] | None) -> None:
+    """Give a series the genres that came with an imported file, but only
+    if it has none of its own yet."""
+    if not name or not wanted:
+        return
+    session.flush()
+    if genres_of(session, [name]).get(name):
+        return
+    set_genres(session, name, wanted)

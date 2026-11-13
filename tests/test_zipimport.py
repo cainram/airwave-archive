@@ -11,7 +11,8 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import AudioFile, Episode, InboxItem, SeriesArt, make_engine
+from app.db import AudioFile, Episode, InboxItem, SeriesArt, SeriesGenre, make_engine
+from app.genres import genres_of
 from app.inbox import airwave_details
 from test_export import make_mp3
 from test_scanner import make_wav
@@ -62,6 +63,7 @@ def exported(tmp_path, monkeypatch) -> bytes:
         ids = [files["Art Bell 1996-05-02 Hour 1.wav"].id, files["Art Bell 1996-05-02 Hour 2.wav"].id]
     sender.post(f"/files/{ids[0]}/parts", data={"part": [str(i) for i in ids]})
     sender.post("/series/picture?name=Suspense", files={"picture": ("cover.png", png(), "image/png")})
+    sender.post("/series/genres?name=Suspense", data={"new_genres": "Thriller, Mystery"})
     with Session(sender.engine) as session:
         episode_ids = [str(e.id) for e in session.scalars(select(Episode))]
     data = sender.get("/export/download", params={"ids": episode_ids}).content
@@ -100,6 +102,8 @@ def test_an_export_arrives_filled_in(tmp_path, monkeypatch, exported):
     assert a.extra["picture"] and items["Art Bell 1996-05-02 Hour 2.wav"].extra["part"] == 2
     # The page shows the extra details.
     assert "Aired at 9:00 PM US Eastern" in page and "Station: CBS" in page and "Part 2 of 2" in page
+    assert a.extra["genres"] == ["Mystery", "Thriller"] and "Genres: Mystery, Thriller" in page
+    assert "genres" not in items["Art Bell 1996-05-02 Hour 1.wav"].extra
     assert "Add all 4 to library" in page
 
     page = receiver.post("/inbox/add-all", follow_redirects=True).text
@@ -117,6 +121,18 @@ def test_an_export_arrives_filled_in(tmp_path, monkeypatch, exported):
         assert story.sources["network"] == "manual"
         assert session.get(SeriesArt, "Suspense") is not None       # the picture came too
         assert session.get(SeriesArt, "Coast to Coast AM") is None
+        assert genres_of(session) == {"Suspense": ["Mystery", "Thriller"]}   # the genres came too
+
+
+def test_genres_you_set_are_kept(tmp_path, monkeypatch, exported):
+    receiver = server(tmp_path, monkeypatch, "receiver")
+    with Session(receiver.engine) as session:
+        session.add(SeriesGenre(series="Suspense", genre="Anthology"))
+        session.commit()
+    upload(receiver, "Airwave - 3 episodes.zip", exported)
+    receiver.post("/inbox/add-all")
+    with Session(receiver.engine) as session:
+        assert genres_of(session) == {"Suspense": ["Anthology"]}
 
 
 def test_episodes_you_have_are_spotted(tmp_path, monkeypatch, exported):
@@ -228,3 +244,4 @@ def test_a_tagged_copy_on_its_own_brings_its_details(tmp_path, monkeypatch, expo
     item = waiting(receiver)["b.mp3"]
     assert item.title == "Story 15" and item.air_day == 15
     assert item.extra["network"] == "CBS" and len(item.extra["uid"]) == 32
+    assert item.extra["genres"] == ["Mystery", "Thriller"]          # from its Airwave tag
