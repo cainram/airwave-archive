@@ -44,8 +44,8 @@
     <a class="tile" href="{{ s.name | series_url }}">
       {{ picture(s.art, s.name or "?") }}
       <span class="tile-name">{{ s.name or "No series yet" }}</span>
-      {% if s.genres %}<span class="tile-genres small">{{ s.genres | join(" · ") }}</span>{% endif %}
       <span class="muted small">{{ s.episodes }} episode{{ "" if s.episodes == 1 else "s" }}{% if s.years %} · {{ s.years }}{% endif %}</span>
+      {% if s.genres %}<span class="tile-genres small">{{ s.genres | join(" · ") }}</span>{% endif %}
     </a>
   </li>
   {% endfor %}
