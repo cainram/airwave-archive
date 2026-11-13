@@ -1167,11 +1167,13 @@ keeps the genres of both.
   by their genres too (every word must be in the name or the genres),
   and lists matching genres above the series. On tiles the genres are
   the bottom line, under the episode count (owner's choice).
-- **Step 3**: the home page gets up to three more rows, **below** "Recently
+- **Step 3** ✅ *done*: the home page gets up to three more rows, **below** "Recently
   added series" and "Most played" (owner's choice): "Recently added in
   [genre]" for the three genres whose series had a recording added most
   recently. Each heading links to the genre's page. Fewer genres in use
-  means fewer rows.
+  means fewer rows. A genre's place is its series' newest recording
+  (when the app first saw it); within a row, series go newest first,
+  like "Recently added series".
 - Maybe later: exports writing the series' genres into the copies'
   genre tag.
 

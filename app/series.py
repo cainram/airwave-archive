@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app import genres
 from app.artwork import folder_art
 from app.db import (
-    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, Feed, FolderArt, Listening, SeriesArt,
+    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, Feed, FolderArt, Listening, SeriesArt, SeriesGenre,
     natural_key, utcnow,
 )
 from app.listening import STARTED
@@ -149,6 +149,29 @@ def recently_added(session: Session, limit: int = 20) -> list[dict]:
         .group_by(Episode.series)
         .order_by(newest.desc(), Episode.series).limit(limit))
     return _named(session, [name for name, _ in rows])
+
+
+def recently_added_by_genre(session: Session, rows: int = 3, limit: int = 20) -> list[tuple[str, list[dict]]]:
+    """The home page's "Recently added in [genre]" rows: the genres whose
+    series had a recording added most recently (up to `rows` of them),
+    each with its series newest first, like "Recently added"."""
+    newest = func.max(AudioFile.first_seen)
+    found = session.execute(
+        select(SeriesGenre.genre, Episode.series, newest)
+        .join(Episode, Episode.series == SeriesGenre.series)
+        .join(AudioFile, AudioFile.episode_id == Episode.id)
+        .where(AudioFile.missing.is_(False))
+        .group_by(SeriesGenre.genre, Episode.series)).all()
+    by_genre: dict[str, list[tuple]] = {}
+    for genre, series, when in found:
+        by_genre.setdefault(genre, []).append((when, series))
+    for series in by_genre.values():
+        series.sort(key=lambda row: sort_key(row[1]))
+        series.sort(key=lambda row: row[0], reverse=True)   # newest first, then A–Z
+    chosen = sorted(by_genre, key=str.casefold)
+    chosen.sort(key=lambda genre: by_genre[genre][0][0], reverse=True)
+    return [(genre, _named(session, [name for _when, name in by_genre[genre][:limit]]))
+            for genre in chosen[:rows]]
 
 
 def most_played(session: Session, limit: int = 20) -> list[dict]:
