@@ -9,7 +9,7 @@ drops off the list by itself.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import Episode, SeriesGenre
@@ -103,3 +103,24 @@ def follow_rename(session: Session, old: str, new: str) -> None:
             session.add(SeriesGenre(series=new, genre=row.genre))
             have.add(row.genre.casefold())
 
+
+
+def spelled(session: Session, typed: str) -> str | None:
+    """The genre in use that matches what was typed, apart from capitals
+    (None if no series has it)."""
+    key = tidy(typed).casefold()
+    return next((g for g in genres_in_use(session) if g.casefold() == key), None) if key else None
+
+
+def series_with(session: Session, genre: str) -> list[str]:
+    """The names of the series (still with episodes) that have this genre."""
+    return list(session.scalars(select(SeriesGenre.series).where(
+        SeriesGenre.genre == genre, SeriesGenre.series.in_(_with_episodes()))))
+
+
+def with_counts(session: Session) -> list[tuple[str, int]]:
+    """Every genre in use with how many series have it, A–Z."""
+    rows = session.execute(
+        select(SeriesGenre.genre, func.count()).where(SeriesGenre.series.in_(_with_episodes()))
+        .group_by(SeriesGenre.genre)).all()
+    return sorted(((g, n) for g, n in rows), key=lambda row: _order(row[0]))

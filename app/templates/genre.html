@@ -1,0 +1,17 @@
+{% extends layout %}
+{% from "_art.html" import picture %}
+{% block title %}{{ genre }} · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/series">← All series</a></nav>
+<section class="summary">
+  <div>
+    <h1>{{ genre }}</h1>
+    <p class="muted">
+      {{ series | length }} series
+      · {{ series | sum(attribute="episodes") }} episodes
+      · {{ series | sum(attribute="seconds") | duration }} of audio
+    </p>
+  </div>
+</section>
+{% include "_series_tiles.html" %}
+{% endblock %}

@@ -33,23 +33,13 @@
   </div>
 </section>
 {% include "_library_notices.html" %}
+{% if series and genre_list %}{% include "_genre_list.html" %}{% endif %}
 
 {% if not series %}
 <div class="notice">No episodes yet. Add recordings to the library and choose <strong>☰ Actions → Rescan</strong>,
   or upload them in the <a href="/inbox">Inbox</a>.</div>
 {% elif view == "tiles" %}
-<ul class="tiles">
-  {% for s in series %}
-  <li>
-    <a class="tile" href="{{ s.name | series_url }}">
-      {{ picture(s.art, s.name or "?") }}
-      <span class="tile-name">{{ s.name or "No series yet" }}</span>
-      <span class="muted small">{{ s.episodes }} episode{{ "" if s.episodes == 1 else "s" }}{% if s.years %} · {{ s.years }}{% endif %}</span>
-      {% if s.genres %}<span class="tile-genres small">{{ s.genres | join(" · ") }}</span>{% endif %}
-    </a>
-  </li>
-  {% endfor %}
-</ul>
+{% include "_series_tiles.html" %}
 {% else %}
 <p class="muted small">A series is every episode with the same <strong>Series</strong> name.
   To join two spellings into one, change the name on their episodes.</p>

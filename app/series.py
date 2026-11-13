@@ -131,6 +131,12 @@ def _named(session: Session, names: list[str]) -> list[dict]:
     return [found[name] for name in names if name in found]
 
 
+def in_genre(session: Session, genre: str) -> list[dict]:
+    """The series that have this genre, with their totals and pictures,
+    in name order."""
+    return _named(session, sorted(genres.series_with(session, genre), key=sort_key))
+
+
 def recently_added(session: Session, limit: int = 20) -> list[dict]:
     """The home page's "Recently added": series by their newest recording
     (when the app first saw it), newest first. An old series with a new

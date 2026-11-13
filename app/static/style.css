@@ -327,6 +327,12 @@ ol.parts li > * { vertical-align: middle; margin-right: 6px; }
   display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;
   font-weight: 600; background: var(--tint); color: var(--tint-text);
 }
+a.genre { text-decoration: none; }
+a.genre:hover, a.genre:focus-visible { background: var(--accent); color: var(--accent-text); }
+.genre-count { margin-left: 6px; font-weight: normal; opacity: 0.75; }
+/* The Series page's (and search's) list of genres. */
+.genre-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; }
+.genre-list-name { font-weight: 600; margin-right: 4px; }
 .genre-ticks { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 1px solid var(--line);
   border-radius: 8px; padding: 10px 14px; margin: 0 0 8px; }
 .genre-ticks legend { font-weight: 600; padding: 0 4px; }

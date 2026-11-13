@@ -1160,9 +1160,13 @@ keeps the genres of both.
 - **Step 1** ✅ *done*: setting genres; shown on the series' own page
   (labels under its totals) and under the name on the Series page's
   tiles and list.
-- **Step 2**: a page for each genre (its series as tiles), a "Genres"
-  list on the Series page, genres on the series page linking there, and
-  search finding series by genre.
+- **Step 2** ✅ *done*: a page for each genre (`/genre?name=…`: its
+  series as tiles, with totals); a "Genres" line on the Series page
+  (both views) with a label per genre and how many series have it; a
+  series' genre labels link to their genre's page; search finds series
+  by their genres too (every word must be in the name or the genres),
+  and lists matching genres above the series. On tiles the genres are
+  the bottom line, under the episode count (owner's choice).
 - **Step 3**: the home page gets up to three more rows, **below** "Recently
   added series" and "Most played" (owner's choice): "Recently added in
   [genre]" for the three genres whose series had a recording added most

@@ -15,7 +15,7 @@
       · {{ totals.bytes | size }}
     </p>
     {% if totals.genres %}
-    <p class="genres" aria-label="Genres">{% for genre in totals.genres %}<span class="genre">{{ genre }}</span>{% endfor %}</p>
+    <p class="genres" aria-label="Genres">{% for genre in totals.genres %}<a class="genre" href="{{ genre | genre_url }}">{{ genre }}</a>{% endfor %}</p>
     {% endif %}
     {% if name is none %}
     <p class="muted small">These episodes have no Series name yet. Open one and press
