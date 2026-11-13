@@ -33,7 +33,7 @@
 {% endif %}
 
 
-{% macro shelf(id, heading, series, link=none) %}
+{% macro shelf(id, heading, series, link=none, genres=false) %}
 {% if series %}
 <section class="shelf-section" aria-labelledby="{{ id }}">
   <h2 id="{{ id }}">{% if link %}<a href="{{ link }}">{{ heading }} <span aria-hidden="true">›</span></a>{% else %}{{ heading }}{% endif %}</h2>
@@ -43,6 +43,7 @@
       <a class="tile" href="{{ s.name | series_url }}">
         {{ picture(s.art, s.name) }}
         <span class="tile-name">{{ s.name }}</span>
+        {% if genres and s.genres %}<span class="tile-genres small">{{ s.genres | join(" · ") }}</span>{% endif %}
       </a>
     </li>
     {% endfor %}
@@ -50,7 +51,7 @@
 </section>
 {% endif %}
 {% endmacro %}
-{{ shelf("recent-heading", "Recently added series", recent) }}
+{{ shelf("recent-heading", "Recently added series", recent, genres=true) }}
 {{ shelf("played-heading", "Most played", played) }}
 {% for genre, series in by_genre %}
 {{ shelf("genre-heading-" ~ loop.index, "Recently added in " ~ genre, series, genre | genre_url) }}
