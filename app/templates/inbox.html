@@ -45,8 +45,16 @@
   <label class="any-file small"><input type="checkbox" data-any-file="#files"> Let me choose any file
     (if a recording is greyed out in the window)</label>
   <progress hidden max="100" value="0"></progress>
-  <div class="form-buttons"><button class="button primary" type="submit">Upload</button></div>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Upload</button>
+    {# Belongs to its own small form below (forms can't be inside each other). #}
+    {% if rows %}<button class="button danger" type="submit" form="clear-inbox">Clear the inbox</button>{% endif %}
+  </div>
 </form>
+{% if rows %}
+<form id="clear-inbox" method="post" action="/inbox/clear" hidden
+      hx-confirm="Delete all {{ rows | length }} recording{{ '' if rows | length == 1 else 's' }} waiting in the inbox? This can't be undone. Your library isn't affected."></form>
+{% endif %}
 
 {% if zips %}
 <h2>Zips to unpack ({{ zips | length }})</h2>

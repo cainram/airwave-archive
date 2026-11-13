@@ -187,6 +187,25 @@ def test_listening_and_rejecting(client):
     assert client.post(f"/inbox/{item.id}/reject").status_code == 404
 
 
+def test_clearing_the_inbox(client):
+    page = client.get("/inbox").text
+    assert "Clear the inbox" not in page                    # nothing waiting: no button
+    for name in ("one.wav", "two.wav", "three.wav"):
+        make_wav(client.box / name, 1)
+    make_wav(client.lib / "one.wav", 1)                     # same name in the library
+    (client.box / "later.zip").write_bytes(b"PK")           # a zip waiting to be unpacked
+    page = client.get("/inbox").text
+    assert '<button class="button danger" type="submit" form="clear-inbox">Clear the inbox</button>' in page
+    assert "Delete all 3 recordings waiting in the inbox?" in page
+    sent = client.post("/inbox/clear", follow_redirects=False)
+    assert sent.headers["location"] == "/inbox?rejected=3"
+    assert items(client) == {}
+    assert [p.name for p in client.box.iterdir()] == ["later.zip"]   # zips stay
+    assert (client.lib / "one.wav").exists()                # the library is never touched
+    page = client.get("/inbox?rejected=3").text
+    assert "3 files were deleted from the inbox" in page and "Clear the inbox" not in page
+
+
 def test_the_menu_has_the_inbox(client):
     assert '<a href="/inbox" data-paths="/inbox"' in client.get("/").text
 

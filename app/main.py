@@ -930,6 +930,19 @@ def inbox_reject(request: Request, item_id: int):
     return go_to(request, "/inbox?rejected=1")
 
 
+@app.post("/inbox/clear")
+def inbox_clear(request: Request):
+    """Delete every recording waiting in the inbox (say, when their tags
+    need fixing in another program first). The library is never touched;
+    zips waiting to be unpacked stay."""
+    with Session(get_engine()) as session:
+        items = session.scalars(select(InboxItem)).all()
+        for item in items:
+            inbox.reject(session, INBOX_DIR, item)
+        session.commit()
+    return go_to(request, f"/inbox?rejected={len(items)}")
+
+
 @app.post("/inbox/reject-duplicates")
 def inbox_reject_duplicates(request: Request):
     """Delete every inbox file whose episode is already in the library."""

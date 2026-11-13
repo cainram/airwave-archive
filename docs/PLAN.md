@@ -154,7 +154,10 @@ for large collections, copying files onto the server is faster).
 3. **Add to library** — approved files are moved into the library, filed in
    a folder for their series (e.g. `library/Suspense/`).
 4. **Or reject** — rejected files are deleted from the inbox. The library is
-   never touched.
+   never touched. A red **Clear the inbox** button next to Upload (after
+   a confirmation) rejects every waiting recording at once, for when the
+   tags are better fixed in another program first (owner's request,
+   2026-11-13). Zips waiting to be unpacked stay.
 
 ## 4. User interface
 
