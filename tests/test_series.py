@@ -341,6 +341,10 @@ def test_home_page_rows_by_genre(client):
     ]
     text = page.text
     assert text.index("Recently added series") < text.index("Recently added in Comedy")
+    # "Recently added series" shows each series' genres under its name; the genre rows don't.
+    recent = text.split(">Recently added series</h2>")[1].split("</ul>")[0]
+    assert '<span class="tile-name">The Campbell Playhouse</span>\n        <span class="tile-genres small">Anthology · Comedy · Drama</span>' in recent
+    assert "tile-genres" not in text.split("Recently added in Comedy")[1]
     # Fewer genres in use: fewer rows.
     client.post(CAMPBELL, data={})
     client.post(escape, data={})
