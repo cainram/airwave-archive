@@ -241,3 +241,35 @@ def test_the_player_can_find_an_episodes_picture(client):
     sent = client.get(f"/files/{hour.id}/art", follow_redirects=False)
     assert sent.status_code == 307 and sent.headers["location"] == f"/art/{hour.art_hash}.jpg"
     assert client.get(f"/files/{found['loose.wav'].id}/art").status_code == 404   # no picture
+
+
+def test_an_uploaded_picture_is_used_for_every_episode_even_with_its_own(client):
+    """Coast to Coast has its logo inside each file; once a picture is
+    uploaded for the series, every episode shows that one instead."""
+    import re
+    found = files(client)
+    hour = found["Coast to Coast - Mar 01 2010 - Hour 1.wav"]
+    blue = hour.art_hash
+    upload(client, "Coast to Coast AM", picture("red"))
+    import app.main as main
+    with Session(main._engine) as session:
+        red = session.get(SeriesArt, "Coast to Coast AM").art_hash
+    assert red != blue
+    # The episode's page, the player bar and Continue listening.
+    assert picture_urls(client.get(f"/files/{hour.id}").text) == [f"/art/{red}.jpg"]
+    sent = client.get(f"/files/{hour.id}/art", follow_redirects=False)
+    assert sent.headers["location"] == f"/art/{red}.jpg"
+    # A podcast feed's episodes too.
+    sent = client.post("/feeds", data={"title": "Mix", "ids": [str(hour.episode_id),
+                                                               str(found["patriot.wav"].episode_id)]},
+                       follow_redirects=False)
+    feed_id = int(re.search(r"/feeds/(\d+)", sent.headers["location"])[1])
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    with Session(main._engine) as session:
+        from app.db import Feed
+        secret = session.get(Feed, feed_id).token
+    xml = client.get(f"/feeds/{secret}/feed.xml").text
+    assert blue not in xml and red in xml
+    # Taking the upload away brings back the file's own picture.
+    client.post("/series/picture/remove?name=Coast%20to%20Coast%20AM")
+    assert picture_urls(client.get(f"/files/{hour.id}").text) == [f"/art/{blue}.jpg"]
