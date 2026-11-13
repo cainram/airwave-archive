@@ -305,3 +305,44 @@ def test_search_finds_series_by_genre(client):
     assert re.findall(r'<span class="tile-name">([^<]+)</span>', page) == ["The Campbell Playhouse"]
     assert "Nothing found" not in page
     assert "<h2>Genres</h2>" not in client.get("/search", params={"q": "abbott"}).text
+
+
+def genre_rows(page: str) -> list[tuple[str, str, list[str]]]:
+    """The home page's "Recently added in" rows: (link, genre, series names)."""
+    rows = re.findall(r'<h2 id="genre-heading-\d"><a href="([^"]+)">Recently added in ([^<]+?) <span'
+                      r'.*?<ul class="shelf">(.*?)</ul>', page, re.S)
+    return [(link, genre, re.findall(r'tile-name">([^<]+)<', tiles)) for link, genre, tiles in rows]
+
+
+def test_home_page_rows_by_genre(client):
+    import app.main as main
+    assert genre_rows(client.get("/").text) == []   # no genres yet: no rows
+    with Session(main._engine) as session:
+        files = {f.name: f for f in session.scalars(select(AudioFile))}
+        long_ago = datetime(2020, 1, 1)
+        for f in files.values():
+            f.first_seen = long_ago
+        files["abbott.wav"].first_seen = long_ago + timedelta(days=30)
+        files["rebecca.wav"].first_seen = long_ago + timedelta(days=20)
+        files["ep2.wav"].first_seen = long_ago + timedelta(days=10)
+        session.commit()
+    escape = "/series/genres?name=Escape%20%26%20Suspense%20%2F%20Mixed"
+    client.post(CAMPBELL, data={"new_genres": "Drama, Comedy, Anthology"})
+    client.post("/series/genres?name=Abbott%20and%20Costello", data={"new_genres": "Comedy"})
+    client.post(escape, data={"new_genres": "Thriller, Drama"})
+    page = client.get("/")
+    rows = genre_rows(page.text)
+    # Comedy has the newest (Abbott); Anthology and Drama come next (Campbell,
+    # A–Z between equals); Thriller's newest is older, so it has no row.
+    assert rows == [
+        ("/genre?name=Comedy", "Comedy", ["Abbott and Costello", "The Campbell Playhouse"]),
+        ("/genre?name=Anthology", "Anthology", ["The Campbell Playhouse"]),
+        ("/genre?name=Drama", "Drama", ["The Campbell Playhouse", "Escape &amp; Suspense / Mixed"]),
+    ]
+    text = page.text
+    assert text.index("Recently added series") < text.index("Recently added in Comedy")
+    # Fewer genres in use: fewer rows.
+    client.post(CAMPBELL, data={})
+    client.post(escape, data={})
+    assert genre_rows(client.get("/").text) == [
+        ("/genre?name=Comedy", "Comedy", ["Abbott and Costello"])]

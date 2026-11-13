@@ -39,6 +39,7 @@ from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
     all_series, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
+    recently_added_by_genre,
     series_files, set_uploaded_picture,
 )
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
@@ -498,17 +499,20 @@ def forget(request: Request, file_id: int):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     """The home page: Continue listening, then rows of series (recently
-    added, most played). A row with nothing in it isn't shown."""
+    added, most played, then recently added in up to three genres). A
+    row with nothing in it isn't shown."""
     last_scan_or_scan()
     with Session(get_engine()) as session:
         unfinished = [(f, done, episode_art(session, f))
                       for f, done in listening.continue_listening(session)]
         recent = recently_added(session)
         played = most_played(session)
+        by_genre = recently_added_by_genre(session)
         anything = recent or session.scalar(select(Episode.id).limit(1)) is not None
         session.expunge_all()
     return render(request, "home.html", {"unfinished": unfinished, "recent": recent,
-                                         "played": played, "anything": anything})
+                                         "played": played, "by_genre": by_genre,
+                                         "anything": anything})
 
 
 @app.get("/series", response_class=HTMLResponse)
