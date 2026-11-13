@@ -13,6 +13,7 @@ import re
 from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.orm import Session
 
+from app import genres
 from app.artwork import folder_art
 from app.db import (
     FIRST_PARTS, WITH_PARTS, AudioFile, Episode, Feed, FolderArt, Listening, SeriesArt,
@@ -107,6 +108,7 @@ def all_series(session: Session) -> list[dict]:
     name None."""
     found = _totals(session)
     _add_art(session, found)
+    genres.add_genres(session, found)
     return sorted(found, key=lambda s: (s["name"] is None, sort_key(s["name"] or "")))
 
 
@@ -114,6 +116,7 @@ def one_series(session: Session, name: str | None) -> dict | None:
     """One series' totals and picture, or None if it has no episodes."""
     found = _totals(session, _in_series(name))
     _add_art(session, found, _in_series(name))
+    genres.add_genres(session, found)
     return found[0] if found else None
 
 
@@ -124,7 +127,14 @@ def _named(session: Session, names: list[str]) -> list[dict]:
     where = Episode.series.in_(names)
     found = {s["name"]: s for s in _totals(session, where)}
     _add_art(session, list(found.values()), where)
+    genres.add_genres(session, list(found.values()))
     return [found[name] for name in names if name in found]
+
+
+def in_genre(session: Session, genre: str) -> list[dict]:
+    """The series that have this genre, with their totals and pictures,
+    in name order."""
+    return _named(session, sorted(genres.series_with(session, genre), key=sort_key))
 
 
 def recently_added(session: Session, limit: int = 20) -> list[dict]:
@@ -182,8 +192,9 @@ def set_uploaded_picture(session: Session, name: str, art_hash: str | None) -> N
 
 def follow_rename(session: Session, old: str | None, new: str | None) -> None:
     """After an episode's series name changed: if no episode is left with
-    the old name, the series' feeds follow it to the new name, and its
-    uploaded picture moves too (unless the new name has one of its own)."""
+    the old name, the series' feeds and genres follow it to the new name,
+    and its uploaded picture moves too (unless the new name has one of its
+    own)."""
     if not old or not new or old == new:
         return
     session.flush()
@@ -191,6 +202,7 @@ def follow_rename(session: Session, old: str | None, new: str | None) -> None:
         return   # other episodes still use the old name
     for feed in session.scalars(select(Feed).where(Feed.series == old)):
         feed.series = new
+    genres.follow_rename(session, old, new)
     picture = session.get(SeriesArt, old)
     if picture is None or session.get(SeriesArt, new) is not None:
         return

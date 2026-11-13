@@ -1,0 +1,5 @@
+{#- Every genre in use, each a label linking to its page, with how many series have it. -#}
+<nav class="genre-list" aria-label="Genres">
+  <span class="genre-list-name">Genres</span>
+  {% for genre, count in genre_list %}<a class="genre" href="{{ genre | genre_url }}">{{ genre }}<span class="genre-count" aria-label="{{ count }} series">{{ count }}</span></a>{% endfor %}
+</nav>

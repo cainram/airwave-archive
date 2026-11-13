@@ -200,3 +200,108 @@ def test_the_series_page_has_the_librarys_tools(client):
                  'href="/organize/history">Past renames', 'href="/library">All files (Library)']:
         assert item in page
     assert '<a class="button" href="/series">← Series</a>' in client.get("/library").text
+
+
+# ------------------------------------------------------------------ genres
+
+CAMPBELL = "/series/genres?name=The%20Campbell%20Playhouse"
+
+
+def test_a_series_starts_without_genres_and_can_be_given_some(client):
+    page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
+    assert 'class="genre"' not in page
+    assert "Edit genres…" in page
+    form = client.get(CAMPBELL).text
+    assert "Genres you've used" not in form   # nothing used yet
+    client.post(CAMPBELL, data={"new_genres": " Drama ,  anthology  drama, "})
+    page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
+    assert re.findall(r'<a class="genre" href="[^"]+">([^<]+)</a>', page) == ["anthology drama", "Drama"]
+    tiles = client.get("/series").text
+    assert '<span class="tile-genres small">anthology drama · Drama</span>' in tiles
+    assert client.get("/series?view=list").text.count("anthology drama · Drama") == 1
+
+
+def test_genres_used_before_are_offered_and_keep_their_spelling(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama"})
+    abbott = "/series/genres?name=Abbott%20and%20Costello"
+    form = client.get(abbott).text
+    assert 'name="genre" value="Drama"' in form
+    assert not re.search(r'value="Drama"\s+checked', form)
+    client.post(abbott, data={"new_genres": "COMEDY, drama"})
+    client.post(abbott, data={"genre": ["Drama", "COMEDY"], "new_genres": "comedy"})
+    tiles = client.get("/series").text
+    assert "COMEDY · Drama" in tiles   # "drama" took the spelling already in use
+    assert "comedy" not in tiles.replace("COMEDY", "")
+
+
+def test_unticking_takes_a_genre_off(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama, Mystery"})
+    assert re.search(r'value="Mystery"\s+checked', client.get(CAMPBELL).text)
+    client.post(CAMPBELL, data={"genre": "Drama"})
+    tiles = client.get("/series").text
+    assert "Mystery" not in tiles and "Drama" in tiles
+    client.post(CAMPBELL, data={})
+    assert 'class="tile-genres' not in client.get("/series").text
+
+
+def test_genres_follow_a_renamed_series_and_join_when_merged(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama"})
+    client.post("/series/genres?name=Abbott%20and%20Costello", data={"new_genres": "Comedy, drama"})
+    client.post("/series/rename?name=The%20Campbell%20Playhouse",
+                data={"new_name": "Abbott and Costello"})
+    page = client.get("/series/episodes", params={"name": "Abbott and Costello"}).text
+    assert re.findall(r'<a class="genre" href="[^"]+">([^<]+)</a>', page) == ["Comedy", "Drama"]
+    assert "Genres you've used" in client.get("/series/genres?name=Abbott%20and%20Costello").text
+
+
+def test_genres_page_for_a_missing_series_is_not_found(client):
+    assert client.get("/series/genres?name=Nobody").status_code == 404
+    assert client.post("/series/genres?name=Nobody", data={"new_genres": "X"}).status_code == 404
+
+
+GENRE_LABEL = r'<a class="genre" href="(/genre\?name=[^"]+)">([^<]+)<span class="genre-count"[^>]*>(\d+)</span></a>'
+
+
+def test_each_genre_has_a_page_of_its_series(client):
+    client.post(CAMPBELL, data={"new_genres": "Drama, Comedy"})
+    client.post("/series/genres?name=Abbott%20and%20Costello", data={"new_genres": "Comedy"})
+    page = client.get("/genre?name=Comedy").text
+    assert "<h1>Comedy</h1>" in page
+    assert re.findall(r'<span class="tile-name">([^<]+)</span>', page) == [
+        "Abbott and Costello", "The Campbell Playhouse"]
+    assert "2 series" in page and "6 episodes" in page
+    assert '<a class="button" href="/series">← All series</a>' in page
+    drama = client.get("/genre?name=Drama").text
+    assert re.findall(r'<span class="tile-name">([^<]+)</span>', drama) == ["The Campbell Playhouse"]
+    # Other capitals go to the usual address; a genre no series has isn't found.
+    moved = client.get("/genre?name=comedy", follow_redirects=False)
+    assert moved.status_code == 303 and moved.headers["location"] == "/genre?name=Comedy"
+    assert client.get("/genre?name=Western").status_code == 404
+    assert client.get("/genre").status_code == 404
+
+
+def test_series_page_lists_the_genres_and_a_series_links_to_them(client):
+    assert 'class="genre-list"' not in client.get("/series").text   # none in use yet
+    client.post(CAMPBELL, data={"new_genres": "Drama, Comedy"})
+    client.post("/series/genres?name=Abbott%20and%20Costello", data={"new_genres": "Comedy"})
+    for view in ("/series", "/series?view=list"):
+        assert re.findall(GENRE_LABEL, client.get(view).text) == [
+            ("/genre?name=Comedy", "Comedy", "2"), ("/genre?name=Drama", "Drama", "1")]
+    page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
+    assert '<a class="genre" href="/genre?name=Comedy">Comedy</a>' in page
+    # A genre no series uses any more drops off the list.
+    client.post(CAMPBELL, data={"genre": "Comedy"})
+    assert re.findall(GENRE_LABEL, client.get("/series").text) == [
+        ("/genre?name=Comedy", "Comedy", "2")]
+
+
+def test_search_finds_series_by_genre(client):
+    client.post(CAMPBELL, data={"new_genres": "Anthology Drama"})
+    page = client.get("/search", params={"q": "drama"}).text
+    assert re.findall(GENRE_LABEL, page) == [("/genre?name=Anthology%20Drama", "Anthology Drama", "1")]
+    assert re.findall(r'<span class="tile-name">([^<]+)</span>', page) == ["The Campbell Playhouse"]
+    # Words from the name and the genre together.
+    page = client.get("/search", params={"q": "campbell drama"}).text
+    assert re.findall(r'<span class="tile-name">([^<]+)</span>', page) == ["The Campbell Playhouse"]
+    assert "Nothing found" not in page
+    assert "<h2>Genres</h2>" not in client.get("/search", params={"q": "abbott"}).text

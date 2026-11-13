@@ -319,6 +319,24 @@ ol.parts li > * { vertical-align: middle; margin-right: 6px; }
 .tile { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--text); }
 .tile:hover .art { outline: 3px solid var(--accent); outline-offset: 2px; }
 .tile-name { font-weight: 600; margin-top: 4px; line-height: 1.3; }
+/* A series' genres: a line under its name on tiles and in the list, and
+   little labels on its own page. */
+.tile-genres { color: var(--accent); font-weight: 600; line-height: 1.3; }
+.genres { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+.genre {
+  display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;
+  font-weight: 600; background: var(--tint); color: var(--tint-text);
+}
+a.genre { text-decoration: none; }
+a.genre:hover, a.genre:focus-visible { background: var(--accent); color: var(--accent-text); }
+.genre-count { margin-left: 6px; font-weight: normal; opacity: 0.75; }
+/* The Series page's (and search's) list of genres. */
+.genre-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; }
+.genre-list-name { font-weight: 600; margin-right: 4px; }
+.genre-ticks { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 14px; margin: 0 0 8px; }
+.genre-ticks legend { font-weight: 600; padding: 0 4px; }
+.genre-ticks label { font-weight: normal; }
 
 /* Tiles / List switch. */
 .view-switch { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }

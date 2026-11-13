@@ -32,13 +32,13 @@ from app.episodes import (
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
-from app import (airdates, convert, converting, csvimport, deleting, export, feeds, grouping, inbox,
-                 listening, renaming, tagwriting, zipimport)
+from app import (airdates, convert, converting, csvimport, deleting, export, feeds, genres, grouping,
+                 inbox, listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
-    all_series, episode_art, follow_rename, most_played, one_series, recently_added,
+    all_series, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
     series_files, set_uploaded_picture,
 )
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
@@ -156,6 +156,14 @@ def series_url(name: str | None) -> str:
 
 
 templates.env.filters["series_url"] = series_url
+
+
+def genre_url(genre: str) -> str:
+    """The page of a genre: its series as tiles."""
+    return f"/genre?name={quote(genre, safe='')}"
+
+
+templates.env.filters["genre_url"] = genre_url
 templates.env.filters["progress"] = listening.progress
 templates.env.filters["resume_point"] = listening.resume_point
 templates.env.filters["listened_at"] = listening.listened_at
@@ -509,11 +517,13 @@ def series_list(request: Request, view: str = "tiles"):
     last_scan_or_scan()
     with Session(get_engine()) as session:
         found = all_series(session)
+        genre_list = genres.with_counts(session)
         new_groups = grouping.unseen(session)
         convert_info = library_convert_info(session)
         session.expunge_all()
     return render(request, "series.html",
                   {"series": found, "view": "list" if view == "list" else "tiles",
+                   "genre_list": genre_list,
                    "new_groups": new_groups, **convert_info})
 
 
@@ -1044,13 +1054,17 @@ SEARCH_PAGE_SIZE = 50
 def search_page(request: Request, q: str = "", page: int = 1):
     """Series and episodes matching the words typed in the search box."""
     q = q.strip()[:200]
-    series, files, snippets, total = [], [], {}, 0
+    series, genre_list, files, snippets, total = [], [], [], {}, 0
     page = max(1, page)
     if q:
         with Session(get_engine()) as session:
             words = words_of(q)
+            # A series matches by its name and its genres.
             series = [s for s in all_series(session)
-                      if s["name"] and all(w in s["name"].lower() for w in words)][:12]
+                      if s["name"] and all(w in " ".join([s["name"], *s["genres"]]).lower()
+                                           for w in words)][:12]
+            genre_list = [(g, n) for g, n in genres.with_counts(session)
+                          if all(w in g.lower() for w in words)]
             found, total = search(session, q, SEARCH_PAGE_SIZE, (page - 1) * SEARCH_PAGE_SIZE)
             snippets = dict(found)
             # Each episode is shown by its first file (with all parts).
@@ -1060,7 +1074,7 @@ def search_page(request: Request, q: str = "", page: int = 1):
             files = [by_episode[e] for e in snippets if e in by_episode]
     pages = max(1, -(-total // SEARCH_PAGE_SIZE))
     return render(request, "search.html", {
-        "q": q, "series": series, "files": files, "snippets": snippets, "total": total,
+        "q": q, "series": series, "genre_list": genre_list, "files": files, "snippets": snippets, "total": total,
         "page": page, "pages": pages, "rows": total,
         "first_index": (page - 1) * SEARCH_PAGE_SIZE + 1,
         "pager_url": with_query("/search", q=quote(q)) + "&page=",
@@ -1609,6 +1623,41 @@ def remove_series_picture(request: Request, name: str = ""):
     with Session(get_engine()) as session:
         series_or_404(session, name)
         set_uploaded_picture(session, name, None)
+        session.commit()
+    return go_to(request, series_url(name))
+
+
+@app.get("/genre", response_class=HTMLResponse)
+def genre_page(request: Request, name: str = ""):
+    """One genre: every series that has it, as tiles."""
+    with Session(get_engine()) as session:
+        genre = genres.spelled(session, name)
+        found = in_genre(session, genre) if genre else []
+    if not found:
+        raise HTTPException(404, "No series has this genre.")
+    if genre != name:   # typed with other capitals: go to the usual address
+        return RedirectResponse(genre_url(genre), status_code=303)
+    return render(request, "genre.html", {"genre": genre, "series": found})
+
+
+@app.get("/series/genres", response_class=HTMLResponse)
+def series_genres_page(request: Request, name: str = ""):
+    """Tick a series' genres, or type new ones."""
+    with Session(get_engine()) as session:
+        totals = series_or_404(session, name)
+        known = genres.genres_in_use(session)
+    return render(request, "series_genres.html",
+                  {"name": name, "totals": totals, "known": known})
+
+
+@app.post("/series/genres")
+async def save_series_genres(request: Request, name: str = ""):
+    form = await read_request_form(request)
+    wanted = [str(g) for g in form.getlist("genre")]
+    wanted += genres.parse_typed(str(form.get("new_genres", "")))
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+        genres.set_genres(session, name, wanted)
         session.commit()
     return go_to(request, series_url(name))
 

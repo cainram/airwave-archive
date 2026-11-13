@@ -142,6 +142,10 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/series.py`: the series list (with totals and pictures), one
   series' episodes in air-date order, and the home page's rows of series
   (recently added, most played)
+- `app/genres.py`: genres for each series (the owner's free list):
+  saving a series' genres, the genres in use (with how many series
+  have each), a genre's series, and moving them when a series is
+  renamed
 - `app/artwork.py`: finds pictures in files and folders, and keeps small
   copies in the data folder (`artwork/`)
 - `app/bulk.py`: editing many episodes at once, and renaming a series

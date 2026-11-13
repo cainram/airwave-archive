@@ -14,9 +14,14 @@
   something from the notes. Every word must match, in any order, and the end of a word
   can be left off ("welle" finds Welles). Put words in quotes to find them together,
   like "our town".</p>
-{% elif not series and not files %}
+{% elif not series and not files and not genre_list %}
 <div class="notice">Nothing found for <strong>{{ q }}</strong>. Try fewer words, or shorter ones.</div>
 {% else %}
+
+{% if genre_list %}
+<h2>Genres</h2>
+{% include "_genre_list.html" %}
+{% endif %}
 
 {% if series %}
 <h2>Series</h2>
@@ -27,6 +32,7 @@
       {{ picture(s.art, s.name) }}
       <span class="tile-name">{{ s.name }}</span>
       <span class="muted small">{{ s.episodes }} episode{{ "" if s.episodes == 1 else "s" }}</span>
+      {% if s.genres %}<span class="tile-genres small">{{ s.genres | join(" · ") }}</span>{% endif %}
     </a>
   </li>
   {% endfor %}

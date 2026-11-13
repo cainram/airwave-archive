@@ -1143,6 +1143,38 @@ How it works:
   lock**. Anyone on the network who knows the address can open it. That's
   fine for a single household, but it isn't security.
 
+### Genres (owner's request, 2026-11-12)
+The owner gives each **series** one or more genres ("Western", "Comedy"),
+or none. Every series starts with none, and genre tags inside files are
+not used to fill them in (they're often just "Old Time Radio"). Genres
+belong to the series, not to episodes; episodes without a series have
+none. Kept by series name (`series_genres` table, like uploaded
+pictures), so renaming a series moves its genres, and joining two series
+keeps the genres of both.
+- **Free list** (owner's choice): the owner makes up a genre by typing
+  it. Genres already in use are offered as tick boxes, and a typed genre
+  that matches one apart from capitals takes its spelling. A genre no
+  series uses any more drops off the list by itself.
+- Set **one series at a time** (owner's choice), from the series page's
+  ☰ Actions → "Edit genres…".
+- **Step 1** ✅ *done*: setting genres; shown on the series' own page
+  (labels under its totals) and under the name on the Series page's
+  tiles and list.
+- **Step 2** ✅ *done*: a page for each genre (`/genre?name=…`: its
+  series as tiles, with totals); a "Genres" line on the Series page
+  (both views) with a label per genre and how many series have it; a
+  series' genre labels link to their genre's page; search finds series
+  by their genres too (every word must be in the name or the genres),
+  and lists matching genres above the series. On tiles the genres are
+  the bottom line, under the episode count (owner's choice).
+- **Step 3**: the home page gets up to three more rows, **below** "Recently
+  added series" and "Most played" (owner's choice): "Recently added in
+  [genre]" for the three genres whose series had a recording added most
+  recently. Each heading links to the genre's page. Fewer genres in use
+  means fewer rows.
+- Maybe later: exports writing the series' genres into the copies'
+  genre tag.
+
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
 program (a Windows installer, a Mac `.dmg`). It starts in the background,

@@ -60,7 +60,8 @@ DB_FILENAME = "airwave.db"
 #  20: Phase 13b, converting inbox files (inbox_items.convert_status, _progress, _error)
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
-SCHEMA_VERSION = 22
+#  23: genres for each series (series_genres table)
+SCHEMA_VERSION = 23
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -224,6 +225,17 @@ class SeriesArt(Base):
     series: Mapped[str] = mapped_column(primary_key=True)
     art_hash: Mapped[str]
     uploaded_at: Mapped[datetime]   # UTC
+
+
+class SeriesGenre(Base):
+    """One genre the owner gave a series ("Western", "Comedy"). A series
+    can have several, or none. Kept under the series name, like its
+    uploaded picture; renaming the series moves its genres too."""
+
+    __tablename__ = "series_genres"
+
+    series: Mapped[str] = mapped_column(primary_key=True)
+    genre: Mapped[str] = mapped_column(primary_key=True, index=True)
 
 
 class Listening(Base):

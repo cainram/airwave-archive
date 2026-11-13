@@ -1,0 +1,27 @@
+{% extends layout %}
+{% block title %}Genres for {{ name }} · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ name | series_url }}">← Back to {{ name }}</a></nav>
+<h1>Genres for {{ name }}</h1>
+<p class="muted">A series can have several genres, or none. Untick a genre to take it off.</p>
+
+<form class="upload-form" method="post" action="/series/genres?name={{ name | urlencode }}">
+  {% if known %}
+  <fieldset class="genre-ticks">
+    <legend>Genres you've used</legend>
+    {% for genre in known %}
+    <label class="tick-all"><input type="checkbox" name="genre" value="{{ genre }}"
+      {% if genre in totals.genres %}checked{% endif %}> {{ genre }}</label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  <label for="new_genres">{{ "Add a new genre" if known else "Genres" }}</label>
+  <input id="new_genres" name="new_genres" type="text" maxlength="200" autocomplete="off">
+  <p class="muted small">Type a genre, like <em>Western</em> or <em>Comedy</em>. To add several,
+    put commas between them. {% if known %}A genre you've used before is ticked above instead of being added twice.{% endif %}</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save</button>
+    <a class="button" href="{{ name | series_url }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
