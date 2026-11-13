@@ -212,8 +212,9 @@ def finish_renaming() -> None:
 
 @app.on_event("startup")
 def start_converting() -> None:
-    """Start the helper that converts inbox files in the background
-    (app/converting.py). It isn't started when there's no ffmpeg."""
+    """Start the helpers that convert files in the background, several at
+    once on a machine with several cores (app/converting.py). They aren't
+    started when there's no ffmpeg."""
     if convert.available():
         converting.start(get_engine, lambda: INBOX_DIR, _sync_inbox_folder,
                          get_library=lambda: LIBRARY_DIR, get_art_dir=art_dir)
