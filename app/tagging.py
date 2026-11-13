@@ -7,7 +7,8 @@ into a hidden copy of a library file and swaps it in only once it's checked
 Two kinds of tags are written:
 
 - the usual ones every player understands: title, artist and album (the
-  series), date, comment (the notes), track (the part number);
+  series), date, genre (the series' genres, if it has any), comment (the
+  notes), track (the part number);
 - "Airwave tags": every radio detail under a fixed name (AIRWAVE_SERIES,
   AIRWAVE_AIR_DATE...), so another Airwave Archive server can read them
   back exactly. Each format stores these its own way (MP3: ID3 "TXXX"
@@ -21,19 +22,22 @@ from pathlib import Path
 
 import mutagen
 from mutagen.asf import ASF
-from mutagen.id3 import COMM, ID3, TALB, TDRC, TIT2, TPE1, TRCK, TXXX, ID3NoHeaderError
+from mutagen.id3 import COMM, ID3, TALB, TCON, TDRC, TIT2, TPE1, TRCK, TXXX, ID3NoHeaderError
 from mutagen.mp4 import MP4, MP4FreeForm
 
 from app.db import Episode
 from app.filenames import date_text
+from app.genres import SEPARATOR
 
 PREFIX = "AIRWAVE_"
 MP4_FREEFORM = "----:com.airwavearchive:"
 ASF_PREFIX = "Airwave/"
 
 
-def airwave_values(episode: Episode, part: int | None, parts: int) -> dict[str, str]:
-    """The Airwave tags for one file of an episode (empty ones left out)."""
+def airwave_values(episode: Episode, part: int | None, parts: int,
+                   genres: list[str] | None = None) -> dict[str, str]:
+    """The Airwave tags for one file of an episode (empty ones left out).
+    ``genres`` are its series' genres."""
     values = {
         "ID": episode.uid,
         "SERIES": episode.series,
@@ -47,12 +51,15 @@ def airwave_values(episode: Episode, part: int | None, parts: int) -> dict[str, 
         "CAST": episode.cast,
         "NOTES": episode.notes,
         "PART": f"{part}/{parts}" if parts > 1 and part else None,
+        "GENRES": SEPARATOR.join(genres) if genres else None,
     }
     return {PREFIX + key: value for key, value in values.items() if value}
 
 
-def common_values(episode: Episode, part: int | None, parts: int) -> dict[str, str]:
-    """The usual tags, in plain words (title, artist, album, date, comment, track)."""
+def common_values(episode: Episode, part: int | None, parts: int,
+                  genres: list[str] | None = None) -> dict[str, str]:
+    """The usual tags, in plain words (title, artist, album, date, genre,
+    comment, track). Several genres are one text: "Western; Drama"."""
     title = episode.title
     if title and parts > 1 and part:
         title = f"{title} (part {part} of {parts})"
@@ -61,18 +68,21 @@ def common_values(episode: Episode, part: int | None, parts: int) -> dict[str, s
         "artist": episode.series,
         "album": episode.series,
         "date": date_text(episode.air_year, episode.air_month, episode.air_day) or None,
+        "genre": SEPARATOR.join(genres) if genres else None,
         "comment": episode.notes,
         "track": f"{part}/{parts}" if parts > 1 and part else None,
     }
     return {key: value for key, value in values.items() if value}
 
 
-def write_tags(path: Path, episode: Episode, part: int | None = None, parts: int = 1) -> bool:
+def write_tags(path: Path, episode: Episode, part: int | None = None, parts: int = 1,
+               genres: list[str] | None = None) -> bool:
     """Write the episode's details into the file at ``path`` (a copy!).
-    Details the app doesn't know are left as the file had them. Returns
+    ``genres`` are its series' genres. Details the app doesn't know (a
+    series without genres, say) are left as the file had them. Returns
     False if this kind of file can't hold tags."""
-    common = common_values(episode, part, parts)
-    airwave = airwave_values(episode, part, parts)
+    common = common_values(episode, part, parts, genres)
+    airwave = airwave_values(episode, part, parts, genres)
     audio = mutagen.File(path)
     if audio is None:
         return False
@@ -98,6 +108,11 @@ def _uses_id3(audio) -> bool:
     return False
 
 
+def _genres(common: dict) -> list[str]:
+    """Several genres go into a tag as separate values."""
+    return common["genre"].split(SEPARATOR)
+
+
 def _write_id3(audio, common: dict, airwave: dict) -> None:
     if audio.tags is None:
         try:
@@ -109,6 +124,8 @@ def _write_id3(audio, common: dict, airwave: dict) -> None:
     for key, frame in frames.items():
         if key in common:
             tags.setall(frame.__name__, [frame(encoding=3, text=common[key])])
+    if "genre" in common:
+        tags.setall("TCON", [TCON(encoding=3, text=_genres(common))])
     if "comment" in common:
         tags.setall("COMM", [COMM(encoding=3, lang="eng", desc="", text=common["comment"])])
     for frame in list(tags.getall("TXXX")):
@@ -129,6 +146,9 @@ def _write_mp4(audio, common: dict, airwave: dict) -> None:
     if "track" in common:
         number, total = (int(n) for n in common["track"].split("/"))
         audio.tags["trkn"] = [(number, total)]
+    if "genre" in common:
+        audio.tags["\xa9gen"] = _genres(common)
+        audio.tags.pop("gnre", None)       # (an old numbered genre would compete)
     for atom in [k for k in audio.tags.keys() if k.startswith(MP4_FREEFORM + PREFIX)]:
         del audio.tags[atom]
     for key, value in airwave.items():
@@ -141,6 +161,8 @@ def _write_asf(audio, common: dict, airwave: dict) -> None:
     for key, name in keys.items():
         if key in common:
             audio.tags[name] = [common[key]]
+    if "genre" in common:
+        audio.tags["WM/Genre"] = _genres(common)
     for name in [k for k in audio.tags.keys() if k.startswith(ASF_PREFIX)]:
         del audio.tags[name]
     for key, value in airwave.items():
@@ -156,6 +178,8 @@ def _write_vorbis(audio, common: dict, airwave: dict) -> None:
     for key, name in keys.items():
         if key in common:
             audio.tags[name] = [common[key]]
+    if "genre" in common:
+        audio.tags["GENRE"] = _genres(common)    # (replaces any "genre", whatever its capitals)
     for name in [k for k in audio.tags.keys() if k.upper().startswith(PREFIX)]:
         del audio.tags[name]
     for key, value in airwave.items():

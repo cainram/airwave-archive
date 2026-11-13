@@ -114,6 +114,22 @@ def test_writing_the_tags(client):
     assert "Already up to date: nothing to write." in page and "There's nothing to write." in page
 
 
+def test_the_series_genres_are_written_too(client):
+    client.post("/series/genres?name=Suspense", data={"new_genres": "Thriller, Mystery"})
+    ep = episode_of("Suspense 1943-05-13.mp3")
+    page = client.get(f"/tags/write?ids={ep.id}").text
+    assert "<td>Genre</td><td><span class=\"muted\">(none)</span></td><td>Mystery; Thriller</td>" in page
+    assert "<td>Genres</td>" in page                                   # the Airwave tag
+    write(client, "Suspense 1943-05-13.mp3")
+    assert read_audio(client.lib / SUSPENSE).tags["genre"] == "Mystery; Thriller"
+    assert read_airwave_tags(client.lib / SUSPENSE)["GENRES"] == "Mystery; Thriller"
+    assert "Already up to date" in client.get(f"/tags/write?ids={ep.id}").text
+    # Changing the series' genres makes the files out of date again.
+    client.post("/series/genres?name=Suspense", data={"genre": "Mystery"})
+    page = client.get(f"/tags/write?ids={ep.id}").text
+    assert "<td>Genre</td><td>Mystery; Thriller</td><td>Mystery</td>" in page
+
+
 def test_the_owners_edits_still_win_after_writing(client):
     write(client, "Suspense 1943-05-13.mp3")
     f = the_file("Suspense 1943-05-13.mp3")
@@ -142,7 +158,7 @@ def test_a_failure_leaves_the_file_as_it_was(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def broken(path, episode, part=None, parts=1):
+    def broken(path, episode, part=None, parts=1, genres=None):
         path.write_bytes(b"half written")
         raise OSError(28, "No space left on device")
     monkeypatch.setattr(tagwriting, "write_tags", broken)
@@ -157,7 +173,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def shortened(copy, episode, part=None, parts=1):
+    def shortened(copy, episode, part=None, parts=1, genres=None):
         copy.write_bytes(copy.read_bytes()[:417 * 3])     # much shorter: something went wrong
         return True
     monkeypatch.setattr(tagwriting, "write_tags", shortened)
@@ -168,7 +184,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
 def test_a_file_changed_meanwhile_isnt_replaced(client, monkeypatch):
     path = client.lib / SUSPENSE
 
-    def meddling(copy, episode, part=None, parts=1):
+    def meddling(copy, episode, part=None, parts=1, genres=None):
         tagging.write_tags(copy, episode, part, parts)
         make_mp3(path, frames=401)                        # edited outside the app
         return True
@@ -205,15 +221,19 @@ def test_other_formats(tmp_path):
     from test_export import make_flac
     path = tmp_path / "show.flac"
     make_flac(path)
+    session = Session(make_engine(tmp_path / "data" / "airwave.db"))  # (genres are looked up)
     ep = Episode(series="Suspense", title="The Hitch-Hiker", air_year=1942, uid="abc")
     f = AudioFile(folder="", name="show.flac", missing=False, part_number=None)
     ep.files = [f]
-    plan = tagwriting.plan_file(f, ep, tmp_path)
-    assert plan.problem is None and [c.label for c in plan.changes] == ["Title", "Artist", "Album", "Date"]
-    tagwriting.write_file(f, ep, tmp_path)
-    audio = mutagen.File(path)
-    assert audio["TITLE"] == ["The Hitch-Hiker"] and audio["AIRWAVE_ID"] == ["abc"]
-    assert tagwriting.plan_file(f, ep, tmp_path).up_to_date
+    session.add(ep)
+    with session.no_autoflush:                   # (never saved)
+        plan = tagwriting.plan_file(f, ep, tmp_path)
+        assert plan.problem is None and [c.label for c in plan.changes] == ["Title", "Artist", "Album", "Date"]
+        tagwriting.write_file(f, ep, tmp_path)
+        audio = mutagen.File(path)
+        assert audio["TITLE"] == ["The Hitch-Hiker"] and audio["AIRWAVE_ID"] == ["abc"]
+        assert tagwriting.plan_file(f, ep, tmp_path).up_to_date
+    session.close()
 
 
 # ------------------------------------------------------- many at once

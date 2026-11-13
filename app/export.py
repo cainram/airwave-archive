@@ -4,7 +4,7 @@ Airwave Archive (or to use in another player).
 The zip holds COPIES of the recordings, with the episode details written
 into their tags (see app/tagging.py), a folder per series, a manifest
 (manifest.json) listing every episode and its details, the series
-pictures, and a short read-me. The library's own files are never changed.
+pictures and genres, and a short read-me. The library's own files are never changed.
 
 The zip is made while it downloads, one recording at a time: each is
 copied to a temporary file, tagged, sent, and deleted. So even a very big
@@ -19,7 +19,7 @@ import json
 import shutil
 import uuid
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.db import Episode
 from app.filenames import date_text
+from app.genres import genres_of
 from app.inbox import folder_name
 from app.series import one_series
 from app.tagging import write_tags
@@ -40,7 +41,8 @@ This zip was made by Airwave Archive, a self-hosted app for collections of
 radio programs.
 
 - Each folder holds one series' recordings. They are copies, with the
-  episode details written into their tags, so most players show them.
+  episode details (and the series' genres) written into their tags, so
+  most players show them.
 - manifest.json lists every episode and all its details (air date, time,
   station, cast, notes...), for another Airwave Archive server to import.
 - pictures/ holds the series pictures.
@@ -66,6 +68,7 @@ class Plan:
     episodes: list[Episode]
     pictures: dict[str, Path]      # series name -> picture file
     missing: int                   # files that couldn't be included (missing)
+    genres: dict[str, list[str]] = field(default_factory=dict)   # series name -> its genres
 
     @property
     def size(self) -> int:
@@ -104,7 +107,8 @@ def make_plan(session: Session, episodes: list[Episode], library: Path,
             art = picture_path(found["art"]) if found and found.get("art") else None
             if art is not None:
                 pictures[episode.series] = art
-    return Plan(items, episodes, pictures, missing)
+    names = sorted({e.series for e in episodes if e.series})
+    return Plan(items, episodes, pictures, missing, genres_of(session, names))
 
 
 def _free_path(used: set[str], path: str) -> str:
@@ -147,8 +151,9 @@ def manifest(plan: Plan, picture_names: dict[str, str]) -> dict:
         "version": VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "episodes": episodes,
-        "series": [{"name": name, "picture": picture}
-                   for name, picture in sorted(picture_names.items())],
+        "series": [{"name": name, "picture": picture_names.get(name),
+                    "genres": plan.genres.get(name, [])}
+                   for name in sorted(set(picture_names) | set(plan.genres))],
     }
 
 
@@ -185,7 +190,8 @@ def stream_zip(plan: Plan, work_dir: Path) -> Iterator[bytes]:
                 copy = temporary.with_suffix(item.source.suffix.lower())
                 shutil.copyfile(item.source, copy)
                 try:
-                    write_tags(copy, item.episode, item.part, item.parts)
+                    write_tags(copy, item.episode, item.part, item.parts,
+                               plan.genres.get(item.episode.series))
                 except Exception:
                     shutil.copyfile(item.source, copy)   # untagged: the manifest has it all
                 info = zipfile.ZipInfo.from_file(copy, item.path)

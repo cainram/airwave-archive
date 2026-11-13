@@ -154,7 +154,10 @@ for large collections, copying files onto the server is faster).
 3. **Add to library** — approved files are moved into the library, filed in
    a folder for their series (e.g. `library/Suspense/`).
 4. **Or reject** — rejected files are deleted from the inbox. The library is
-   never touched.
+   never touched. A red **Clear the inbox** button next to Upload (after
+   a confirmation) rejects every waiting recording at once, for when the
+   tags are better fixed in another program first (owner's request,
+   2026-11-13). Zips waiting to be unpacked stay.
 
 ## 4. User interface
 
@@ -1177,8 +1180,15 @@ keeps the genres of both.
   means fewer rows. A genre's place is its series' newest recording
   (when the app first saw it); within a row, series go newest first,
   like "Recently added series".
-- Maybe later: exports writing the series' genres into the copies'
-  genre tag.
+- **Step 4** ✅ *done* (2026-11-13): genres in the files' tags. Exports
+  write the series' genres into the copies' genre tag (several as
+  separate values, shown as "Western; Drama") and an `AIRWAVE_GENRES`
+  tag, and list them in the manifest (`series[].genres`). Importing an
+  export (or a lone tagged copy) brings them back, shown in the inbox,
+  and gives them to the series only if it has no genres yet (like
+  pictures). "Write details into the files" (Phase 10a) writes them too
+  (owner's choice), so they show in its preview. A series without
+  genres leaves the file's own genre tag alone.
 
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop

@@ -9,8 +9,8 @@ An Airwave export zip has a manifest (manifest.json) listing every
 episode's details, so its files arrive filled in: series, number, title
 and date in the inbox's boxes, and the rest (time, station, cast, notes,
 the episode's permanent ID, which part it is) kept with the file until
-it's added. Series pictures in the zip are offered for series that have
-no picture yet. Any other zip of recordings works too: its files are
+it's added. Series pictures and genres in the zip are offered for series
+that have none yet. Any other zip of recordings works too: its files are
 treated like ordinary uploads (their tags and names are read).
 
 Zips come from other people, so nothing in them is trusted: folder names
@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from app.artwork import MAX_PICTURE_BYTES, save_picture
 from app.db import InboxItem, utcnow
 from app.export import FORMAT
+from app.genres import read_list
 from app.inbox import (
     MAX_NAME, UNSAFE, guess_details, is_audio, safe_name, save_upload, with_airwave,
 )
@@ -88,19 +89,20 @@ def _recordings(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
     return found
 
 
-def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str]]:
+def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str],
+                                                dict[str, list[str]]]:
     """What an Airwave export's manifest says: details by file path in the
-    zip (named like Airwave tags), and picture paths by series. Empty if
-    there's no manifest, or it isn't one."""
+    zip (named like Airwave tags), picture paths by series, and genres by
+    series. Empty if there's no manifest, or it isn't one."""
     try:
         info = zf.getinfo(MANIFEST)
         if info.file_size > MAX_MANIFEST_BYTES:
-            return {}, {}
+            return {}, {}, {}
         data = json.loads(zf.read(info))
     except (KeyError, ValueError, zipfile.BadZipFile, OSError):
-        return {}, {}
+        return {}, {}, {}
     if not isinstance(data, dict) or data.get("format") != FORMAT:
-        return {}, {}
+        return {}, {}, {}
     details: dict[str, dict] = {}
     for episode in data.get("episodes") or []:
         if not isinstance(episode, dict):
@@ -115,10 +117,11 @@ def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str]]
                 these["PART"] = f"{part}/{len(files)}"
             if isinstance(f.get("path"), str):
                 details[f["path"]] = these
-    pictures = {s["name"]: s["picture"] for s in data.get("series") or []
-                if isinstance(s, dict) and isinstance(s.get("name"), str)
-                and isinstance(s.get("picture"), str)}
-    return details, pictures
+    series = [s for s in data.get("series") or []
+              if isinstance(s, dict) and isinstance(s.get("name"), str)]
+    pictures = {s["name"]: s["picture"] for s in series if isinstance(s.get("picture"), str)}
+    genres = {s["name"]: found for s in series if (found := read_list(s.get("genres")))}
+    return details, pictures, genres
 
 
 def _save_pictures(zf: zipfile.ZipFile, pictures: dict[str, str],
@@ -160,7 +163,7 @@ def unpack(session: Session, zip_path: Path, inbox_folder: Path,
             raise ZipProblem(
                 f"There isn't enough free space to unpack “{zip_path.name}”: its recordings "
                 f"need {format_size(needed)}, and the disk has {format_size(free)} free.")
-        details, pictures = read_manifest(zf)
+        details, pictures, genres = read_manifest(zf)
         picture_hashes = _save_pictures(zf, pictures, picture_dir)
         done = with_details = 0
         for member in members:
@@ -182,6 +185,8 @@ def unpack(session: Session, zip_path: Path, inbox_folder: Path,
                 series = values.get("SERIES")
                 if series in picture_hashes:
                     found["extra"]["picture"] = picture_hashes[series]
+                if series in genres:
+                    found["extra"]["genres"] = genres[series]
             if found.get("extra"):
                 with_details += 1
             # (The inbox page may have noticed the file already.)
