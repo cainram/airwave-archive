@@ -516,7 +516,10 @@ Split into four smaller steps, done in order.
   30 MB; the app keeps a 600-pixel copy in `data/uploaded-artwork/`
   (needs backing up, unlike `data/artwork/`). Phone photos are turned the
   right way up. An uploaded picture wins over the library's, for the
-  series and for its episodes without a picture of their own. Renaming
+  series and for **every** one of its episodes, even those with a
+  picture inside their files (owner's choice, 2026-11-13: so all of a
+  series' episodes look the same; also each episode's picture in podcast
+  feeds). Renaming
   every episode of a series carries its picture to the new name. Database
   version 7 adds the `series_art` table. Pictures for single episodes
   aren't offered (could be added later).

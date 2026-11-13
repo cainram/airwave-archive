@@ -48,7 +48,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import AudioFile, Episode, Feed, FeedItem, utcnow
 from app.episodes import format_air_date
-from app.series import AIR_ORDER, one_series
+from app.series import AIR_ORDER, one_series, uploaded_pictures
 
 ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd"
 ET.register_namespace("itunes", ITUNES)
@@ -274,6 +274,7 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
     app reached it, like http://192.168.1.20:8000."""
     found = feed_items(session, feed)
     picture = feed_picture(session, feed, found)
+    uploads = uploaded_pictures(session)
     it = f"{{{ITUNES}}}"
 
     root = ET.Element("rss", {"version": "2.0"})
@@ -316,8 +317,11 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
         _add(entry, "pubDate", _when(item.added))
         if f.duration_seconds:
             _add(entry, it + "duration", str(round(f.duration_seconds)))
-        if f.art_hash and f.art_hash != picture:      # a picture inside the file
-            _add(entry, it + "image", href=f"{base}/art/{f.art_hash}.jpg")
+        # The series' uploaded picture, else one inside the file (not
+        # repeated when it's the podcast's own picture).
+        own = uploads.get(episode.series or "") or f.art_hash
+        if own and own != picture:
+            _add(entry, it + "image", href=f"{base}/art/{own}.jpg")
     ET.indent(root)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 

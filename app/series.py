@@ -190,13 +190,14 @@ def most_played(session: Session, limit: int = 20) -> list[dict]:
 
 
 def episode_art(session: Session, f: AudioFile) -> str | None:
-    """An episode's picture: from inside its files (first part first), else
-    the one uploaded for its series, else its folder's."""
+    """An episode's picture: the one uploaded for its series (so every
+    episode of the series looks the same), else from inside its files
+    (first part first), else its folder's."""
     parts = f.episode.parts if f.episode else [f]
     series = f.episode.series if f.episode else None
     uploaded = session.get(SeriesArt, series) if series else None
-    return (next((p.art_hash for p in parts if p.art_hash), None)
-            or (uploaded.art_hash if uploaded else None)
+    return ((uploaded.art_hash if uploaded else None)
+            or next((p.art_hash for p in parts if p.art_hash), None)
             or folder_art(folder_pictures(session), f.folder))
 
 
