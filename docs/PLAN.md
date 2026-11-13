@@ -986,9 +986,15 @@ window greys them out, because the inbox only accepts audio file types.
   (the page can be left); progress for each file; Cancel; plain error
   messages. The original is deleted once the new file has been checked.
   Converted files then join the usual inbox list (and group suggestions).
-- Notes: one file at a time (measured on the dev VM: about 32 seconds to
+- Notes: several files at once since 2026-11-13 (owner's choice): one
+  helper for each core the app may use, minus one, so a core stays free
+  for the pages (`converting.helpers`; a 2-core machine still converts
+  one at a time). Making an MP3 uses one core per file, so this is what
+  speeds up a big batch. Taking the next file is done under a lock, so
+  two helpers never take the same one; watching the inbox folder has a
+  helper of its own. (Measured on the dev VM: about 32 seconds to
   re-encode 40 minutes of Opus to MP3, under a second to copy MP3 sound
-  out of a container). Files join the queue as soon as they're in the
+  out of a container.) Files join the queue as soon as they're in the
   inbox (uploads, unpacked zips, and files copied into the folder: the
   helper looks there every 30 seconds). The queue is
   `inbox_items.convert_status` (waiting / converting / failed /

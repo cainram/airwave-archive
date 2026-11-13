@@ -1,9 +1,11 @@
 """The inbox's converting queue (Phase 13b).
 
 Files that need converting (see app/convert.py) join a queue as soon as
-they're in the inbox. A helper inside the app (a background *thread*: a
-second line of work running alongside the web pages) converts them one at
-a time, so the pages stay quick. The queue is kept in the database
+they're in the inbox. Helpers inside the app (background *threads*: lines
+of work running alongside the web pages) convert them, several at once on
+a machine with several cores: one helper for each core but one, so a
+core stays free and the pages stay quick (see ``helpers``). Making an MP3
+uses one core per file, so this is what makes a big batch faster. The queue is kept in the database
 (``inbox_items.convert_status``), so it carries on after a restart.
 
 For each file:
@@ -37,6 +39,7 @@ group and feeds stay as they were. Their queue is the
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 import threading
 import time
@@ -58,6 +61,18 @@ TEMPORARY = ".converting-"       # start of a half-made file's name
 IDLE_SECONDS = 3                 # how often an idle helper looks for work
 LOOK_IN_FOLDER_SECONDS = 30      # and for files copied straight into the inbox folder
 SAVE_PROGRESS_SECONDS = 2
+
+# Taking the next waiting file and marking it "converting" happen together
+# under this lock, so two helpers never take the same file.
+_CLAIM = threading.Lock()
+
+
+def helpers(cores: int | None = None) -> int:
+    """How many files to convert at once: the number of cores this app may
+    use, minus one (at least one)."""
+    if cores is None:
+        cores = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    return max(1, cores - 1)
 
 
 def queue(item: InboxItem) -> None:
@@ -117,7 +132,7 @@ def convert_next(engine: Engine, inbox_dir: Path) -> bool:
     there was one."""
     from app.inbox import LOCK, item_path   # here, to avoid a circular import
 
-    with Session(engine) as session:
+    with _CLAIM, Session(engine) as session:
         item = session.scalars(
             select(InboxItem).where(InboxItem.convert_status == WAITING)
             .order_by(InboxItem.added_at, InboxItem.id).limit(1)).first()
@@ -301,7 +316,7 @@ def _library_status(engine: Engine, file_id: int) -> str | None:
 def convert_next_library(engine: Engine, library_dir: Path, art_dir: Path | None = None) -> bool:
     """Convert the next library file waiting in the queue, if there is one.
     Returns whether there was one."""
-    with Session(engine) as session:
+    with _CLAIM, Session(engine) as session:
         job = session.scalars(
             select(LibraryConversion).where(LibraryConversion.status == WAITING)
             .order_by(LibraryConversion.queued_at, LibraryConversion.file_id).limit(1)).first()
@@ -389,25 +404,35 @@ def start(get_engine: Callable[[], Engine], get_inbox: Callable[[], Path],
           sync: Callable[[Engine, Path], None] | None = None,
           get_library: Callable[[], Path] | None = None,
           get_art_dir: Callable[[], Path | None] | None = None) -> None:
-    """Start the helper that works through the queue (once). ``sync``
-    brings the inbox list in step with its folder now and then, so files
-    copied straight into the folder are converted too."""
+    """Start the helpers that work through the queue (once): see
+    ``helpers`` for how many. ``sync`` brings the inbox list in step with
+    its folder every 30 seconds (on a helper of its own, so it isn't held
+    up while every helper is busy), so files copied straight into the
+    folder are converted too."""
     global _started
     if _started:
         return
     _started = True
 
-    def work() -> None:
+    def begin() -> None:
         try:
             recover(get_engine(), get_inbox(), get_library() if get_library else None)
         except Exception:
             log.exception("Couldn't tidy up the converting queue")
-        looked = 0.0
+        count = helpers()
+        log.info("Converting up to %d file%s at once", count, "" if count == 1 else "s")
+        for number in range(count):
+            threading.Thread(target=work, name=f"converting-{number + 1}", daemon=True).start()
+        while sync is not None:      # this one keeps an eye on the inbox folder
+            try:
+                sync(get_engine(), get_inbox())
+            except Exception:
+                log.exception("Couldn't look in the inbox folder")
+            time.sleep(LOOK_IN_FOLDER_SECONDS)
+
+    def work() -> None:
         while True:
             try:
-                if sync is not None and time.monotonic() - looked > LOOK_IN_FOLDER_SECONDS:
-                    looked = time.monotonic()
-                    sync(get_engine(), get_inbox())
                 busy = convert_next(get_engine(), get_inbox())
                 if not busy and get_library is not None:
                     busy = convert_next_library(get_engine(), get_library(),
@@ -418,4 +443,4 @@ def start(get_engine: Callable[[], Engine], get_inbox: Callable[[], Path],
             if not busy:
                 time.sleep(IDLE_SECONDS)
 
-    threading.Thread(target=work, name="converting", daemon=True).start()
+    threading.Thread(target=begin, name="converting", daemon=True).start()

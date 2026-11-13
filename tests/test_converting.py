@@ -99,6 +99,51 @@ def test_an_upload_is_queued_and_converted(client, pretend):
         assert session.scalar(select(AudioFile.name)) == names[0]
 
 
+def test_one_helper_for_each_core_but_one():
+    assert converting.helpers(1) == 1
+    assert converting.helpers(2) == 1
+    assert converting.helpers(4) == 3
+    assert converting.helpers(16) == 15
+    assert converting.helpers() >= 1        # on this machine
+
+
+def test_several_helpers_never_convert_the_same_file(client, pretend, monkeypatch):
+    import threading
+    import time
+    names = [f"The Lone Ranger 1941-01-0{n} - Part {n}.webm" for n in range(1, 7)]
+    for name in names:
+        (client.box / name).write_bytes(b"\x1aE\xdf\xa3 pretend")
+    client.get("/inbox")                     # they join the queue
+    at_once, most = [0], [0]
+    count = threading.Lock()
+    slow = convert.run
+
+    def run(*args, **kwargs):                # slow enough that the helpers overlap
+        with count:
+            at_once[0] += 1
+            most[0] = max(most[0], at_once[0])
+        time.sleep(0.3)
+        slow(*args, **kwargs)
+        with count:
+            at_once[0] -= 1
+    monkeypatch.setattr(convert, "run", run)
+
+    def helper():
+        while converting.convert_next(engine(), client.box):
+            pass
+    helpers = [threading.Thread(target=helper) for _ in range(3)]
+    for h in helpers:
+        h.start()
+    for h in helpers:
+        h.join(timeout=30)
+    assert sorted(pretend) == sorted(names)              # each converted exactly once
+    assert most[0] > 1                                   # really at the same time
+    assert sorted(p.name for p in client.box.iterdir()) == sorted(n.replace(".webm", ".mp3") for n in names)
+    with Session(engine()) as session:
+        assert {i.convert_status for i in session.scalars(select(InboxItem))} == {None}
+        assert len(session.scalars(select(InboxItem)).all()) == 6
+
+
 def test_the_converting_box_updates_itself(client, pretend):
     (client.box / WEBM).write_bytes(b"pretend")
     client.get("/inbox")
