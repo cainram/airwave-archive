@@ -401,6 +401,14 @@ Split into five smaller steps, done in order.
   1943-05-13 Affair`) and six run-together digits at the end (`Case
   380411`) are left alone. Only new or changed files are affected:
   existing episodes keep their titles (owner's choice: no clean-up run).
+  An episode number at the very start or end of the title tag comes off
+  too (owner's request, 2026-11-14): `(12)`, `[012]`, `(#12)`,
+  `(Episode 12)`, `(Ep. 12)`, `#12`, `Episode 12`
+  (`take_number_off` / `clean_title_and_number`). It fills a blank
+  episode number (the file name's number comes first in the inbox). A
+  year in brackets (`The Thin Man (1945)`), a number in the middle, a
+  bare number without brackets or a mark (`Apollo 13`), and a title
+  that's only a number are left alone.
 
 #### 4c — Filename parser with a confirm screen ✅ *done*
 - Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's

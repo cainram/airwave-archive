@@ -120,6 +120,20 @@ def test_dates_and_series_names_come_off_title_tags(client):
     assert (item.air_year, item.air_month, item.air_day) == (1943, 5, 13)
 
 
+def test_episode_numbers_come_off_title_tags(client):
+    for name, title in (("upload.wav", "Donovan's Brain (12)"),
+                        ("second.wav", "(Episode 13) The Dunwich Horror"),
+                        ("named 14.wav", "Sorry, Wrong Number (#15)")):
+        make_wav(client.box / name, 1)
+        add_tags(client.box / name, title=TIT2(encoding=3, text=title),
+                 artist=TPE1(encoding=3, text="Suspense"))
+    client.get("/inbox")
+    found = items(client)
+    assert (found["upload.wav"].title, found["upload.wav"].episode_number) == ("Donovan's Brain", "12")
+    assert (found["second.wav"].title, found["second.wav"].episode_number) == ("The Dunwich Horror", "13")
+    assert found["named 14.wav"].title == "Sorry, Wrong Number"
+
+
 def test_a_blank_episode_number_is_filled_in_but_a_typed_one_is_kept(client):
     import app.main as main
     make_wav(client.box / "Black Museum - 07 - A Can Of Weedkiller.wav", 1)

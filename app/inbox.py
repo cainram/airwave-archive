@@ -44,7 +44,7 @@ from app.episodes import (
     PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, known_parts,
     read_date_text,
 )
-from app.filenames import clean_title, date_text, marked_number, parse_filename
+from app.filenames import clean_title_and_number, date_text, marked_number, parse_filename
 from app.parts import set_parts
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
 from app.series import one_series, set_uploaded_picture
@@ -159,9 +159,10 @@ def guess_details(path: Path, found: dict | None = None) -> dict:
                 pass
     guess = parse_filename(path.name)
     series = _clean(tags.get("artist")) or _clean(tags.get("album")) or (guess and guess.series)
-    # A date or the series name in the title tag is taken off the title.
-    title, from_title = clean_title(_clean(tags.get("title")),
-                                    (series, _clean(tags.get("album")), guess and guess.series))
+    # A date, the series name or an episode number in the title tag is
+    # taken off the title.
+    title, from_title, title_number = clean_title_and_number(
+        _clean(tags.get("title")), (series, _clean(tags.get("album")), guess and guess.series))
     # The date that says the most: the date tag, else the title's, else the name's.
     date = date_from_tag(tags.get("date"))
     for other in (from_title, (guess.year, guess.month, guess.day) if guess else (None,) * 3):
@@ -169,9 +170,10 @@ def guess_details(path: Path, found: dict | None = None) -> dict:
             date = other
     details = {
         "series": series,
-        # From the name, else a tag that says "episode 9".
+        # From the name, else a tag that says "episode 9", else a number
+        # at the start or end of the title tag ("Donovan's Brain (12)").
         "episode_number": (guess and guess.episode_number) or marked_number(tags.get("album"))
-                          or marked_number(tags.get("title")),
+                          or marked_number(tags.get("title")) or title_number,
         "title": title or (guess and guess.title),
         "air_year": date[0], "air_month": date[1], "air_day": date[2],
         "duration_seconds": info.duration_seconds,

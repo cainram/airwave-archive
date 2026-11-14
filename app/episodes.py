@@ -179,13 +179,19 @@ def fill_from_tags(episode: Episode, f: AudioFile) -> bool:
         notes = combined_notes(parts)
     else:
         notes = _clean(f.tag_comment)
-    # A date or the series name in the title tag ("Suspense - 1943-05-13 -
-    # Donovan's Brain") is taken off, so the title is just the episode's.
-    from app.filenames import clean_title   # here: that module imports this one
+    # A date, the series name or an episode number in the title tag
+    # ("Suspense - 1943-05-13 - Donovan's Brain (Ep. 12)") is taken off, so
+    # the title is just the episode's. The number fills a blank episode
+    # number.
+    from app.filenames import clean_title_and_number   # here: that module imports this one
     series = _clean(f.tag_artist) or _clean(f.tag_album)
-    title, title_date = clean_title(title, (series, _clean(f.tag_album), episode.series))
+    title, title_date, number = clean_title_and_number(
+        title, (series, _clean(f.tag_album), episode.series))
     sources = episode.sources
     changed = False
+    if number and not episode.episode_number:
+        episode.episode_number = number
+        changed = True
     found = {
         "series": series,
         "title": title,

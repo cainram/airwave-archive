@@ -324,6 +324,14 @@ def test_dates_and_series_names_come_off_title_tags(tmp_path, engine):
     assert (other.air_year, other.air_month, other.air_day) == (1944, 1, 6)   # the date tag is as full
 
 
+def test_episode_numbers_come_off_title_tags(tmp_path, engine):
+    lib = tmp_path / "library"
+    tagged_wav(lib / "brain.wav", title="Donovan's Brain (Ep. 12)", artist="Suspense", date="1943")
+    sync_library(engine, lib)
+    brain = files(engine)["brain.wav"].episode
+    assert (brain.title, brain.episode_number) == ("Donovan's Brain", "12")
+
+
 def test_manual_edits_win_over_tags(tmp_path, engine):
     lib = tmp_path / "library"
     tagged_wav(lib / "patriot.wav")

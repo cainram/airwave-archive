@@ -244,3 +244,48 @@ from app.filenames import clean_title  # noqa: E402
 ])
 def test_dates_and_series_names_come_off_titles(title, series, cleaned, date):
     assert clean_title(title, series) == (cleaned, date)
+
+
+# ------------------------------------------------ episode numbers in title tags
+
+from app.filenames import clean_title_and_number, take_number_off  # noqa: E402
+
+
+@pytest.mark.parametrize("title, number, cleaned", [
+    ("Donovan's Brain (12)", "12", "Donovan's Brain"),
+    ("Donovan's Brain (012)", "12", "Donovan's Brain"),
+    ("Donovan's Brain [12]", "12", "Donovan's Brain"),
+    ("Donovan's Brain (#12)", "12", "Donovan's Brain"),
+    ("Donovan's Brain ( 12 )", "12", "Donovan's Brain"),
+    ("Donovan's Brain (Episode 12)", "12", "Donovan's Brain"),
+    ("Donovan's Brain (Ep. 12)", "12", "Donovan's Brain"),
+    ("Donovan's Brain (ep12)", "12", "Donovan's Brain"),
+    ("Donovan's Brain - Episode 12", "12", "Donovan's Brain"),
+    ("Donovan's Brain #12", "12", "Donovan's Brain"),
+    ("(12) Donovan's Brain", "12", "Donovan's Brain"),
+    ("(012) - Donovan's Brain", "12", "Donovan's Brain"),
+    ("[12] Donovan's Brain", "12", "Donovan's Brain"),
+    ("#12 - Donovan's Brain", "12", "Donovan's Brain"),
+    ("Episode 12: Donovan's Brain", "12", "Donovan's Brain"),
+    ("Ep 12 - Donovan's Brain", "12", "Donovan's Brain"),
+    # Left alone:
+    ("The Thin Man (1945)", None, "The Thin Man (1945)"),          # a year
+    ("Donovan's Brain (0)", None, "Donovan's Brain (0)"),          # never an episode
+    ("(12)", None, "(12)"),                                         # nothing would be left
+    ("The 39 Steps", None, "The 39 Steps"),                         # in the middle
+    ("Apollo 13", None, "Apollo 13"),                               # bare, no mark
+    ("Room 222 (Part One)", None, "Room 222 (Part One)"),
+    ("Return of Episode 5 Man", None, "Return of Episode 5 Man"),   # in the middle
+])
+def test_episode_numbers_come_off_titles(title, number, cleaned):
+    assert take_number_off(title) == (number, cleaned)
+
+
+@pytest.mark.parametrize("title, series, cleaned, date, number", [
+    ("Suspense - 1943-05-13 - Donovan's Brain (Ep. 12)", ("Suspense",), "Donovan's Brain", (1943, 5, 13), "12"),
+    ("(012) 1943-05-13 Donovan's Brain", (), "Donovan's Brain", (1943, 5, 13), "12"),
+    ("Donovan's Brain (12) (May 13, 1943)", (), "Donovan's Brain", (1943, 5, 13), "12"),
+    ("Donovan's Brain", (), "Donovan's Brain", (None, None, None), None),
+])
+def test_dates_series_and_numbers_come_off_together(title, series, cleaned, date, number):
+    assert clean_title_and_number(title, series) == (cleaned, date, number)

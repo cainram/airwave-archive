@@ -272,6 +272,57 @@ def clean_title(title: str | None, series=()) -> tuple[str | None, tuple]:
     return text, date
 
 
+# An episode number at the start or end of a title tag: in brackets
+# ("(12)", "[012]", "(#12)", "(Episode 12)", "(Ep. 12)") or marked ("#12",
+# "Episode 12", "Ep. 12").
+_TITLE_NUMBER = (r"(?:[(\[]\s*(?P<mark>(?:episode|epi|ep|no|nr)\.?\s*)?#?\s*(?P<n>\d{1,5})\s*[)\]]"
+                 r"|(?<![a-z0-9])(?P<mark2>#|(?:episode|epi|ep|no|nr)\.?\s*#?)\s*(?P<n2>\d{1,5})(?!\d))")
+_TITLE_NUMBER_START = re.compile(r"^" + _TITLE_NUMBER, re.I)
+_TITLE_NUMBER_END = re.compile(_TITLE_NUMBER + r"$", re.I)
+
+
+def take_number_off(title: str | None) -> tuple[str | None, str | None]:
+    """Take an episode number off the start or end of a title tag: (the
+    number, the title without it), or (None, the title) if there isn't one.
+
+    "Donovan's Brain (Episode 12)" -> ("12", "Donovan's Brain")
+    "(012) Donovan's Brain" -> ("12", "Donovan's Brain")
+
+    A number in the middle may belong to the title, so it stays; so does a
+    year in brackets ("The Thin Man (1945)"), and a title that's only a
+    number.
+    """
+    if not title:
+        return None, title
+    for pattern, start in ((_TITLE_NUMBER_END, False), (_TITLE_NUMBER_START, True)):
+        text = title.strip(TITLE_JUNK) if start else title.rstrip(TITLE_END_JUNK).lstrip()
+        match = pattern.search(text)
+        if match is None:
+            continue
+        digits = match["n"] or match["n2"]
+        marked = match["mark"] or match["mark2"]
+        if not marked and len(digits) == 4 and EARLIEST_YEAR <= int(digits) <= LATEST_YEAR:
+            continue   # "(1945)": a year, not an episode
+        number = digits.lstrip("0")
+        rest = (text[match.end():].lstrip(TITLE_JUNK) if start
+                else text[:match.start()].rstrip(TITLE_END_JUNK))
+        if number and rest:
+            return number, rest
+    return None, title
+
+
+def clean_title_and_number(title: str | None, series=()) -> tuple[str | None, tuple, str | None]:
+    """``clean_title``, and an episode number at the start or end taken off
+    too: (the title, (year, month, day) of the date taken off, the
+    number). "Suspense - 1943-05-13 - Donovan's Brain (Ep. 12)" ->
+    ("Donovan's Brain", (1943, 5, 13), "12")."""
+    number, title = take_number_off(title)
+    title, date = clean_title(title, series)
+    if number is None:
+        number, title = take_number_off(title)
+    return title, date, number
+
+
 def _parse_without_date(stem: str) -> Guess | None:
     """Names with no date: a clear episode number splits the series (before
     it) from the title (after it). None if there's no such number."""
