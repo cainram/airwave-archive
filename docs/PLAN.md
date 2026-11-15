@@ -1229,6 +1229,30 @@ keeps the genres of both.
   (owner's choice), so they show in its preview. A series without
   genres leaves the file's own genre tag alone.
 
+### Mobile version (owner's request, 2026-11-15)
+On a phone the app is for **listening, not curating**: "sitting in an
+airport, noodling around and listening to a few episodes". Less clutter;
+every tool that changes the library is left out. (Not a security
+measure: the pages still exist, nothing on the phone leads to them.)
+- **What's a phone** (owner's choice): the browser's own description
+  (`Mobi` in its user agent: every phone, in either direction; an iPad
+  says it's a Mac and gets the desktop version). A footer link
+  **"Desktop version" / "Mobile version"** (owner's wording) overrides
+  it, remembered in a cookie (`airwave-view`), via `/view`.
+- **Step 1** ✅ *done*: the switch; the mobile menu is Home · Series ·
+  Feeds (no Calendar, owner's choice, and no Inbox); an empty library
+  just says there's nothing to listen to yet.
+- **Step 2**: Series page: tiles only, no Actions menu, no library
+  notices. A series' page: no Actions menu, no tick boxes, no size
+  total. An episode's page: listening only (play, played / not played,
+  start over, the details); no editing, parts, delete, file details or
+  raw tags. Home, Search, genre pages and the player bar stay as they
+  are; the calendar pages stay reachable from dates.
+- **Step 3**: Feeds read-only (list, a feed's page with Open in Podcasts
+  and Copy link, its episodes), no publishing, editing or deleting.
+  Library-managing pages reached on a phone (old bookmark) show "This is
+  for managing your library; use a computer" with a Back button.
+
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
 program (a Windows installer, a Mac `.dmg`). It starts in the background,
@@ -1282,8 +1306,4 @@ How it would work:
 - Multiple library folders, playlists / "collections", backups of the
   database, podcast RSS feed subscriptions. (Online episode logs: see
   "Look up episode details online" above.)
-- **A phone version that differs from the computer one** (owner's wish,
-  2026-11-15; not started, details to decide together): leave out
-  features nobody will use on a phone, the Inbox for example, so the
-  phone layout stays simple. Today the phone shows the same pages,
-  squeezed to fit.
+

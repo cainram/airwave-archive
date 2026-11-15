@@ -57,7 +57,9 @@
 {{ shelf("genre-heading-" ~ loop.index, "Recently added in " ~ genre, series, genre | genre_url) }}
 {% endfor %}
 
-{% if not anything %}
+{% if not anything and mobile %}
+<div class="notice">Nothing to listen to yet.</div>
+{% elif not anything %}
 <div class="notice">No episodes yet. Add recordings to the library and choose <strong>☰ Actions → Rescan</strong> on the <a href="/series">Series</a> page, or upload them in the <a href="/inbox">Inbox</a>.</div>
 {% elif not unfinished and not played %}
 <p class="muted">Play an episode and it will show up here.</p>

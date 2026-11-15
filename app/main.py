@@ -241,6 +241,22 @@ def inbox_waiting() -> int:
         return 0
 
 
+# Mobile version (owner's choice, 2026-11-15): on a phone the app is for
+# listening, not for managing the library, so the tools that change the
+# library aren't shown. A phone is recognised by how its browser describes
+# itself ("Mobi" is in every phone browser's description, and not in an
+# iPad's, which gets the desktop version). The footer's "Desktop version" /
+# "Mobile version" link overrides that, remembered in a cookie.
+VIEW_COOKIE = "airwave-view"
+
+
+def is_mobile(request: Request) -> bool:
+    chosen = request.cookies.get(VIEW_COOKIE)
+    if chosen in ("mobile", "desktop"):
+        return chosen == "mobile"
+    return "Mobi" in request.headers.get("user-agent", "")
+
+
 def render(request: Request, template: str, context: dict, status_code: int = 200):
     """Send a page. When htmx asks (a click inside the app), send only the
     title and the middle of the page, so the player bar isn't replaced."""
@@ -256,9 +272,11 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
         return Response(headers={"HX-Refresh": "true", "Vary": "HX-Request"})
     context["layout"] = "_partial.html" if from_htmx else "base.html"
     context.setdefault("inbox_waiting", inbox_waiting())
+    context.setdefault("mobile", is_mobile(request))
     response = templates.TemplateResponse(request, template, context, status_code=status_code)
-    # Tell browsers the full and partial versions are different pages.
-    response.headers["Vary"] = "HX-Request, HX-History-Restore-Request"
+    # Tell browsers the full and partial versions are different pages (and
+    # the mobile and desktop versions).
+    response.headers["Vary"] = "HX-Request, HX-History-Restore-Request, User-Agent, Cookie"
     return response
 
 
@@ -281,6 +299,19 @@ async def read_request_form(request: Request):
     """What a page sent (its boxes and uploaded files), without the
     framework's low limits on how many there may be."""
     return await request.form(max_fields=FORM_LIMIT, max_files=FORM_LIMIT)
+
+
+@app.get("/view")
+def choose_view(request: Request, to: str = ""):
+    """The footer's "Desktop version" / "Mobile version" link: remember the
+    choice in this browser and show the same page again, whole."""
+    from urllib.parse import urlsplit
+    came_from = urlsplit(request.headers.get("referer", ""))
+    back = safe_back(came_from.path + (f"?{came_from.query}" if came_from.query else ""))
+    response = RedirectResponse(back if back != "/view" else "/", status_code=303)
+    if to in ("mobile", "desktop"):
+        response.set_cookie(VIEW_COOKIE, to, max_age=10 * 365 * 24 * 3600, samesite="lax")
+    return response
 
 
 def go_to(request: Request, path: str) -> Response:

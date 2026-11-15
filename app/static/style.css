@@ -287,6 +287,9 @@ body.has-player { padding-bottom: 150px; }
 }
 
 .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 16px; }
+/* "Desktop version" / "Mobile version". */
+.view-switch-link { margin: 8px 0 0; }
+.view-switch-link a { color: var(--muted); display: inline-block; padding: 6px 10px; }
 
 /* Episodes made of several files ("parts"). */
 .badge.parts { background: var(--tint); color: var(--tint-text); }
