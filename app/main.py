@@ -250,6 +250,20 @@ def inbox_waiting() -> int:
 VIEW_COOKIE = "airwave-view"
 
 
+# Pages for managing the library: the mobile version shows a note instead
+# ("use a computer"). Nothing on a phone leads to them; this covers old
+# bookmarks and the like.
+MANAGING_PAGES = {
+    "inbox.html", "library.html", "advanced.html", "import.html", "import_preview.html",
+    "review.html", "groups_suggested.html", "edit.html", "bulk_edit.html", "export.html",
+    "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
+    "organize.html", "organized.html", "organize_history.html", "renaming.html",
+    "library_convert.html", "rename.html", "series_picture.html", "series_genres.html",
+    "parts.html", "feed_form.html", "feed_picture.html", "feed_new_link.html",
+    "feed_delete.html", "feed_add.html",
+}
+
+
 def is_mobile(request: Request) -> bool:
     chosen = request.cookies.get(VIEW_COOKIE)
     if chosen in ("mobile", "desktop"):
@@ -273,6 +287,12 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
     context["layout"] = "_partial.html" if from_htmx else "base.html"
     context.setdefault("inbox_waiting", inbox_waiting())
     context.setdefault("mobile", is_mobile(request))
+    if context["mobile"] and template in MANAGING_PAGES:
+        template, status_code = "desktop_only.html", 200
+        from urllib.parse import urlsplit
+        came_from = urlsplit(request.headers.get("referer", ""))
+        back = safe_back(came_from.path + (f"?{came_from.query}" if came_from.query else ""))
+        context["back"] = back if came_from.path and came_from.path != request.url.path else "/"
     response = templates.TemplateResponse(request, template, context, status_code=status_code)
     # Tell browsers the full and partial versions are different pages (and
     # the mobile and desktop versions).

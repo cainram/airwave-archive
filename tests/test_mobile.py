@@ -149,3 +149,50 @@ def test_the_series_pages_are_for_listening(client):
     assert "Donovan&#39;s Brain" in page and "data-play" in page or "play" in page
     desktop = computer(client, "/series/episodes?name=Suspense")
     assert "Edit genres…" in desktop and "With ticked" in desktop and 'type="checkbox"' in desktop
+
+
+# ------------------------------------------------------ step 3: feeds, and managing pages
+
+def make_feeds(client):
+    client.post("/files/1/edit", data={"series": "Suspense", "title": "Donovan's Brain"})
+    for title, publish in (("Out", True), ("Not yet", False)):
+        sent = client.post("/feeds", data={"series": "Suspense", "title": title, "description": ""},
+                           follow_redirects=False)
+        feed_id = int(re.search(r"/feeds/(\d+)", sent.headers["location"])[1])
+        if publish:
+            client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    return 1
+
+
+def test_feeds_are_read_only(client):
+    make_feeds(client)
+    listing = phone(client, "/feeds")
+    assert ">Out</a>" in listing and "Not yet" not in listing            # only published ones
+    assert "Draft" not in listing and "Make a feed" not in listing
+    assert "Not yet" in computer(client, "/feeds")
+    page = phone(client, "/feeds/1")
+    for words in ("Edit details", "Change picture", "New private link", "Unpublish", "Delete the feed",
+                  "<svg", "Take ticked out", 'type="checkbox"'):
+        assert words not in page, words
+    assert "Open in Podcasts" in page and 'data-copy="#feed-address"' in page
+    assert "Donovan&#39;s Brain" in page                                  # what's in it
+    desktop = computer(client, "/feeds/1")
+    assert "Edit details" in desktop and "<svg" in desktop
+    assert "isn't published yet" in phone(client, "/feeds/2")
+
+
+@pytest.mark.parametrize("url", ["/inbox", "/library", "/advanced", "/files/1/edit", "/import",
+                                 "/review/filenames", "/export?ids=1", "/feeds/1/edit",
+                                 "/series/genres?name=Suspense"])
+def test_managing_pages_say_to_use_a_computer(client, url):
+    make_feeds(client)
+    page = client.get(url, headers={"User-Agent": IPHONE,
+                                    "Referer": "http://testserver/series/episodes?name=Suspense"}).text
+    assert "<h1>Use a computer for this</h1>" in page
+    assert '<a class="button" href="/series/episodes?name=Suspense">← Back</a>' in page
+    assert "Use a computer for this" not in computer(client, url)
+
+
+def test_the_note_goes_home_without_somewhere_to_go_back_to(client):
+    page = phone(client, "/inbox")
+    assert '<a class="button" href="/">← Back</a>' in page

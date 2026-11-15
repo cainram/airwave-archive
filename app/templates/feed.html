@@ -31,13 +31,14 @@
   <div class="summary-text">
     <h1>{{ feed.title }}</h1>
     <p class="muted">
-      {% if feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
+      {% if mobile %}{% elif feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
       {% if feed.series %}Every episode of <a href="{{ feed.series | series_url }}">{{ feed.series }}</a> ·{% else %}Hand-picked ·{% endif %}
       {{ episodes }} episode{{ "" if episodes == 1 else "s" }}{% if recordings != episodes %} ({{ recordings }} recordings){% endif %}
     </p>
     {% if feed.author %}<p class="muted small">By {{ feed.author }}</p>{% endif %}
     {% if feed.description %}<p class="feed-description">{{ feed.description }}</p>{% endif %}
   </div>
+  {% if not mobile %}{# (the mobile version doesn't manage feeds) #}
   <div class="actions">
     {% if not feed.published %}
     <form method="post" action="/feeds/{{ feed.id }}/publish">
@@ -59,9 +60,25 @@
       </div>
     </details>
   </div>
+  {% endif %}
 </section>
 
-{% if not feed.published %}
+{% if not feed.published and mobile %}
+<div class="notice">This feed isn't published yet, so podcast apps can't open it.</div>
+{% elif feed.published and mobile %}
+{# Mobile: reading this on the phone itself, so no code to scan. #}
+<section class="feed-subscribe" aria-labelledby="subscribe-heading">
+  <h2 id="subscribe-heading">Add it to Podcasts</h2>
+  <p><a class="button primary" href="{{ podcast_address }}" hx-boost="false">Open in Podcasts</a></p>
+  <p>Or copy its address, and in <strong>Podcasts</strong> tap <strong>Library</strong>, then
+    <strong>⋯</strong>, then <strong>Follow a Show by URL</strong>, and paste it.</p>
+  <div class="copy-row">
+    <input id="feed-address" type="text" value="{{ address }}" readonly aria-label="The feed's address">
+    <button class="button" type="button" data-copy="#feed-address">Copy</button>
+  </div>
+  <p class="muted small">The address is private: share it only with your household.</p>
+</section>
+{% elif not feed.published %}
 <div class="notice">This feed is a <strong>draft</strong>: its address doesn't work yet.
   Press <strong>Publish</strong> when it's ready, and the way to add it on your iPhone appears here.</div>
 {% else %}
@@ -110,14 +127,18 @@
   <h2 id="in-feed-heading">In the feed</h2>
   {% if not first and feed.series %}
   <p class="muted">No episodes yet. Episodes added to {{ feed.series }} later appear here.</p>
+  {% elif not first and mobile %}
+  <p class="muted">No episodes in it yet.</p>
   {% elif not first %}
   <p class="muted">No episodes in it. To add some, tick them in the <a href="/library">Library</a> or on a
     series' page and choose <strong>☰ With ticked → Add to a feed…</strong></p>
   {% else %}
+  {% if not mobile %}
   <p class="muted small">{% if feed.newest_first %}Newest first{% else %}Oldest first, in air-date order{% endif %},
     as podcast apps list them (change it in <a href="/feeds/{{ feed.id }}/edit">Edit details</a>). The apps show
     the date each one was added to the feed; the real air date is in each episode's description.</p>
-  {% set picked = feed.series is none %}
+  {% endif %}
+  {% set picked = feed.series is none and not mobile %}
   {% if picked %}
   <form id="feed-remove" class="pick-toolbar" method="post" action="/feeds/{{ feed.id }}/remove">
     <button class="button" type="submit">Take ticked out of the feed</button>

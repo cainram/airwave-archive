@@ -1254,10 +1254,14 @@ measure: the pages still exist, nothing on the phone leads to them.)
   details or raw tags; a missing recording "isn't available right
   now". Home, Search, genre pages and the player bar stay as they
   are; the calendar pages stay reachable from dates.
-- **Step 3**: Feeds read-only (list, a feed's page with Open in Podcasts
-  and Copy link, its episodes), no publishing, editing or deleting.
-  Library-managing pages reached on a phone (old bookmark) show "This is
-  for managing your library; use a computer" with a Back button.
+- **Step 3** ✅ *done*: Feeds read-only: the list shows only published
+  feeds (a draft can't be opened in Podcasts); a feed's page has "Add it
+  to Podcasts" (Open in Podcasts, the address with Copy, the three
+  steps; no QR code, as you'd be scanning your own screen) and its
+  episodes; no publishing, editing, deleting or tick boxes.
+  Library-managing pages (`MANAGING_PAGES` in `app/main.py`) reached on
+  a phone show "Use a computer for this" with ← Back (to the page you
+  came from, else Home) and a link to the desktop version.
 
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
