@@ -169,8 +169,12 @@ def test_an_overnight_broadcast_uses_the_length_of_all_parts(client, monkeypatch
     client.post(f"/files/{file_id(client, 1)}/edit",
                 data={"air_year": "1996", "air_month": "5", "air_day": "2",
                       "air_time": "22:00", "air_timezone": "America/Los_Angeles"})
-    page = client.get(f"/files/{file_id(client, 2)}").text
-    assert "until about 2:30 AM on Friday, May 3rd" in page
+    # (Times aren't shown on pages; the end is still worked out from all the parts.)
+    from app.episodes import format_air_date
+    with Session(main._engine) as session:
+        episode = session.get(AudioFile, file_id(client, 2)).episode
+        assert format_air_date(episode, with_time=True, length=episode.length).endswith(
+            "until about 2:30 AM on Friday, May 3rd")
 
 
 def test_review_page_ignores_later_parts(client):

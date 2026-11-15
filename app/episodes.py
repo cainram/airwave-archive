@@ -341,15 +341,18 @@ def air_end(ep: Episode | None, seconds: float | None) -> datetime | None:
 
 
 def format_air_date(ep: Episode | None, short: bool = False,
-                    length: float | None = None) -> str:
+                    length: float | None = None, with_time: bool = False) -> str:
     """Show an air date with only the parts that are known, the American
     way (the owner's choice).
 
-    Long:  'Friday, April 14th, 1939, 8:00 PM US Eastern'
-           'Friday, April 14th, 1939, time unknown'
+    Long:  'Friday, April 14th, 1939'
            'April 1939, day unknown' · '1939, date unknown'
     Short: 'Apr 14, 1939' · 'Apr 1939' · '1939'
-    With ``length`` (seconds on air) and a known time, the end is added:
+    The time of day isn't shown (owner's choice, 2026-11-15: the dates
+    matter, the times don't; they're still kept). With ``with_time``:
+           'Friday, April 14th, 1939, 8:00 PM US Eastern'
+           'Friday, April 14th, 1939, time unknown'
+    and with ``length`` (seconds on air) and a known time, the end too:
            '..., 8:00 PM US Eastern, until about 8:30 PM'
            '..., 10:00 PM US Pacific, until about 3:00 AM on Friday, May 3rd'
     Returns '' if nothing is known.
@@ -367,6 +370,8 @@ def format_air_date(ep: Episode | None, short: bool = False,
     if day is None:
         return f"{calendar.month_name[month]} {year}, day unknown"
     text = f"{_day_words(date(year, month, day))}, {year}"
+    if not with_time:
+        return text
     if not ep.air_time:
         return f"{text}, time unknown"
     zone = TIME_ZONES.get(ep.air_timezone or "", "time zone unknown")

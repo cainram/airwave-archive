@@ -52,12 +52,14 @@ def test_air_dates_show_only_what_is_known():
     assert format_air_date(ep) == "April 1939, day unknown"
     assert format_air_date(ep, short=True) == "Apr 1939"
     ep.air_day = 14
-    assert format_air_date(ep) == "Friday, April 14th, 1939, time unknown"
+    assert format_air_date(ep) == "Friday, April 14th, 1939"          # no time shown
+    assert format_air_date(ep, with_time=True) == "Friday, April 14th, 1939, time unknown"
     assert format_air_date(ep, short=True) == "Apr 14, 1939"
     ep.air_time = "20:00"
-    assert format_air_date(ep) == "Friday, April 14th, 1939, 8:00 PM time zone unknown"
+    assert format_air_date(ep) == "Friday, April 14th, 1939"
+    assert format_air_date(ep, with_time=True) == "Friday, April 14th, 1939, 8:00 PM time zone unknown"
     ep.air_timezone = "America/New_York"
-    assert format_air_date(ep) == "Friday, April 14th, 1939, 8:00 PM US Eastern"
+    assert format_air_date(ep, with_time=True) == "Friday, April 14th, 1939, 8:00 PM US Eastern"
     assert format_air_date(Episode()) == ""
     assert format_air_date(None) == ""
 
@@ -227,7 +229,7 @@ def test_edit_form_saves_details(client):
 
     page = client.get("/files/1")
     assert "<h1>The Patriot</h1>" in page.text
-    assert "Friday, April 14th, 1939, 8:00 PM US Eastern" in page.text
+    assert "Friday, April 14th, 1939" in page.text and "8:00 PM" not in page.text
     assert "Anna May Wong" in page.text
     library = client.get("/library")
     assert "The Patriot" in library.text and "Apr 14, 1939" in library.text
@@ -420,41 +422,41 @@ def on_air(day, time, zone="America/Los_Angeles", year=1996, month=5):
 
 def test_an_overnight_show_ends_on_the_next_day():
     ep = on_air(2, "22:00")
-    assert format_air_date(ep, length=5 * 3600) == (
+    assert format_air_date(ep, with_time=True, length=5 * 3600) == (
         "Thursday, May 2nd, 1996, 10:00 PM US Pacific, until about 3:00 AM on Friday, May 3rd")
 
 
 def test_a_short_show_ends_the_same_day():
     ep = on_air(14, "20:00", "America/New_York", 1939, 4)
-    assert format_air_date(ep, length=29 * 60 + 40) == (
+    assert format_air_date(ep, with_time=True, length=29 * 60 + 40) == (
         "Friday, April 14th, 1939, 8:00 PM US Eastern, until about 8:30 PM")
 
 
 def test_the_end_is_right_on_the_night_the_clocks_change():
     # US clocks went forward at 2 AM on April 7th, 1996: 5 hours from 10 PM
     # ends at 4 AM by the clock, not 3 AM.
-    assert format_air_date(on_air(6, "22:00", month=4), length=5 * 3600).endswith(
+    assert format_air_date(on_air(6, "22:00", month=4), with_time=True, length=5 * 3600).endswith(
         "until about 4:00 AM on Sunday, April 7th")
     # ...and back at 2 AM on October 27th, 1996: it ends at 2 AM.
-    assert format_air_date(on_air(26, "22:00", month=10), length=5 * 3600).endswith(
+    assert format_air_date(on_air(26, "22:00", month=10), with_time=True, length=5 * 3600).endswith(
         "until about 2:00 AM on Sunday, October 27th")
 
 
 def test_a_show_on_new_years_eve_names_the_new_year():
     ep = on_air(31, "22:00", month=12)
-    assert format_air_date(ep, length=4 * 3600).endswith("until about 2:00 AM on Wednesday, January 1st, 1997")
+    assert format_air_date(ep, with_time=True, length=4 * 3600).endswith("until about 2:00 AM on Wednesday, January 1st, 1997")
 
 
 def test_no_end_without_a_time_or_a_length():
-    assert format_air_date(on_air(2, "22:00"), length=None).endswith("10:00 PM US Pacific")
+    assert format_air_date(on_air(2, "22:00"), with_time=True, length=None).endswith("10:00 PM US Pacific")
     ep = Episode(air_year=1996, air_month=5, air_day=2)
-    assert format_air_date(ep, length=5 * 3600) == "Thursday, May 2nd, 1996, time unknown"
+    assert format_air_date(ep, with_time=True, length=5 * 3600) == "Thursday, May 2nd, 1996, time unknown"
     # A time without a zone still gets an end, by the clock.
-    assert format_air_date(on_air(2, "22:00", zone=None), length=3600).endswith(
+    assert format_air_date(on_air(2, "22:00", zone=None), with_time=True, length=3600).endswith(
         "10:00 PM time zone unknown, until about 11:00 PM")
 
 
-def test_file_page_shows_the_end_of_an_overnight_show(client):
+def test_file_page_shows_the_date_but_not_the_time(client):
     import app.main as main
     with Session(main._engine) as session:   # pretend the recording is 4.5 hours long
         session.get(AudioFile, 1).duration_seconds = 4.5 * 3600
@@ -462,7 +464,8 @@ def test_file_page_shows_the_end_of_an_overnight_show(client):
     client.post("/files/1/edit", data={"air_year": "1996", "air_month": "5", "air_day": "2",
                                        "air_time": "22:00", "air_timezone": "America/Los_Angeles"})
     page = client.get("/files/1").text
-    assert "10:00 PM US Pacific, until about 2:30 AM on Friday, May 3rd" in page
+    assert "Thursday, May 2nd, 1996" in page
+    assert "10:00 PM" not in page and "until about" not in page    # times aren't shown
 
 
 def test_ordinal_days():

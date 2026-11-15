@@ -125,7 +125,7 @@ def test_the_feed_itself(client):
     assert len(set(dates)) == 4      # a second apart, so apps keep the order
     # The real air date is only in the description; nothing is made up.
     wrong = items[1].findtext("description")
-    assert "Aired: Tuesday, May 25th, 1943, 8:00 PM US Eastern" in wrong
+    assert "Aired: Tuesday, May 25th, 1943<" in wrong and "8:00 PM" not in wrong
     assert "Station: CBS" in wrong and "Cast: Agnes Moorehead" in wrong
     assert "Aired: 1944, date unknown" in items[2].findtext("description")
     assert "Air date unknown" in items[3].findtext("description")

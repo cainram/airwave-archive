@@ -101,7 +101,8 @@ def test_an_export_arrives_filled_in(tmp_path, monkeypatch, exported):
     assert a.extra["network"] == "CBS" and a.extra["air_time"] == "21:00"
     assert a.extra["picture"] and items["Art Bell 1996-05-02 Hour 2.wav"].extra["part"] == 2
     # The page shows the extra details.
-    assert "Aired at 9:00 PM US Eastern" in page and "Station: CBS" in page and "Part 2 of 2" in page
+    assert "Station: CBS" in page and "Part 2 of 2" in page
+    assert "9:00 PM" not in page                  # (the time is kept, but not shown)
     assert a.extra["genres"] == ["Mystery", "Thriller"] and "Genres: Mystery, Thriller" in page
     assert "genres" not in items["Art Bell 1996-05-02 Hour 1.wav"].extra
     assert "Add all 4 to library" in page
