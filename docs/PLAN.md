@@ -1207,7 +1207,9 @@ keeps the genres of both.
   tiles and list.
 - **Step 2** ✅ *done*: a page for each genre (`/genre?name=…`: its
   series as tiles, with totals); a "Genres" line on the Series page
-  (both views) with a label per genre and how many series have it; a
+  (both views) with a label per genre and how many series have it (in
+  the mobile version a "Genres" drop-down instead, as the line grows
+  too long for a phone: owner's choice, 2026-11-15); a
   series' genre labels link to their genre's page; search finds series
   by their genres too (every word must be in the name or the genres),
   and lists matching genres above the series. On tiles the genres are
@@ -1228,6 +1230,38 @@ keeps the genres of both.
   pictures). "Write details into the files" (Phase 10a) writes them too
   (owner's choice), so they show in its preview. A series without
   genres leaves the file's own genre tag alone.
+
+### Mobile version (owner's request, 2026-11-15)
+On a phone the app is for **listening, not curating**: "sitting in an
+airport, noodling around and listening to a few episodes". Less clutter;
+every tool that changes the library is left out. (Not a security
+measure: the pages still exist, nothing on the phone leads to them.)
+- **What's a phone** (owner's choice): the browser's own description
+  (`Mobi` in its user agent: every phone, in either direction; an iPad
+  says it's a Mac and gets the desktop version). A footer link
+  **"Desktop version" / "Mobile version"** (owner's wording) overrides
+  it, remembered in a cookie (`airwave-view`), via `/view`.
+- **Step 1** ✅ *done*: the switch; the mobile menu is Home · Series ·
+  Feeds (no Calendar, owner's choice, and no Inbox); an empty library
+  just says there's nothing to listen to yet.
+- **Step 2** ✅ *done*: Series page: tiles only, no Actions menu, no
+  library notices. A series' page: no Actions menu, no tick boxes, no
+  size total. An episode's page: listening only: Play, and **Mark
+  played / Mark not played / Start over as buttons** (no ☰ menu: one or
+  two items); "About this episode" with only the filled-in details
+  (number, air date, station, host, cast, notes); parts as "Part 1",
+  "Part 2" with play buttons; no editing, parts tools, delete, file
+  details or raw tags; a missing recording "isn't available right
+  now". Home, Search, genre pages and the player bar stay as they
+  are; the calendar pages stay reachable from dates.
+- **Step 3** ✅ *done*: Feeds read-only: the list shows only published
+  feeds (a draft can't be opened in Podcasts); a feed's page has "Add it
+  to Podcasts" (Open in Podcasts, the address with Copy, the three
+  steps; no QR code, as you'd be scanning your own screen) and its
+  episodes; no publishing, editing, deleting or tick boxes.
+  Library-managing pages (`MANAGING_PAGES` in `app/main.py`) reached on
+  a phone show "Use a computer for this" with ← Back (to the page you
+  came from, else Home) and a link to the desktop version.
 
 ### Later — Desktop installers (Windows and Mac)
 For people who don't want Docker: package the app as a normal desktop
@@ -1282,8 +1316,4 @@ How it would work:
 - Multiple library folders, playlists / "collections", backups of the
   database, podcast RSS feed subscriptions. (Online episode logs: see
   "Look up episode details online" above.)
-- **A phone version that differs from the computer one** (owner's wish,
-  2026-11-15; not started, details to decide together): leave out
-  features nobody will use on a phone, the Inbox for example, so the
-  phone layout stays simple. Today the phone shows the same pages,
-  squeezed to fit.
+

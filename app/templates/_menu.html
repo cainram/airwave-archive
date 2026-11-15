@@ -4,7 +4,8 @@
    the addresses that belong to each section (player.js uses it too). #}
 {% set here = request.url.path %}
 <nav id="menu" class="menu"{% if oob %} hx-swap-oob="true"{% endif %}>
-  {% for href, label, paths in [("/", "Home", "/"), ("/series", "Series", "/series /library /files /review /import /groups /organize"), ("/calendar", "Calendar", "/calendar"), ("/feeds", "Feeds", "/feeds"), ("/inbox", "Inbox", "/inbox")] %}
+  {# The mobile version leaves out Calendar and Inbox. #}
+  {% for href, label, paths in [("/", "Home", "/"), ("/series", "Series", "/series /library /files /review /import /groups /organize"), ("/calendar", "Calendar", "/calendar"), ("/feeds", "Feeds", "/feeds"), ("/inbox", "Inbox", "/inbox")] if not (mobile and href in ("/calendar", "/inbox")) %}
   {% set ns = namespace(current=false) %}
   {% for path in paths.split() %}
     {% if here == path or (path != "/" and here.startswith(path)) %}{% set ns.current = true %}{% endif %}

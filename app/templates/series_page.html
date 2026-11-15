@@ -12,17 +12,17 @@
       {{ totals.episodes }} episode{{ "" if totals.episodes == 1 else "s" }}
       {% if totals.years %}· {{ totals.years }}{% endif %}
       · {{ totals.seconds | duration }} of audio
-      · {{ totals.bytes | size }}
+      {% if not mobile %}· {{ totals.bytes | size }}{% endif %}
     </p>
     {% if totals.genres %}
     <p class="genres" aria-label="Genres">{% for genre in totals.genres %}<a class="genre" href="{{ genre | genre_url }}">{{ genre }}</a>{% endfor %}</p>
     {% endif %}
-    {% if name is none %}
+    {% if name is none and not mobile %}
     <p class="muted small">These episodes have no Series name yet. Open one and press
       <strong>Edit details</strong> to give it one.</p>
     {% endif %}
   </div>
-  {% if name is not none %}
+  {% if name is not none and not mobile %}{# (the mobile version is for listening) #}
   <div class="actions">
     <details class="drop">
       <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
@@ -45,12 +45,12 @@
 {% set numbered = files | selectattr("episode.episode_number") | list | length > 0 %}
 {% if pages > 1 %}{% include "_pager.html" %}{% endif %}
 {% set back = (name | series_url) ~ ("&" if name else "?") ~ "page=" ~ page %}
-{% include "_pick_toolbar.html" %}
+{% if not mobile %}{% include "_pick_toolbar.html" %}{% endif %}
 <div class="table-wrap">
   <table class="files">
     <thead>
       <tr>
-        <th class="pick"><input type="checkbox" form="pick" data-select-all aria-label="Tick all on this page"></th>
+        {% if not mobile %}<th class="pick"><input type="checkbox" form="pick" data-select-all aria-label="Tick all on this page"></th>{% endif %}
         <th class="play"><span class="visually-hidden">Play</span></th>
         <th class="date">Aired</th>
         {% if numbered %}<th class="num">Ep.</th>{% endif %}
@@ -64,7 +64,7 @@
       {% set parts = ep.parts %}
       {% set first = parts | rejectattr("missing") | first %}
       <tr{% if not first %} class="is-missing"{% endif %}>
-        <td class="pick"><input type="checkbox" form="pick" name="ids" value="{{ ep.id }}" aria-label="Tick {{ f | display_title }}"></td>
+        {% if not mobile %}<td class="pick"><input type="checkbox" form="pick" name="ids" value="{{ ep.id }}" aria-label="Tick {{ f | display_title }}"></td>{% endif %}
         <td class="play">{% if first %}{% with f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}</td>
         <td class="date">{{ (ep | air_date(short=true)) or "date unknown" }}</td>
         {% if numbered %}<td class="num">{{ ep.episode_number or "" }}</td>{% endif %}

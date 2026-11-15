@@ -287,6 +287,9 @@ body.has-player { padding-bottom: 150px; }
 }
 
 .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 16px; }
+/* "Desktop version" / "Mobile version". */
+.view-switch-link { margin: 8px 0 0; }
+.view-switch-link a { color: var(--muted); display: inline-block; padding: 6px 10px; }
 
 /* Episodes made of several files ("parts"). */
 .badge.parts { background: var(--tint); color: var(--tint-text); }
@@ -339,6 +342,9 @@ a.genre:hover, a.genre:focus-visible { background: var(--accent); color: var(--a
 /* The Series page's (and search's) list of genres. */
 .genre-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; }
 .genre-list-name { font-weight: 600; margin-right: 4px; }
+/* The Series page's Genres drop-down: a long list scrolls. */
+.genre-drop { display: inline-block; margin: 0 0 16px; }
+.genre-drop .drop-list { max-height: min(60vh, 420px); overflow-y: auto; }
 .genre-ticks { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 1px solid var(--line);
   border-radius: 8px; padding: 10px 14px; margin: 0 0 8px; }
 .genre-ticks legend { font-weight: 600; padding: 0 4px; }
@@ -745,3 +751,6 @@ h2.tag-file { font-size: 1.05rem; margin: 0 0 2px; }
               border-radius: 8px; margin-bottom: 18px; font-size: 1.05rem; }
 .danger-bar strong { display: block; font-size: 1.15rem; }
 .advanced-tool p { margin: 6px 0; }
+
+/* Mobile version: the episode page's listening buttons, beside Play. */
+.listen-buttons { display: flex; flex-wrap: wrap; gap: 8px; }

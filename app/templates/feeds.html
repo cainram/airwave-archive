@@ -13,7 +13,11 @@
 <div class="notice success" role="status">The feed was deleted. Its recordings are still in your library.</div>
 {% endif %}
 
-{% if not rows %}
+{# Mobile: only feeds a podcast app can open (published ones), no making-a-feed hints. #}
+{% set rows = rows | selectattr("feed.published") | list if mobile else rows %}
+{% if not rows and mobile %}
+<div class="notice">No feeds yet.</div>
+{% elif not rows %}
 <div class="notice">No feeds yet. To make one, open a series and choose
   <strong>☰ Actions → Make a feed…</strong></div>
 {% else %}
@@ -24,7 +28,7 @@
     {{ picture(row.art, feed.title, "small") }}
     <div class="result-text">
       <a class="title" href="/feeds/{{ feed.id }}">{{ feed.title }}</a>
-      {% if feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
+      {% if mobile %}{% elif feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
       <div class="muted small">
         {% if feed.series %}Series: {{ feed.series }}{% else %}Hand-picked{% endif %} · {{ row.episodes }} episode{{ "" if row.episodes == 1 else "s" }}
         {% if row.recordings != row.episodes %}({{ row.recordings }} recordings){% endif %}
@@ -33,6 +37,6 @@
   </li>
   {% endfor %}
 </ul>
-<p class="muted small">To make another, open a series and choose <strong>☰ Actions → Make a feed…</strong></p>
+{% if not mobile %}<p class="muted small">To make another, open a series and choose <strong>☰ Actions → Make a feed…</strong></p>{% endif %}
 {% endif %}
 {% endblock %}

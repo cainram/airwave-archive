@@ -259,6 +259,7 @@ def test_genres_page_for_a_missing_series_is_not_found(client):
     assert client.post("/series/genres?name=Nobody", data={"new_genres": "X"}).status_code == 404
 
 
+GENRE_MENU = r'<a href="(/genre\?name=[^"]+)">([^<]+) <span class="muted small">· (\d+) series</span></a>'
 GENRE_LABEL = r'<a class="genre" href="(/genre\?name=[^"]+)">([^<]+)<span class="genre-count"[^>]*>(\d+)</span></a>'
 
 
@@ -287,6 +288,11 @@ def test_series_page_lists_the_genres_and_a_series_links_to_them(client):
     for view in ("/series", "/series?view=list"):
         assert re.findall(GENRE_LABEL, client.get(view).text) == [
             ("/genre?name=Comedy", "Comedy", "2"), ("/genre?name=Drama", "Drama", "1")]
+    # On a phone: a drop-down instead.
+    phone = client.get("/series", headers={"User-Agent": "iPhone Mobile Safari"}).text
+    assert re.findall(GENRE_MENU, phone) == [
+        ("/genre?name=Comedy", "Comedy", "2"), ("/genre?name=Drama", "Drama", "1")]
+    assert "Genres <span class=\"muted small\">(2)</span>" in phone and 'class="genre-list"' not in phone
     page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
     assert '<a class="genre" href="/genre?name=Comedy">Comedy</a>' in page
     # A genre no series uses any more drops off the list.

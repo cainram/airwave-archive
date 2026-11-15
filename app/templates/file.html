@@ -9,7 +9,9 @@
 <nav class="back"><a class="button" href="{{ series_name | series_url }}">← {{ series_name or "No series yet" }}</a></nav>
 {% include "_done_notice.html" %}
 
-{% if f.missing %}
+{% if f.missing and mobile %}
+<div class="notice">This recording isn't available right now.</div>
+{% elif f.missing %}
 <div class="notice warning">
   <strong>This file is missing.</strong> It wasn't found in the library on the last scan,
   but its details are kept because you've edited them. If the file comes back (even in
@@ -34,6 +36,21 @@
   <div class="actions">
     {% set first = (parts | rejectattr("missing") | first) %}
     {% if first %}{% with big = true, f = first %}{% include "_play_button.html" %}{% endwith %}{% endif %}
+    {% if mobile %}
+    {# The mobile version is for listening: only the listening actions, as buttons. #}
+    {% if ep %}
+    <form class="listen-buttons" method="post" action="/episodes/played">
+      <input type="hidden" name="ids" value="{{ ep.id }}">
+      <input type="hidden" name="back" value="/files/{{ f.id }}">
+      {% if ep.listening and (ep.listening.played or (ep | progress)) %}
+      <button class="button" type="submit" name="played" value="0">{{ "Mark not played" if ep.listening.played else "Start over" }}</button>
+      {% endif %}
+      {% if not (ep.listening and ep.listening.played) %}
+      <button class="button" type="submit" name="played" value="1">Mark played</button>
+      {% endif %}
+    </form>
+    {% endif %}
+    {% else %}
     <details class="drop">
       <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
       <div class="drop-list">
@@ -56,10 +73,38 @@
         {% if ep %}<a class="danger" href="/delete?ids={{ ep.id }}&amp;back=/files/{{ f.id }}">Delete…</a>{% endif %}
       </div>
     </details>
+    {% endif %}
   </div>
 </section>
 
 {% set sources = ep.sources if ep else {} %}
+{% if mobile %}
+{# Mobile: what's worth knowing while listening, only what's filled in. #}
+{% set about = [("Episode number", ep.episode_number if ep else None),
+                ("Aired", ep | air_date(length=ep.length if ep else f.duration_seconds)),
+                ("Station / network", ep.network if ep else None), ("Host", ep.host if ep else None),
+                ("Cast", ep.cast if ep else None), ("Notes", ep.notes if ep else None)]
+               | selectattr(1) | list %}
+{% if about %}
+<h2>About this episode</h2>
+<dl class="facts">
+  {% for label, value in about %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}
+</dl>
+{% endif %}
+{% if grouped %}
+<h2>Parts</h2>
+<ol class="parts">
+  {% for p in parts %}
+  <li{% if p.id == f.id %} class="is-current"{% endif %}>
+    {% if not p.missing %}{% with f = p %}{% include "_play_button.html" %}{% endwith %}{% endif %}
+    {% if p.id == f.id %}<strong>Part {{ loop.index }}</strong>{% else %}<a href="/files/{{ p.id }}">Part {{ loop.index }}</a>{% endif %}
+    <span class="muted small">{{ p.duration_seconds | duration }}</span>
+    {% if p.missing %}<span class="badge">not available</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+{% else %}
 {% macro fact(label, value, source) %}
   <dt>{{ label }}{% if value and source == "tags" %} <span class="tag-code">from file tags</span>{% endif %}</dt>
   <dd>{{ value or "—" }}</dd>
@@ -118,4 +163,5 @@
   <dt>Tags</dt><dd class="muted">none found in this file</dd>
   {% endfor %}
 </dl>
+{% endif %}
 {% endblock %}

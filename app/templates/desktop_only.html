@@ -1,0 +1,9 @@
+{% extends layout %}
+{% block title %}Use a computer · Airwave Archive{% endblock %}
+{% block content %}
+{# The mobile version is for listening: pages that manage the library show this instead. #}
+<nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
+<h1>Use a computer for this</h1>
+<p>This page is for managing your library. The mobile version is just for listening.</p>
+<p class="muted small">To use it here anyway, switch to the <a href="/view?to=desktop" hx-boost="false">desktop version</a>.</p>
+{% endblock %}
