@@ -49,7 +49,8 @@
           <span class="day-count">{{ files | length }}</span>
         </a>
         <ul class="day-titles">
-          {% for f in files[:3] %}<li><a href="/files/{{ f.id }}">{{ f | display_title }}</a></li>{% endfor %}
+          {# The series first, the episode's title under it. #}
+          {% for f in files[:3] %}<li><a href="/files/{{ f.id }}">{% if f.episode and f.episode.series %}<span class="day-series">{{ f.episode.series }}</span><span class="day-episode">{{ f | display_title }}</span>{% else %}<span class="day-series">{{ f | display_title }}</span>{% endif %}</a></li>{% endfor %}
           {% if files | length > 3 %}<li><a class="muted" href="#day-{{ day }}">+{{ files | length - 3 }} more</a></li>{% endif %}
         </ul>
         {% else %}

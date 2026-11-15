@@ -68,6 +68,20 @@ def test_a_month(client):
     assert 'href="/calendar?year=1938&month=9"' in page and 'href="/calendar?year=1938&month=11"' in page
 
 
+def test_the_grid_shows_the_series_then_the_title(client):
+    import app.main as main
+    with Session(main._engine) as session:
+        for f in session.scalars(select(AudioFile)):
+            if f.name in ("wotw.wav", "early.wav"):
+                f.episode.series = "The Mercury Theatre on the Air"
+        session.commit()
+    page = client.get("/calendar?year=1938&month=10").text
+    grid = page.split('<table class="month-grid">')[1].split("</table>")[0]
+    assert ('<span class="day-series">The Mercury Theatre on the Air</span>'
+            '<span class="day-episode">Wotw</span>') in grid
+    assert '<span class="day-series">Late</span></a>' in grid       # no series: just its title
+
+
 def test_the_calendar_opens_on_the_latest_month(client):
     page = client.get("/calendar").text
     assert "<h1>February 1940</h1>" in page and "Later recordings" not in page
