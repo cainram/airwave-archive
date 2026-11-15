@@ -342,6 +342,9 @@ a.genre:hover, a.genre:focus-visible { background: var(--accent); color: var(--a
 /* The Series page's (and search's) list of genres. */
 .genre-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; }
 .genre-list-name { font-weight: 600; margin-right: 4px; }
+/* The Series page's Genres drop-down: a long list scrolls. */
+.genre-drop { display: inline-block; margin: 0 0 16px; }
+.genre-drop .drop-list { max-height: min(60vh, 420px); overflow-y: auto; }
 .genre-ticks { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 1px solid var(--line);
   border-radius: 8px; padding: 10px 14px; margin: 0 0 8px; }
 .genre-ticks legend { font-weight: 600; padding: 0 4px; }

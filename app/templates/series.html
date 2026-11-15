@@ -35,7 +35,15 @@
   {% endif %}
 </section>
 {% if not mobile %}{% include "_library_notices.html" %}{% endif %}
-{% if series and genre_list %}{% include "_genre_list.html" %}{% endif %}
+{% if series and genre_list %}
+{# Every genre in use, in a drop-down (the line of labels grew too long). #}
+<details class="drop genre-drop">
+  <summary class="button">Genres <span class="muted small">({{ genre_list | length }})</span> <span aria-hidden="true">▾</span></summary>
+  <nav class="drop-list" aria-label="Genres">
+    {% for genre, count in genre_list %}<a href="{{ genre | genre_url }}">{{ genre }} <span class="muted small">· {{ count }} series</span></a>{% endfor %}
+  </nav>
+</details>
+{% endif %}
 
 {% if not series and mobile %}
 <div class="notice">Nothing to listen to yet.</div>

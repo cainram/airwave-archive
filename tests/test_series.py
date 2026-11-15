@@ -259,6 +259,7 @@ def test_genres_page_for_a_missing_series_is_not_found(client):
     assert client.post("/series/genres?name=Nobody", data={"new_genres": "X"}).status_code == 404
 
 
+GENRE_MENU = r'<a href="(/genre\?name=[^"]+)">([^<]+) <span class="muted small">· (\d+) series</span></a>'
 GENRE_LABEL = r'<a class="genre" href="(/genre\?name=[^"]+)">([^<]+)<span class="genre-count"[^>]*>(\d+)</span></a>'
 
 
@@ -281,17 +282,18 @@ def test_each_genre_has_a_page_of_its_series(client):
 
 
 def test_series_page_lists_the_genres_and_a_series_links_to_them(client):
-    assert 'class="genre-list"' not in client.get("/series").text   # none in use yet
+    assert 'class="drop genre-drop"' not in client.get("/series").text   # none in use yet
     client.post(CAMPBELL, data={"new_genres": "Drama, Comedy"})
     client.post("/series/genres?name=Abbott%20and%20Costello", data={"new_genres": "Comedy"})
     for view in ("/series", "/series?view=list"):
-        assert re.findall(GENRE_LABEL, client.get(view).text) == [
+        assert re.findall(GENRE_MENU, client.get(view).text) == [
             ("/genre?name=Comedy", "Comedy", "2"), ("/genre?name=Drama", "Drama", "1")]
+        assert "Genres <span class=\"muted small\">(2)</span>" in client.get(view).text
     page = client.get("/series/episodes", params={"name": "The Campbell Playhouse"}).text
     assert '<a class="genre" href="/genre?name=Comedy">Comedy</a>' in page
     # A genre no series uses any more drops off the list.
     client.post(CAMPBELL, data={"genre": "Comedy"})
-    assert re.findall(GENRE_LABEL, client.get("/series").text) == [
+    assert re.findall(GENRE_MENU, client.get("/series").text) == [
         ("/genre?name=Comedy", "Comedy", "2")]
 
 
