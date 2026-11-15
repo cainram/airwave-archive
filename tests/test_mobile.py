@@ -196,3 +196,11 @@ def test_managing_pages_say_to_use_a_computer(client, url):
 def test_the_note_goes_home_without_somewhere_to_go_back_to(client):
     page = phone(client, "/inbox")
     assert '<a class="button" href="/">← Back</a>' in page
+
+
+
+def test_the_file_and_tags_fold_away_on_the_desktop(client):
+    page = computer(client, "/files/1")
+    assert '<details class="fold">\n<summary><h2>File</h2></summary>' in page
+    assert '<details class="fold">\n<summary><h2>Tags in the file</h2></summary>' in page
+    assert '<details class="fold" open' not in page                 # closed to start with
