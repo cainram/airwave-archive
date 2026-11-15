@@ -43,8 +43,10 @@ DATE_PATTERNS = [
     re.compile(r"(?<!\d)(?P<y>(?:18|19|20)\d\d)(?P<s>[-._ ])(?P<m>\d\d|xx)(?P=s)(?P<d>\d\d|xx)(?!\d)", re.I),
     # 19430513
     re.compile(r"(?<!\d)(?P<y>(?:18|19|20)\d\d)(?P<m>0[1-9]|1[0-2])(?P<d>0[1-9]|[12]\d|3[01])(?!\d)"),
-    # 43-05-13: a two-digit year is read as 19xx (old-time radio)
-    re.compile(r"(?<!\d)(?P<yy>\d\d)-(?P<m>\d\d|xx)-(?P<d>\d\d|xx)(?!\d)", re.I),
+    # 43-05-13, 43_05_13, 43.05.13 (same mark both times): a two-digit
+    # year is read as 19xx (old-time radio). Not with spaces: "01 02 03"
+    # is more likely numbers than a date.
+    re.compile(r"(?<!\d)(?P<yy>\d\d)(?P<s>[-._])(?P<m>\d\d|xx)(?P=s)(?P<d>\d\d|xx)(?!\d)", re.I),
     # Mar 01 2010, March 1, 2010, Mar_1st_2010
     re.compile(r"(?<![a-z])" + _MONTH + r"[ _-]+" + _DAY + r",?[ _-]+" + _YEAR + r"(?!\d)", re.I),
     # 1 March 2010, 01-Mar-2010
@@ -247,6 +249,41 @@ def _date_at(text: str, start: bool):
     return None
 
 
+# "Date unknown", written as x's: "xxxxxx", "xx-xx-xx", "xx/xx/xxxx".
+_NO_DATE = r"(?:xx[-./_ ]?){2}x{2,4}"
+_NO_DATE_START = re.compile(r"^[(\[]?" + _NO_DATE + r"[)\]]?(?![a-z0-9])", re.I)
+_NO_DATE_END = re.compile(r"(?<![a-z0-9])[(\[]?" + _NO_DATE + r"[)\]]?$", re.I)
+
+
+# A title tag that's really a file name: "01 Ellery Queen.mp3".
+_FILE_NAME = re.compile(r"\.(?:mp3|mp2|m4a|m4b|aac|ogg|oga|opus|flac|wav|wma|aif|aiff|ra|rm|ram|webm|mkv|mp4)$", re.I)
+# The end of a series name that's a stray date: "Ellery Queen 44-01"
+# (year and month), or an unknown date written as x's ("... xx xx xx").
+_SERIES_DATE_END = re.compile(r"[\s_]+(?:\d\d[-._](?:0[1-9]|1[0-2])|" + _NO_DATE + r")$", re.I)
+
+
+def clean_series(name: str | None) -> str | None:
+    """A series name without a stray date at its end ("Ellery Queen 44-01"
+    -> "Ellery Queen"; "Ellery Queens Minute Mysteries xx xx xx" -> "Ellery
+    Queens Minute Mysteries"). Numbers that are part of a name ("Box 13",
+    "Room 222") stay."""
+    if not name:
+        return name
+    rest = _SERIES_DATE_END.sub("", name).strip(" -_,;:")
+    return rest or name
+
+
+def _without_unknown_date(text: str) -> str:
+    """``text`` without an unknown date ("xxxxxx") at its start or end,
+    unless nothing would be left."""
+    rest = text.strip()
+    if _NO_DATE_START.search(rest.lstrip(TITLE_JUNK)):
+        rest = _NO_DATE_START.sub("", rest.lstrip(TITLE_JUNK)).lstrip(TITLE_JUNK)
+    if _NO_DATE_END.search(rest.rstrip(TITLE_END_JUNK)):
+        rest = _NO_DATE_END.sub("", rest.rstrip(TITLE_END_JUNK)).rstrip(TITLE_END_JUNK)
+    return rest or text
+
+
 def clean_title(title: str | None, series=()) -> tuple[str | None, tuple]:
     """Take a date and the series name off a title tag, so the title is
     just the episode's own name: (the title, (year, month, day) of the date
@@ -256,20 +293,77 @@ def clean_title(title: str | None, series=()) -> tuple[str | None, tuple]:
     "Suspense - 1943-05-13 - Donovan's Brain" (series "Suspense") -> the same
     "Donovan's Brain (May 13, 1943)" -> the same
 
+    "Ellery Queen Minute Mysteries - xxxxxx Bad Man's Bad Man" (an unknown
+    date written as x's) -> ("Bad Man's Bad Man", three Nones)
+
     Only a date at the very start or end is taken off: one in the middle
-    may belong to the title. If nothing would be left, the title is None
+    may belong to the title. A title tag that's only a short number ("29")
+    isn't a title, nor is one that's a file name ("01 Ellery Queen.mp3"):
+    None. If nothing would be left, the title is None
     (the date is still given).
     """
     none = (None, None, None)
-    if not title:
-        return title, none
-    text = _without_series(title.strip(), series)
+    if not title or re.fullmatch(r"\d{1,3}", title.strip()) or _FILE_NAME.search(title.strip()):
+        return None, none   # "29" or "01 Ellery Queen.mp3": not a title ("1984" is kept)
+    text = _without_unknown_date(_without_series(title.strip(), series))
+    text = _without_series(text, series)
     found = _date_at(text, start=True) or _date_at(text, start=False)
     if found is None:
         return text, none
     text, date = found
     text = _without_series(text, series).strip() or None
     return text, date
+
+
+# An episode number at the start or end of a title tag: in brackets
+# ("(12)", "[012]", "(#12)", "(Episode 12)", "(Ep. 12)") or marked ("#12",
+# "Episode 12", "Ep. 12").
+_TITLE_NUMBER = (r"(?:[(\[]\s*(?P<mark>(?:episode|epi|ep|no|nr)\.?\s*)?#?\s*(?P<n>\d{1,5})\s*[)\]]"
+                 r"|(?<![a-z0-9])(?P<mark2>#|(?:episode|epi|ep|no|nr)\.?\s*#?)\s*(?P<n2>\d{1,5})(?!\d))")
+_TITLE_NUMBER_START = re.compile(r"^" + _TITLE_NUMBER, re.I)
+_TITLE_NUMBER_END = re.compile(_TITLE_NUMBER + r"$", re.I)
+
+
+def take_number_off(title: str | None) -> tuple[str | None, str | None]:
+    """Take an episode number off the start or end of a title tag: (the
+    number, the title without it), or (None, the title) if there isn't one.
+
+    "Donovan's Brain (Episode 12)" -> ("12", "Donovan's Brain")
+    "(012) Donovan's Brain" -> ("12", "Donovan's Brain")
+
+    A number in the middle may belong to the title, so it stays; so does a
+    year in brackets ("The Thin Man (1945)"), and a title that's only a
+    number.
+    """
+    if not title:
+        return None, title
+    for pattern, start in ((_TITLE_NUMBER_END, False), (_TITLE_NUMBER_START, True)):
+        text = title.strip(TITLE_JUNK) if start else title.rstrip(TITLE_END_JUNK).lstrip()
+        match = pattern.search(text)
+        if match is None:
+            continue
+        digits = match["n"] or match["n2"]
+        marked = match["mark"] or match["mark2"]
+        if not marked and len(digits) == 4 and EARLIEST_YEAR <= int(digits) <= LATEST_YEAR:
+            continue   # "(1945)": a year, not an episode
+        number = digits.lstrip("0")
+        rest = (text[match.end():].lstrip(TITLE_JUNK) if start
+                else text[:match.start()].rstrip(TITLE_END_JUNK))
+        if number and rest:
+            return number, rest
+    return None, title
+
+
+def clean_title_and_number(title: str | None, series=()) -> tuple[str | None, tuple, str | None]:
+    """``clean_title``, and an episode number at the start or end taken off
+    too: (the title, (year, month, day) of the date taken off, the
+    number). "Suspense - 1943-05-13 - Donovan's Brain (Ep. 12)" ->
+    ("Donovan's Brain", (1943, 5, 13), "12")."""
+    number, title = take_number_off(title)
+    title, date = clean_title(title, series)
+    if number is None:
+        number, title = take_number_off(title)
+    return title, date, number
 
 
 def _parse_without_date(stem: str) -> Guess | None:
@@ -281,7 +375,7 @@ def _parse_without_date(stem: str) -> Guess | None:
             number = _number(match)
             if number:
                 before, after = stem[:match.start()], stem[match.end():]
-                return Guess(series=tidy(_without_labels(before)), episode_number=number,
+                return Guess(series=clean_series(tidy(_without_labels(before))), episode_number=number,
                              title=tidy(after))
     return None
 
@@ -312,7 +406,7 @@ def parse_filename(name: str) -> Guess | None:
     guess.episode_number = number
 
     if before.strip(EDGE_JUNK):
-        guess.series = tidy(_without_labels(before))
+        guess.series = clean_series(tidy(_without_labels(before)))
         guess.title = tidy(after)
     elif " - " in after:
         # "1943-05-13 Suspense - Donovan's Brain"
