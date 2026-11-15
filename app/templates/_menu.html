@@ -1,13 +1,15 @@
-{# The menu in the top bar. Sent with every page (see _partial.html), so the
+{# The menu in the top bar. The Inbox link carries a red number while
+   recordings are waiting there. Sent with every page (see _partial.html), so the
    current section stays highlighted as you move around. `data-paths` lists
    the addresses that belong to each section (player.js uses it too). #}
 {% set here = request.url.path %}
 <nav id="menu" class="menu"{% if oob %} hx-swap-oob="true"{% endif %}>
-  {% for href, label, paths in [("/", "Home", "/"), ("/series", "Series", "/series /library /files /review /import /groups /organize"), ("/calendar", "Calendar", "/calendar"), ("/inbox", "Inbox", "/inbox"), ("/feeds", "Feeds", "/feeds")] %}
+  {% for href, label, paths in [("/", "Home", "/"), ("/series", "Series", "/series /library /files /review /import /groups /organize"), ("/calendar", "Calendar", "/calendar"), ("/feeds", "Feeds", "/feeds"), ("/inbox", "Inbox", "/inbox")] %}
   {% set ns = namespace(current=false) %}
   {% for path in paths.split() %}
     {% if here == path or (path != "/" and here.startswith(path)) %}{% set ns.current = true %}{% endif %}
   {% endfor %}
-  <a href="{{ href }}" data-paths="{{ paths }}"{% if ns.current %} aria-current="page"{% endif %}>{{ label }}</a>
+  <a href="{{ href }}" data-paths="{{ paths }}"{% if ns.current %} aria-current="page"{% endif %}>{{ label }}
+    {%- if href == "/inbox" and inbox_waiting %}<span class="menu-count"><span class="visually-hidden">, </span>{{ inbox_waiting if inbox_waiting < 100 else "99+" }}<span class="visually-hidden"> waiting</span></span>{% endif %}</a>
   {% endfor %}
 </nav>

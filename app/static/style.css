@@ -79,6 +79,12 @@ code { font-size: 0.9em; color: var(--accent); }
 }
 .menu a:hover { background: var(--hover); }
 .menu a[aria-current="page"] { background: var(--tint); color: var(--accent); font-weight: 600; }
+/* The red number on the Inbox link: recordings waiting there. */
+.menu-count {
+  display: inline-block; min-width: 1.4em; margin-left: 5px; padding: 0 5px; border-radius: 999px;
+  background: var(--error-text); color: var(--panel); font-size: 0.72rem; font-weight: 700;
+  line-height: 1.45; text-align: center; vertical-align: 2px;
+}
 .brand { color: var(--accent); font-weight: 700; font-size: 1.2rem; text-decoration: none; }
 
 .content { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
