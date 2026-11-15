@@ -1206,10 +1206,10 @@ keeps the genres of both.
   (labels under its totals) and under the name on the Series page's
   tiles and list.
 - **Step 2** ✅ *done*: a page for each genre (`/genre?name=…`: its
-  series as tiles, with totals); a "Genres" drop-down on the Series
-  page (both views; a line of labels at first, a drop-down since
-  2026-11-15 as it grew long) listing each genre and how many series
-  have it; a
+  series as tiles, with totals); a "Genres" line on the Series page
+  (both views) with a label per genre and how many series have it (in
+  the mobile version a "Genres" drop-down instead, as the line grows
+  too long for a phone: owner's choice, 2026-11-15); a
   series' genre labels link to their genre's page; search finds series
   by their genres too (every word must be in the name or the genres),
   and lists matching genres above the series. On tiles the genres are
