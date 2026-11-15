@@ -16,7 +16,7 @@ import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.db import MANUAL, TAGS, AudioFile, Episode, utcnow
+from app.db import MANUAL, STANDIN, TAGS, AudioFile, Episode, utcnow
 
 # The plain text fields, in the order they appear on the form.
 TEXT_FIELDS = {
@@ -426,3 +426,68 @@ def ordinal(n: int) -> str:
 def _day_words(day: date) -> str:
     """'Friday, April 14th' (no year)."""
     return f"{calendar.day_name[day.weekday()]}, {calendar.month_name[day.month]} {ordinal(day.day)}"
+
+
+# ------------------------------------------------------ stand-in titles
+
+UNTITLED = "Untitled Episode"
+
+
+def standin_title(episode_number: str | None, year: int | None, month: int | None,
+                  day: int | None) -> str:
+    """The title used when an episode has none (owner's choice): "Episode
+    12" if its number is known, else its air date if the whole date is
+    known ("April 14th, 1939"; never just a year or month), else "Untitled
+    Episode", easy to search for and fix."""
+    if episode_number and episode_number.strip():
+        return f"Episode {episode_number.strip()}"
+    if year and month and day:
+        return f"{calendar.month_name[month]} {ordinal(day)}, {year}"
+    return UNTITLED
+
+
+def has_standin_title(episode: Episode) -> bool:
+    """Whether the episode's title is one the app made up."""
+    return episode.sources.get("title") == STANDIN
+
+
+def fill_standin_title(episode: Episode) -> bool:
+    """Give an episode without a title a stand-in, and keep a stand-in up
+    to date with the episode's number and date. A real title (typed, or
+    from tags) is never touched. Returns True if anything changed."""
+    sources = episode.sources
+    title = standin_title(episode.episode_number, episode.air_year, episode.air_month,
+                          episode.air_day)
+    if sources.get("title") == STANDIN and episode.title and episode.title.strip():
+        # A title set some other way since the stand-in (and not to it) is
+        # a real one: stop managing it.
+        from sqlalchemy import inspect
+        added = inspect(episode).attrs.title.history.added
+        if added and added[0] and added[0] not in (title, UNTITLED):
+            sources.pop("title")
+            episode.sources = sources
+            return True
+    if episode.title and episode.title.strip() and sources.get("title") != STANDIN:
+        return False
+    if episode.title == title and sources.get("title") == STANDIN:
+        return False
+    episode.title = title
+    sources["title"] = STANDIN
+    episode.sources = sources
+    return True
+
+
+def _fill_titles(session, _context, _instances) -> None:
+    for obj in [*session.new, *session.dirty]:
+        if isinstance(obj, Episode):
+            fill_standin_title(obj)
+
+
+def keep_titles_filled() -> None:
+    """Before every save, give episodes without a title a stand-in (and
+    update stand-ins), however the episode was changed. (Safe to call more
+    than once.)"""
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    if not event.contains(Session, "before_flush", _fill_titles):
+        event.listen(Session, "before_flush", _fill_titles)

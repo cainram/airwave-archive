@@ -417,6 +417,23 @@ Split into five smaller steps, done in order.
   `... xx xx xx`) comes off (`clean_series`). File names: two-digit-year
   dates with underscores or dots (`Ellery_Queen_43_09_30_...`) are
   dates now, like `43-09-30` (not with spaces: `01 02 03`).
+- **Stand-in titles** (owner's choice, 2026-11-15): an episode is never
+  left without a title (blank titles trouble podcast apps). Whenever an
+  episode is saved without one, it gets a stand-in: `Episode 12` if its
+  number is known, else its air date if the **whole** date is known
+  (`April 14th, 1939`; never a year or month alone), else `Untitled
+  Episode`, easy to search for and fix. The stand-in is marked as such
+  (source `standin`) and follows the number and date until a real title
+  is typed or arrives from tags; emptying a title brings it back. Done
+  in one place, a before-save hook (`app/episodes.py`), so every way an
+  episode changes is covered. In the edit form and the inbox it shows as
+  a grey hint in the Title box, so saving doesn't make it a real title.
+  It's **never written into the library's own files** (Write details
+  into files) and never used to rename files; export copies get it in
+  the ordinary title tag only if the file has no title of its own, and
+  the manifest and Airwave tags leave it out (an import works it out
+  again). Existing episodes get one the next time they're changed (no
+  clean-up run: owner's choice).
 
 #### 4c — Filename parser with a confirm screen ✅ *done*
 - Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's

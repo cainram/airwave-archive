@@ -158,7 +158,7 @@ def test_a_failure_leaves_the_file_as_it_was(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def broken(path, episode, part=None, parts=1, genres=None):
+    def broken(path, episode, part=None, parts=1, genres=None, standin=True):
         path.write_bytes(b"half written")
         raise OSError(28, "No space left on device")
     monkeypatch.setattr(tagwriting, "write_tags", broken)
@@ -173,7 +173,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def shortened(copy, episode, part=None, parts=1, genres=None):
+    def shortened(copy, episode, part=None, parts=1, genres=None, standin=True):
         copy.write_bytes(copy.read_bytes()[:417 * 3])     # much shorter: something went wrong
         return True
     monkeypatch.setattr(tagwriting, "write_tags", shortened)
@@ -184,7 +184,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
 def test_a_file_changed_meanwhile_isnt_replaced(client, monkeypatch):
     path = client.lib / SUSPENSE
 
-    def meddling(copy, episode, part=None, parts=1, genres=None):
+    def meddling(copy, episode, part=None, parts=1, genres=None, standin=True):
         tagging.write_tags(copy, episode, part, parts)
         make_mp3(path, frames=401)                        # edited outside the app
         return True
@@ -373,3 +373,16 @@ def test_writing_details_into_every_file(series):
     assert (job.files, job.checked, job.written, job.up_to_date, job.problems) == (15, 15, 13, 2, [])
     assert job.back == "/advanced"
     assert 'href="/tags/writing">Writing now' not in series.get("/advanced").text
+
+
+def test_a_stand_in_title_is_never_written_into_the_file(client):
+    hour = the_file("Art Bell Hour 1.wav")
+    client.post(f"/files/{hour.id}/edit", data=dict(series="Coast to Coast AM"))
+    assert episode_of("Art Bell Hour 1.wav").title == "Untitled Episode"
+    page = client.get(f"/tags/write?ids={hour.episode_id}").text
+    assert "<td>Untitled Episode</td>" not in page              # (only the heading names it)
+    write(client, "Art Bell Hour 1.wav")
+    path = client.lib / "Art Bell/Art Bell Hour 1.wav"
+    assert read_audio(path).tags.get("artist") == "Coast to Coast AM"   # the real details are
+    assert read_audio(path).tags.get("title") is None
+    assert "TITLE" not in read_airwave_tags(path)

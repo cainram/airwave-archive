@@ -26,7 +26,7 @@ from typing import Iterator
 
 from sqlalchemy.orm import Session
 
-from app.db import Episode
+from app.db import STANDIN, Episode
 from app.filenames import date_text
 from app.genres import genres_of
 from app.inbox import folder_name
@@ -135,7 +135,7 @@ def manifest(plan: Plan, picture_names: dict[str, str]) -> dict:
             "id": episode.uid,
             "series": episode.series,
             "episode_number": episode.episode_number,
-            "title": episode.title,
+            "title": None if episode.sources.get("title") == STANDIN else episode.title,
             "air_date": date_text(episode.air_year, episode.air_month, episode.air_day) or None,
             "air_time": episode.air_time,
             "time_zone": episode.air_timezone,

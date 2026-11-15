@@ -27,8 +27,8 @@ from app.db import (
 )
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
-    day_heading, format_air_date, format_air_span, format_air_time, format_time, read_date_text,
-    read_form,
+    day_heading, format_air_date, format_air_span, format_air_time, format_time, has_standin_title,
+    read_date_text, read_form, standin_title,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
@@ -437,10 +437,22 @@ def file_page(request: Request, file_id: int):
     return render(request, "file.html", {"f": f, "art": art})
 
 
+def _typed_date(values: dict) -> tuple:
+    """The (year, month, day) in an edit form's values (numbers, or what was
+    typed), with None for anything unknown or unreadable."""
+    def number(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    return tuple(number(values.get(part)) for part in ("air_year", "air_month", "air_day"))
+
+
 def render_edit_form(request: Request, f: AudioFile, values: dict, errors: dict | None = None):
     return render(request, "edit.html", {
         "f": f, "v": values, "errors": errors or {},
         "sources": f.episode.sources if f.episode else {},
+        "title_hint": standin_title(values.get("episode_number"), *_typed_date(values)),
         "text_fields": TEXT_FIELDS, "long_fields": LONG_FIELDS,
         "months": MONTHS, "time_zones": TIME_ZONES,
     })
@@ -453,6 +465,8 @@ def edit_page(request: Request, file_id: int):
     values = {name: getattr(ep, name) if ep else None
               for name in [*TEXT_FIELDS, "air_year", "air_month", "air_day",
                            "air_time", "air_timezone"]}
+    if ep is not None and has_standin_title(ep):
+        values["title"] = None   # shown as a hint, so saving doesn't make it a real title
     return render_edit_form(request, f, values)
 
 
@@ -649,9 +663,12 @@ def render_inbox(request: Request, typed=None, errors=None, problems=(), **notic
                       "title": item.title or "",
                       "date": date_text(item.air_year, item.air_month, item.air_day)}
             values.update((typed or {}).get(item.id, {}))
+            # What an empty title becomes, shown as a hint in the box.
+            hints = {"title": standin_title(item.episode_number, item.air_year, item.air_month,
+                                            item.air_day)}
             have = inbox.already_have(session, item)
             group, number = in_group.get(item.id, (None, None))
-            rows.append({"item": item, "vals": values, "extra": item.extra,
+            rows.append({"item": item, "vals": values, "hints": hints, "extra": item.extra,
                          "have": have and {"id": have.id, "title": display_title(have)},
                          "group": group, "part": number,
                          "convert": convert.needs_converting(item.name),

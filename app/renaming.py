@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 
 from app import convert
 from app.artwork import folder_image_rank
-from app.db import AudioFile, Episode, LibraryConversion, RenameBatch, Renamed, utcnow
+from app.db import STANDIN, AudioFile, Episode, LibraryConversion, RenameBatch, Renamed, utcnow
 from app.inbox import MAX_NAME, NO_SERIES_FOLDER
 from app.scanner import AUDIO_EXTENSIONS, LIBRARY_LOCK
 
@@ -84,8 +84,10 @@ def folder_for(episode: Episode) -> str:
 
 def name_for(f: AudioFile, episode: Episode) -> str | None:
     """The file's new name, or None if the episode hasn't enough details
-    (a date or a title) to name it by."""
-    date, title = date_text(episode), clean(episode.title)
+    (a date or a title) to name it by. A stand-in title ("Untitled
+    Episode") isn't used: it's not a real detail."""
+    date = date_text(episode)
+    title = "" if episode.sources.get("title") == STANDIN else clean(episode.title)
     if not date and not title:
         return None
     suffix = Path(f.name).suffix.lower()
