@@ -6,6 +6,9 @@
 {% set parts = ep.parts if ep else [f] %}
 {% set grouped = parts | length > 1 %}
 {% set series_name = ep.series if ep else none %}
+{# The air date links to its month in the calendar (when the month is known;
+   not in the mobile version, which has no calendar in its menu). #}
+{% set month_url = "/calendar?year=%d&month=%d" % (ep.air_year, ep.air_month) if ep and ep.air_month and not mobile else none %}
 <nav class="back"><a class="button" href="{{ series_name | series_url }}">← {{ series_name or "No series yet" }}</a></nav>
 {% include "_done_notice.html" %}
 
@@ -30,7 +33,7 @@
     {% if grouped %}<p class="part-of">Part {{ f.part_number }} of {{ parts | length }}</p>{% endif %}
     {% if ep %}<p class="listened">{% include "_listened.html" %}</p>{% endif %}
     <p class="muted">
-      {% if ep and ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% if (ep | air_date) or f.tag_date %} · {% endif %}{% endif %}{{ (ep | air_date) or f.tag_date or "" }}
+      {% if ep and ep.series %}<a href="{{ ep.series | series_url }}">{{ ep.series }}</a>{% if (ep | air_date) or f.tag_date %} · {% endif %}{% endif %}{% if month_url %}<a href="{{ month_url }}">{{ ep | air_date }}</a>{% else %}{{ (ep | air_date) or f.tag_date or "" }}{% endif %}
     </p>
   </div>
   <div class="actions">
@@ -105,16 +108,16 @@
 </ol>
 {% endif %}
 {% else %}
-{% macro fact(label, value, source) %}
+{% macro fact(label, value, source, link=none) %}
   <dt>{{ label }}{% if value and source == "tags" %} <span class="tag-code">from file tags</span>{% endif %}</dt>
-  <dd>{{ value or "—" }}</dd>
+  <dd>{% if value and link %}<a href="{{ link }}">{{ value }}</a>{% else %}{{ value or "—" }}{% endif %}</dd>
 {% endmacro %}
 <h2>Episode</h2>
 <dl class="facts">
   {{ fact("Series", ep.series if ep else None, sources.get("series")) }}
   {{ fact("Episode number", ep.episode_number if ep else None, sources.get("episode_number")) }}
   {{ fact("Title", ep.title if ep else None, sources.get("title")) }}
-  {{ fact("Aired", ep | air_date(length=ep.length if ep else f.duration_seconds), sources.get("air_date")) }}
+  {{ fact("Aired", ep | air_date(length=ep.length if ep else f.duration_seconds), sources.get("air_date"), month_url) }}
   {{ fact("Station / network", ep.network if ep else None, sources.get("network")) }}
   {{ fact("Host", ep.host if ep else None, sources.get("host")) }}
   {{ fact("Cast", ep.cast if ep else None, sources.get("cast")) }}

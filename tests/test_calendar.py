@@ -185,3 +185,16 @@ def test_day_pages_open_on_the_latest_and_are_linked(client):
     assert "Saturday, February 3rd, 1940" in client.get("/calendar/day").text
     assert 'href="/calendar/day?date=1938-10-30"' in client.get("/calendar/week?date=1938-10-30").text
     assert 'href="/calendar/day?date=1938-10-30"' in client.get("/calendar?year=1938&month=10").text
+
+
+
+def test_an_episodes_air_date_links_to_its_month(client):
+    import app.main as main
+    with Session(main._engine) as session:
+        ids = {f.name: f.id for f in session.scalars(select(AudioFile))}
+    page = client.get(f"/files/{ids['wotw.wav']}").text.replace("&amp;", "&")
+    link = '<a href="/calendar?year=1938&month=10">Sunday, October 30th, 1938</a>'
+    assert page.count(link) == 2                             # under the title, and "Aired"
+    assert "/calendar?" not in client.get(f"/files/{ids['yearonly.wav']}").text   # no month: no link
+    phone = client.get(f"/files/{ids['wotw.wav']}", headers={"User-Agent": "iPhone Mobile"}).text
+    assert "/calendar?" not in phone.replace("&amp;", "&")   # the mobile version has no calendar
