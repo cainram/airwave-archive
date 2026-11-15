@@ -1231,6 +1231,18 @@ keeps the genres of both.
   (owner's choice), so they show in its preview. A series without
   genres leaves the file's own genre tag alone.
 
+### Air times not shown (owner's choice, 2026-11-15)
+The dates matter; the time of day doesn't, so pages show **dates only**:
+the episode page ("Friday, April 14th, 1939", no "time unknown" or "until
+about"), the calendar's lists, a calendar day as one list (in the order
+they aired, unknown times last: no hour headings, no "continued from the
+night before"), podcast feed descriptions, and the inbox's notes on
+imported details. The times are **kept** and still used behind the
+scenes: in the database, the edit form's Time and Time zone boxes (left
+as they are, owner's choice), the order within a day, exports, Airwave
+tags and spreadsheet imports. `format_air_date(..., with_time=True)`
+still gives the time, if it's ever wanted again.
+
 ### Mobile version (owner's request, 2026-11-15)
 On a phone the app is for **listening, not curating**: "sitting in an
 airport, noodling around and listening to a few episodes". Less clutter;

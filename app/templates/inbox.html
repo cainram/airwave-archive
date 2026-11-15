@@ -144,7 +144,6 @@
     {% if x %}
     <p class="inbox-extra muted small">
       {% if x.part %}<span>Part {{ x.part }} of {{ x.parts }}</span>{% endif %}
-      {% if x.air_time %}<span>Aired at {{ x.air_time | clock }}{% if x.time_zone %} {{ zone_names[x.time_zone] }}{% endif %}{% if x.air_date != row.vals.date %} (on {{ x.air_date }}; kept only if the date stays the same){% endif %}</span>{% endif %}
       {% if x.network %}<span>Station: {{ x.network }}</span>{% endif %}
       {% if x.host %}<span>Host: {{ x.host }}</span>{% endif %}
       {% if x.cast %}<span>Cast: {{ x.cast | truncate(120) }}</span>{% endif %}

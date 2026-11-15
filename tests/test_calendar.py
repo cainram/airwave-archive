@@ -54,7 +54,7 @@ def test_a_month(client):
     # In time order, unknown time last.
     day = page[page.index('<section class="calendar-day" id="day-30">'):]
     assert day.index(">Early<") < day.index(">Wotw<") < day.index(">Late<")
-    assert "8:00 PM US Eastern" in page and "7:00 PM" in page
+    assert "8:00 PM" not in page and "7:00 PM" not in page        # times aren't shown
     assert "Sometime in October 1938" in page and "Sometime" in page
     assert "1 episode from 1938 has only the year known" in page
     assert "Yearonly" not in page and "Undated" not in page
@@ -123,7 +123,7 @@ def test_a_week(client):
     assert "<h1>October 30th – November 5th, 1938</h1>" in page and "3 episodes aired this week" in page
     sunday = page[page.index('id="day-1938-10-30"'):page.index('id="day-1938-10-31"')]
     assert sunday.index(">Early<") < sunday.index(">Wotw<") < sunday.index(">Late<")
-    assert "8:00 PM – 8:00 PM US Eastern" in sunday         # 1-second test file
+    assert "8:00 PM" not in sunday                          # times aren't shown
     assert page.count(">Nothing<") == 6
     assert "Sometime" not in page
     assert "1 episode from October 1938 has no known day" in page
@@ -157,9 +157,9 @@ def test_hour_labels():
 def test_a_day(client):
     page = client.get("/calendar/day?date=October 30, 1938").text
     assert "<h1>Sunday, October 30th, 1938</h1>" in page and "3 broadcasts this day" in page
-    assert page.index("<h2>7 PM</h2>") < page.index(">Early<") < page.index("<h2>8 PM</h2>") \
-        < page.index(">Wotw<") < page.index("<h2>Time unknown</h2>") < page.index(">Late<")
-    assert "different zones" in page                       # one has a zone, one hasn't
+    # One list, in the order they aired (unknown time last), without the times.
+    assert page.index(">Early<") < page.index(">Wotw<") < page.index(">Late<")
+    assert "<h2>7 PM</h2>" not in page and "Time unknown" not in page and "8:00 PM" not in page
     page = page.replace("&amp;", "&")
     assert 'href="/calendar/day?date=1938-10-29"' in page and 'href="/calendar/day?date=1938-10-31"' in page
     assert 'href="/calendar/day?date=1935-07-04">⇤ Earlier' in page
@@ -168,7 +168,7 @@ def test_a_day(client):
     assert 'href="/calendar?year=1938&month=10">Month view' in page
 
 
-def test_an_overnight_show_continues_the_next_morning(client):
+def test_an_overnight_show_is_only_on_its_own_day(client):
     import app.main as main
     from app.db import Episode
     with Session(main._engine) as session:
@@ -177,9 +177,8 @@ def test_an_overnight_show_continues_the_next_morning(client):
         ep.files[0].duration_seconds = 3 * 3600               # on until 1 AM
         session.commit()
     nextday = client.get("/calendar/day?date=1940-02-04").text
-    assert "Continued from the night before" in nextday and ">Later<" in nextday
-    assert "10:00 PM – 1:00 AM (next day)" in nextday
-    assert "Continued" not in client.get("/calendar/day?date=1940-02-03").text
+    assert "Continued from the night before" not in nextday and ">Later<" not in nextday
+    assert ">Later<" in client.get("/calendar/day?date=1940-02-03").text
 
 
 def test_day_pages_open_on_the_latest_and_are_linked(client):

@@ -28,33 +28,12 @@
 </form>
 {% if error %}<p class="field-error" role="alert">{{ error }}</p>{% endif %}
 
-{% if view.carried %}
-<section class="calendar-hour carried">
-  <h2>Continued from the night before</h2>
-  <ul class="results">
-    {% for f, end in view.carried %}
-    {% include "_calendar_row.html" %}
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
-
-{% for hour, files in view.hours %}
-<section class="calendar-hour">
-  <h2>{{ hour_label(hour) }}</h2>
-  <ul class="results">{% for f in files %}{% include "_calendar_row.html" %}{% endfor %}</ul>
-</section>
-{% endfor %}
-
-{% if view.unknown %}
-<section class="calendar-hour">
-  <h2>Time unknown</h2>
-  <ul class="results">{% for f in view.unknown %}{% include "_calendar_row.html" %}{% endfor %}</ul>
-</section>
-{% endif %}
-
-{% if view.mixed_zones %}
-<p class="muted small">These shows are placed by their own local time, as listed in the newspapers of the day,
-  so times in different zones aren't the same moment.</p>
+{# One list for the day, in the order they aired (unknown times last); the
+   times themselves aren't shown (owner's choice). #}
+{% if view.count %}
+<ul class="results">
+  {% for hour, files in view.hours %}{% for f in files %}{% include "_calendar_row.html" %}{% endfor %}{% endfor %}
+  {% for f in view.unknown %}{% include "_calendar_row.html" %}{% endfor %}
+</ul>
 {% endif %}
 {% endblock %}
