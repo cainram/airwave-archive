@@ -26,6 +26,23 @@ machines, or personal details. In practice:
 - Public docs (README, INSTALL) should be accurate and usable, but needn't
   cover every setup or promise support.
 
+## Design philosophy: clean and easy
+
+The owner could have bent a bigger app (AudioBookshelf) to this job, but
+it's too busy: everything it does makes sense, there's just too much of
+it. Airwave Archive exists to be the calm alternative. So:
+
+- **Prioritize a seamless feel and avoid clutter**, in what you recommend
+  and in what you build. Fewer buttons, fewer notices, fewer settings.
+  When in doubt, leave it out, or ask.
+- Prefer the app quietly doing the right thing over asking the owner to
+  choose or configure.
+- **Behind-the-scenes tools** (maintenance, bulk fixes, diagnostics,
+  anything that "needs to exist" but isn't part of everyday use) should
+  be suggested for the **Advanced page** (`/advanced`), not added to the
+  everyday pages.
+- The mobile version is stricter still: listening only.
+
 ## About the owner — read this first
 
 The project owner is **not a programmer**. The last time they wrote code was in
