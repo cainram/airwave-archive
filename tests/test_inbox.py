@@ -238,6 +238,27 @@ def test_clearing_the_inbox(client):
     assert "3 files were deleted from the inbox" in page and "Clear the inbox" not in page
 
 
+def test_the_menu_shows_how_many_are_waiting(client):
+    import re
+    count = lambda page: re.findall(r'class="menu-count">.*?(\d+\+?)<span class="visually-hidden"> waiting', page)
+    assert count(client.get("/").text) == []                 # empty inbox: nothing shown
+    for n in range(3):
+        make_wav(client.box / f"show {n}.wav", 1)
+    client.get("/inbox")
+    assert count(client.get("/").text) == ["3"]
+    assert count(client.get("/series", headers={"HX-Request": "true"}).text) == ["3"]   # clicking around too
+    client.post("/inbox/clear")
+    assert count(client.get("/").text) == []
+    import app.main as main
+    from app.db import InboxItem as Item
+    from datetime import datetime
+    with Session(main._engine) as session:
+        session.add_all(Item(name=f"x{n}.wav", size_bytes=1, added_at=datetime(2026, 1, 1))
+                        for n in range(120))
+        session.commit()
+    assert count(client.get("/").text) == ["99+"]
+
+
 def test_the_menu_has_the_inbox(client):
     assert '<a href="/inbox" data-paths="/inbox"' in client.get("/").text
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import threading
 from urllib.parse import quote, urlencode
@@ -110,6 +111,7 @@ def tag_label(key: str) -> tuple[str, str]:
     return name, extra or (code if code != name else "")
 
 
+log = logging.getLogger(__name__)
 templates = Jinja2Templates(directory=APP_DIR / "templates")
 
 
@@ -228,6 +230,17 @@ def get_engine() -> Engine:
     return _engine
 
 
+def inbox_waiting() -> int:
+    """How many recordings are waiting in the inbox (for the red number on
+    the menu's Inbox link)."""
+    try:
+        with Session(get_engine()) as session:
+            return session.scalar(select(func.count()).select_from(InboxItem)) or 0
+    except Exception:          # never let the menu stop a page from showing
+        log.exception("Couldn't count the inbox")
+        return 0
+
+
 def render(request: Request, template: str, context: dict, status_code: int = 200):
     """Send a page. When htmx asks (a click inside the app), send only the
     title and the middle of the page, so the player bar isn't replaced."""
@@ -242,6 +255,7 @@ def render(request: Request, template: str, context: dict, status_code: int = 20
             return Response(headers={"HX-Redirect": target, "Vary": "HX-Request"})
         return Response(headers={"HX-Refresh": "true", "Vary": "HX-Request"})
     context["layout"] = "_partial.html" if from_htmx else "base.html"
+    context.setdefault("inbox_waiting", inbox_waiting())
     response = templates.TemplateResponse(request, template, context, status_code=status_code)
     # Tell browsers the full and partial versions are different pages.
     response.headers["Vary"] = "HX-Request, HX-History-Restore-Request"
