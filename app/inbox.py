@@ -44,7 +44,7 @@ from app.episodes import (
     PART_PATTERN, TIME_PATTERN, TIME_ZONES, _clean, apply_confirmed, date_from_tag, known_parts,
     read_date_text,
 )
-from app.filenames import clean_title_and_number, date_text, marked_number, parse_filename
+from app.filenames import clean_series, clean_title_and_number, date_text, marked_number, parse_filename
 from app.parts import set_parts
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
 from app.series import one_series, set_uploaded_picture
@@ -158,7 +158,8 @@ def guess_details(path: Path, found: dict | None = None) -> dict:
             except (KeyError, TypeError, ValueError):
                 pass
     guess = parse_filename(path.name)
-    series = _clean(tags.get("artist")) or _clean(tags.get("album")) or (guess and guess.series)
+    series = clean_series(_clean(tags.get("artist")) or _clean(tags.get("album"))) \
+        or (guess and guess.series)
     # A date, the series name or an episode number in the title tag is
     # taken off the title.
     title, from_title, title_number = clean_title_and_number(

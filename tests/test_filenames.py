@@ -234,6 +234,13 @@ from app.filenames import clean_title  # noqa: E402
     ("1943-xx-xx - Unknown Episode", (), "Unknown Episode", (1943, None, None)),
     ("Gunsmoke: Billy the Kid", ("Gunsmoke",), "Billy the Kid", (None, None, None)),
     ("1943-05-13", (), None, (1943, 5, 13)),                     # only a date
+    ("Ellery Queen Minute Mysteries - xxxxxx Bad Man's Bad Man ", ("Ellery Queen Minute Mysteries",),
+     "Bad Man's Bad Man", (None, None, None)),                    # date unknown, as x's
+    ("xx-xx-xx Bad Man's Bad Man", (), "Bad Man's Bad Man", (None, None, None)),
+    ("Bad Man's Bad Man (xx/xx/xxxx)", (), "Bad Man's Bad Man", (None, None, None)),
+    ("29", (), None, (None, None, None)),                         # a stray number
+    ("1984", (), "1984", (None, None, None)),                     # a title
+    ("01 Ellery Queen.mp3", (), None, (None, None, None)),        # a file name, not a title
     # Left alone:
     ("The Shadow Knows", ("The Shadow",), "The Shadow Knows", (None, None, None)),
     ("Suspense's Best", ("Suspense",), "Suspense's Best", (None, None, None)),
@@ -289,3 +296,51 @@ def test_episode_numbers_come_off_titles(title, number, cleaned):
 ])
 def test_dates_series_and_numbers_come_off_together(title, series, cleaned, date, number):
     assert clean_title_and_number(title, series) == (cleaned, date, number)
+
+
+@pytest.mark.parametrize("name, series, number, title, date", [
+    ("Ellery_Queen_43_09_30_The_World_Series_Crime.mp3", "Ellery Queen", None,
+     "The World Series Crime", (1943, 9, 30)),
+    ("Ellery_Queen_39_09_24_015_The_Lost_Treasure.mp3", "Ellery Queen", "15",
+     "The Lost Treasure", (1939, 9, 24)),
+    ("Ellery_Queen_The_Bad_Boy_Ford_Theater_48_01_04.mp3", "Ellery Queen The Bad Boy Ford Theater", None,
+     None, (1948, 1, 4)),
+    ("Ellery.Queen.43.09.30.The.World.Series.Crime.mp3", "Ellery Queen", None,
+     "The World Series Crime", (1943, 9, 30)),
+])
+def test_two_digit_years_with_underscores_or_dots(name, series, number, title, date):
+    guess = parse_filename(name)
+    assert (guess.series, guess.episode_number, guess.title) == (series, number, title)
+    assert (guess.year, guess.month, guess.day) == date
+
+
+def test_numbers_with_spaces_are_not_two_digit_dates():
+    guess = parse_filename("Hour 01 02 03.mp3")
+    assert guess is None or guess.year is None
+
+
+from app.filenames import clean_series  # noqa: E402
+
+
+@pytest.mark.parametrize("name, cleaned", [
+    ("Ellery Queen 44-01", "Ellery Queen"),
+    ("Ellery Queen 48_04", "Ellery Queen"),
+    ("Ellery Queens Minute Mysteries xx xx xx", "Ellery Queens Minute Mysteries"),
+    ("Ellery Queens Minute Mysteries xx-xx-xx", "Ellery Queens Minute Mysteries"),
+    # Left alone:
+    ("Box 13", "Box 13"),
+    ("Room 222", "Room 222"),
+    ("Studio One", "Studio One"),
+    ("X Minus One", "X Minus One"),
+    ("Dimension X", "Dimension X"),
+    ("Ellery Queen 44-13", "Ellery Queen 44-13"),      # no 13th month
+    (None, None),
+])
+def test_stray_dates_come_off_series_names(name, cleaned):
+    assert clean_series(name) == cleaned
+
+
+def test_unknown_dates_dont_end_up_in_the_series():
+    guess = parse_filename("Ellery_Queens_Minute_Mysteries_xx_xx_xx_027_Deserted_Island.mp3")
+    assert (guess.series, guess.episode_number, guess.title) == (
+        "Ellery Queens Minute Mysteries", "27", "Deserted Island")

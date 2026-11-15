@@ -409,6 +409,14 @@ Split into five smaller steps, done in order.
   year in brackets (`The Thin Man (1945)`), a number in the middle, a
   bare number without brackets or a mark (`Apollo 13`), and a title
   that's only a number are left alone.
+  Also (2026-11-15, from a batch of Ellery Queen files): an unknown date
+  written as x's (`xxxxxx`, `xx-xx-xx`) comes off a title's start or end;
+  a title tag that's only a short number (`29`) or a file name
+  (`01 Ellery Queen.mp3`) isn't used as a title (the file name's title
+  is); a stray date at the end of a series name (`Ellery Queen 44-01`,
+  `... xx xx xx`) comes off (`clean_series`). File names: two-digit-year
+  dates with underscores or dots (`Ellery_Queen_43_09_30_...`) are
+  dates now, like `43-09-30` (not with spaces: `01 02 03`).
 
 #### 4c — Filename parser with a confirm screen ✅ *done*
 - Recognise common naming patterns (`Suspense 1943-05-13 - Donovan's
