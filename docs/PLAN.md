@@ -1242,11 +1242,15 @@ measure: the pages still exist, nothing on the phone leads to them.)
 - **Step 1** ✅ *done*: the switch; the mobile menu is Home · Series ·
   Feeds (no Calendar, owner's choice, and no Inbox); an empty library
   just says there's nothing to listen to yet.
-- **Step 2**: Series page: tiles only, no Actions menu, no library
-  notices. A series' page: no Actions menu, no tick boxes, no size
-  total. An episode's page: listening only (play, played / not played,
-  start over, the details); no editing, parts, delete, file details or
-  raw tags. Home, Search, genre pages and the player bar stay as they
+- **Step 2** ✅ *done*: Series page: tiles only, no Actions menu, no
+  library notices. A series' page: no Actions menu, no tick boxes, no
+  size total. An episode's page: listening only: Play, and **Mark
+  played / Mark not played / Start over as buttons** (no ☰ menu: one or
+  two items); "About this episode" with only the filled-in details
+  (number, air date, station, host, cast, notes); parts as "Part 1",
+  "Part 2" with play buttons; no editing, parts tools, delete, file
+  details or raw tags; a missing recording "isn't available right
+  now". Home, Search, genre pages and the player bar stay as they
   are; the calendar pages stay reachable from dates.
 - **Step 3**: Feeds read-only (list, a feed's page with Open in Podcasts
   and Copy link, its episodes), no publishing, editing or deleting.

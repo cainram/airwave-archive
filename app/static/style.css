@@ -748,3 +748,6 @@ h2.tag-file { font-size: 1.05rem; margin: 0 0 2px; }
               border-radius: 8px; margin-bottom: 18px; font-size: 1.05rem; }
 .danger-bar strong { display: block; font-size: 1.15rem; }
 .advanced-tool p { margin: 6px 0; }
+
+/* Mobile version: the episode page's listening buttons, beside Play. */
+.listen-buttons { display: flex; flex-wrap: wrap; gap: 8px; }

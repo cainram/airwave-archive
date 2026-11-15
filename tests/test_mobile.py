@@ -79,3 +79,73 @@ def test_the_switch_only_goes_back_inside_the_app(client):
     assert sent.headers["location"] == "/"
     sent = client.get("/view?to=nonsense", follow_redirects=False)
     assert sent.headers["location"] == "/" and "set-cookie" not in sent.headers
+
+
+# ------------------------------------------------------ step 2: series and episodes
+
+def phone(client, url):
+    return client.get(url, headers={"User-Agent": IPHONE}).text
+
+
+def computer(client, url):
+    return client.get(url).text
+
+
+CURATING = ["Edit details", "Write details into the file", "Rename the file", "Group with other files",
+            "Delete…", "Tags in the file", "File name", "from file tags"]
+
+
+def test_the_episode_page_is_for_listening(client):
+    client.post("/files/1/edit", data={"series": "Suspense", "title": "Donovan's Brain",
+                                       "air_year": "1943", "air_month": "5", "air_day": "13"})
+    page = phone(client, "/files/1")
+    for words in CURATING:
+        assert words not in page, words
+    assert "☰" not in page.split('id="content"')[1]
+    assert '<button class="button" type="submit" name="played" value="1">Mark played</button>' in page
+    assert "<h2>About this episode</h2>" in page and "<dt>Aired</dt>" in page
+    assert "<dt>Host</dt>" not in page                  # nothing to say: no row
+    desktop = computer(client, "/files/1")
+    for words in CURATING[:6]:
+        assert words in desktop, words
+
+
+def test_parts_are_numbered_not_named(client):
+    import app.main as main
+    make_wav(main.LIBRARY_DIR / "Suspense" / "Suspense 1943-05-13 Hour 2.wav", 1)
+    client.post("/rescan")
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from app.db import AudioFile
+    with Session(main._engine) as session:
+        second = session.scalar(select(AudioFile.id).where(AudioFile.name.contains("Hour 2")))
+    client.post("/files/1/parts", data={"part": ["1", str(second)]})
+    page = phone(client, "/files/1")
+    parts = page.split("<h2>Parts</h2>")[1].split("</ol>")[0]
+    assert re.findall(r">(Part \d)<", parts) == ["Part 1", "Part 2"]
+    assert ".wav" not in page.split("<h2>Parts</h2>")[1] and "Split into separate files" not in page
+    assert "Split into separate files" in computer(client, "/files/1")
+
+
+def test_a_missing_recording_just_isnt_available(client):
+    import app.main as main
+    client.post("/files/1/edit", data={"series": "Suspense", "title": "Donovan's Brain"})
+    (main.LIBRARY_DIR / "Suspense" / "Suspense 1943-05-13.wav").unlink()
+    client.post("/rescan")
+    page = phone(client, "/files/1")
+    assert "This recording isn't available right now." in page and "Forget this recording" not in page
+    assert "Forget this recording" in computer(client, "/files/1")
+
+
+def test_the_series_pages_are_for_listening(client):
+    client.post("/files/1/edit", data={"series": "Suspense", "title": "Donovan's Brain"})
+    page = phone(client, "/series")
+    assert "Rescan" not in page and "All files (Library)" not in page and 'class="view-switch"' not in page
+    assert '<ul class="tiles">' in phone(client, "/series?view=list")        # tiles only
+    assert "Rescan" in computer(client, "/series") and 'class="view-switch"' in computer(client, "/series")
+    page = phone(client, "/series/episodes?name=Suspense")
+    assert "Edit genres…" not in page and "With ticked" not in page and 'type="checkbox"' not in page
+    assert " KB" not in page and " MB" not in page                         # no size total
+    assert "Donovan&#39;s Brain" in page and "data-play" in page or "play" in page
+    desktop = computer(client, "/series/episodes?name=Suspense")
+    assert "Edit genres…" in desktop and "With ticked" in desktop and 'type="checkbox"' in desktop

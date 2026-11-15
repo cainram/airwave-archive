@@ -11,6 +11,7 @@
       · {{ series | sum(attribute="seconds") | duration }} of audio
     </p>
   </div>
+  {% if not mobile %}{# (the mobile version is for listening: tiles only, no tools) #}
   <div class="actions">
     <details class="drop">
       <summary class="button"><span aria-hidden="true">☰</span>Actions</summary>
@@ -31,14 +32,17 @@
   </nav>
   {% endif %}
   </div>
+  {% endif %}
 </section>
-{% include "_library_notices.html" %}
+{% if not mobile %}{% include "_library_notices.html" %}{% endif %}
 {% if series and genre_list %}{% include "_genre_list.html" %}{% endif %}
 
-{% if not series %}
+{% if not series and mobile %}
+<div class="notice">Nothing to listen to yet.</div>
+{% elif not series %}
 <div class="notice">No episodes yet. Add recordings to the library and choose <strong>☰ Actions → Rescan</strong>,
   or upload them in the <a href="/inbox">Inbox</a>.</div>
-{% elif view == "tiles" %}
+{% elif view == "tiles" or mobile %}
 {% include "_series_tiles.html" %}
 {% else %}
 <p class="muted small">A series is every episode with the same <strong>Series</strong> name.
