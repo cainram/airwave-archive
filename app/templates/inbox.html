@@ -136,7 +136,7 @@
       {% for key, label in fields.items() %}
       <div class="review-field review-{{ key }}">
         <label for="{{ key }}-{{ item.id }}">{{ label }}</label>
-        <input id="{{ key }}-{{ item.id }}" name="{{ key }}-{{ item.id }}" type="text" value="{{ row.vals[key] }}">
+        <input id="{{ key }}-{{ item.id }}" name="{{ key }}-{{ item.id }}" type="text" value="{{ row.vals[key] }}"{% if row.hints[key] %} placeholder="{{ row.hints[key] }}"{% endif %}>
       </div>
       {% endfor %}
     </div>

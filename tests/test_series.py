@@ -93,7 +93,7 @@ def test_numbered_episodes_go_in_number_order(client):
 
 def test_episodes_without_a_series(client):
     page = client.get("/series/episodes").text
-    assert "No series yet" in page and titles_in_order(page) == ["loose.wav"]
+    assert "No series yet" in page and titles_in_order(page) == ["Untitled Episode"]
 
 
 def test_an_unknown_series_is_not_found(client):

@@ -21,7 +21,9 @@
   {% if name in long_fields %}
   <textarea id="{{ name }}" name="{{ name }}" rows="{{ 6 if name == 'cast' else 4 }}">{{ v[name] or "" }}</textarea>
   {% else %}
-  <input id="{{ name }}" name="{{ name }}" type="text" value="{{ v[name] or '' }}">
+  <input id="{{ name }}" name="{{ name }}" type="text" value="{{ v[name] or '' }}"{% if name == "title" %} placeholder="{{ title_hint }}"{% endif %}>
+  {% if name == "title" %}<p class="muted small">Left empty, the title is <strong>{{ title_hint }}</strong>
+    (the episode number, else the full air date, else "Untitled Episode"), and it changes by itself when those do.</p>{% endif %}
   {% endif %}
   {% endfor %}
 

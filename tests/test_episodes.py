@@ -357,8 +357,8 @@ def test_details_from_tags_follow_tag_changes(tmp_path, engine):
     make_wav(lib / "show.wav", 2)                        # same file, tags gone
     sync_library(engine, lib)
     ep = files(engine)["show.wav"].episode
-    assert ep.series is None and ep.title is None and ep.air_year is None
-    assert ep.sources == {}
+    assert ep.series is None and ep.air_year is None
+    assert ep.title == "Untitled Episode" and ep.sources == {"title": "standin"}
 
 
 def test_upgrade_fills_in_existing_episodes(tmp_path):
@@ -469,3 +469,60 @@ def test_ordinal_days():
     from app.episodes import ordinal
     assert [ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31)] == [
         "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st"]
+
+
+# ------------------------------------------------------ stand-in titles
+
+from app.episodes import standin_title  # noqa: E402
+
+
+def test_the_stand_in_title_order():
+    assert standin_title("12", 1939, 4, 14) == "Episode 12"          # the number first
+    assert standin_title(" A-12 ", None, None, None) == "Episode A-12"
+    assert standin_title(None, 1939, 4, 14) == "April 14th, 1939"   # then a whole date
+    assert standin_title("", 1939, 4, None) == "Untitled Episode"   # never part of a date
+    assert standin_title(None, 1939, None, None) == "Untitled Episode"
+    assert standin_title(None, None, None, None) == "Untitled Episode"
+
+
+def episode_1() -> Episode:
+    import app.main as main
+    with Session(main._engine) as session:
+        ep = session.get(AudioFile, 1).episode
+        session.expunge_all()
+        return ep
+
+
+def test_a_stand_in_follows_the_details_until_a_title_is_typed(client):
+    assert (episode_1().title, episode_1().sources) == ("Untitled Episode", {"title": "standin"})
+    # The edit form shows it as a hint, not as typed text.
+    page = client.get("/files/1/edit").text
+    assert 'id="title" name="title" type="text" value="" placeholder="Untitled Episode"' in page
+    # A whole date, then a number: the stand-in follows.
+    client.post("/files/1/edit", data={"air_year": "1939", "air_month": "4", "air_day": "14"})
+    assert episode_1().title == "April 14th, 1939"
+    client.post("/files/1/edit", data={"episode_number": "7", "air_year": "1939", "air_month": "4",
+                                       "air_day": "14"})
+    assert episode_1().title == "Episode 7"
+    assert 'placeholder="Episode 7"' in client.get("/files/1/edit").text
+    # A typed title is kept, whatever changes after.
+    client.post("/files/1/edit", data={"episode_number": "7", "title": "The Patriot"})
+    client.post("/files/1/edit", data={"episode_number": "8", "title": "The Patriot"})
+    ep = episode_1()
+    assert (ep.title, ep.sources["title"]) == ("The Patriot", MANUAL)
+    # Emptied by hand: a stand-in again.
+    client.post("/files/1/edit", data={"episode_number": "8"})
+    assert (episode_1().title, episode_1().sources["title"]) == ("Episode 8", "standin")
+    # And search finds it.
+    assert "/files/1" in client.get("/search", params={"q": "Episode 8"}).text
+
+
+def test_tags_replace_a_stand_in(tmp_path, engine):
+    lib = tmp_path / "library"
+    make_wav(lib / "show.wav", 1)
+    sync_library(engine, lib)
+    assert files(engine)["show.wav"].episode.title == "Untitled Episode"
+    tagged_wav(lib / "show.wav", title="The Patriot")           # tags added later
+    sync_library(engine, lib)
+    ep = files(engine)["show.wav"].episode
+    assert (ep.title, ep.sources["title"]) == ("The Patriot", TAGS)

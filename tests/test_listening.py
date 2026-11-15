@@ -169,8 +169,10 @@ def test_only_the_four_most_recent_cards_show(tmp_path, monkeypatch):
     ids = files(client)
 
     def cards() -> list[str]:
+        # (Their titles are all "Untitled Episode": tell them apart by file.)
         row = client.get("/").text.split('class="continue-list"')[1].split("</ul>")[0]
-        return re.findall(r'href="/files/\d+">(Show \d)', row)
+        names = {file_id: name.removesuffix(".wav") for name, file_id in ids.items()}
+        return [names[int(i)] for i in re.findall(r'href="/files/(\d+)">', row)]
 
     for name in names:                  # started one after another
         client.post(f"/listening/{episode_of(client, name)}", data={"file": ids[name], "at": "30"})

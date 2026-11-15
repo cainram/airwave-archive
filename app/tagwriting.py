@@ -107,7 +107,7 @@ def plan_file(f: AudioFile, episode: Episode, library: Path) -> FilePlan:
         return plan
     part, parts = part_of(f, episode)
     genres = of_episode(episode)
-    common = common_values(episode, part, parts, genres)
+    common = common_values(episode, part, parts, genres, standin=False)   # never a stand-in title
     wanted = {key[len(PREFIX):]: value
               for key, value in airwave_values(episode, part, parts, genres).items()}
     if not common and not set(wanted) - {"ID"}:
@@ -148,7 +148,7 @@ def write_file(f: AudioFile, episode: Episode, library: Path) -> None:
         try:
             try:
                 shutil.copy2(path, temporary)
-                written = write_tags(temporary, episode, part, parts, genres)
+                written = write_tags(temporary, episode, part, parts, genres, standin=False)
             except OSError as error:
                 raise TagError(f"The tags couldn't be written ({error.strerror or error}).") from None
             except Exception:

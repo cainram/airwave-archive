@@ -109,7 +109,7 @@ def test_matching_by_series_and_date_with_a_preview(client):
     assert "<strong>2</strong> would change an episode" in text and "1 couldn't be matched" in text
     assert "matched by series and date" in page and "Row 4" in page
     assert "Nothing has been saved yet" in text
-    assert episode(client, "patriot.wav").title is None          # still nothing saved
+    assert episode(client, "patriot.wav").title == "April 14th, 1939"   # still only its stand-in
 
     token = preview_url.split("/import/")[1].split("?")[0]
     columns = ["series", "date", "title", "cast", "network", "time", "timezone"]

@@ -175,3 +175,15 @@ def test_exporting_ticked_episodes_with_parts(client):
 def test_nothing_to_export(client):
     assert "no episodes were ticked" in client.get("/export").text
     assert client.get("/export/download").status_code == 404
+
+
+def test_a_stand_in_title_goes_in_the_copy_but_not_the_airwave_details(client):
+    zf = unzip(client.get("/export/download?whole_series=Coast%20to%20Coast%20AM"))
+    found = json.loads(zf.read("manifest.json"))
+    assert found["episodes"][0]["title"] is None            # worked out again on import
+    copy = client.lib.parent / "copy.wav"
+    name = next(n for n in zf.namelist() if n.endswith("Hour 1.wav"))
+    copy.write_bytes(zf.read(name))
+    from app.scanner import read_audio
+    assert read_audio(copy).tags["title"] == "Untitled Episode (part 1 of 2)"   # players show something
+    assert "TITLE" not in read_airwave_tags(copy)

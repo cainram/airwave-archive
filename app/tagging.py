@@ -25,7 +25,7 @@ from mutagen.asf import ASF
 from mutagen.id3 import COMM, ID3, TALB, TCON, TDRC, TIT2, TPE1, TRCK, TXXX, ID3NoHeaderError
 from mutagen.mp4 import MP4, MP4FreeForm
 
-from app.db import Episode
+from app.db import STANDIN, Episode
 from app.filenames import date_text
 from app.genres import SEPARATOR
 
@@ -42,7 +42,9 @@ def airwave_values(episode: Episode, part: int | None, parts: int,
         "ID": episode.uid,
         "SERIES": episode.series,
         "EPISODE_NUMBER": episode.episode_number,
-        "TITLE": episode.title,
+        # A stand-in title isn't a real detail: an export brought back in
+        # works it out again.
+        "TITLE": None if episode.sources.get("title") == STANDIN else episode.title,
         "AIR_DATE": date_text(episode.air_year, episode.air_month, episode.air_day) or None,
         "AIR_TIME": episode.air_time,
         "TIME_ZONE": episode.air_timezone,
@@ -57,10 +59,15 @@ def airwave_values(episode: Episode, part: int | None, parts: int,
 
 
 def common_values(episode: Episode, part: int | None, parts: int,
-                  genres: list[str] | None = None) -> dict[str, str]:
+                  genres: list[str] | None = None, standin: bool = True) -> dict[str, str]:
     """The usual tags, in plain words (title, artist, album, date, genre,
-    comment, track). Several genres are one text: "Western; Drama"."""
+    comment, track). Several genres are one text: "Western; Drama".
+    ``standin``: whether a stand-in title ("Episode 12") is written (yes for
+    export copies, so players show something; never into the library's own
+    files)."""
     title = episode.title
+    if not standin and episode.sources.get("title") == STANDIN:
+        title = None
     if title and parts > 1 and part:
         title = f"{title} (part {part} of {parts})"
     values = {
@@ -76,12 +83,17 @@ def common_values(episode: Episode, part: int | None, parts: int,
 
 
 def write_tags(path: Path, episode: Episode, part: int | None = None, parts: int = 1,
-               genres: list[str] | None = None) -> bool:
+               genres: list[str] | None = None, standin: bool = True) -> bool:
     """Write the episode's details into the file at ``path`` (a copy!).
     ``genres`` are its series' genres. Details the app doesn't know (a
-    series without genres, say) are left as the file had them. Returns
+    series without genres, say) are left as the file had them; so is a
+    title tag, if the episode's title is only a stand-in. ``standin``:
+    whether a stand-in title may be written at all (never into the
+    library's own files). Returns
     False if this kind of file can't hold tags."""
-    common = common_values(episode, part, parts, genres)
+    if standin and episode.sources.get("title") == STANDIN and _has_title(path):
+        standin = False   # the file's own title tag beats a stand-in
+    common = common_values(episode, part, parts, genres, standin)
     airwave = airwave_values(episode, part, parts, genres)
     audio = mutagen.File(path)
     if audio is None:
@@ -96,6 +108,17 @@ def write_tags(path: Path, episode: Episode, part: int | None = None, parts: int
         _write_vorbis(audio, common, airwave)
     audio.save()
     return True
+
+
+def _has_title(path: Path) -> bool:
+    """Whether the file already has a title tag."""
+    try:
+        easy = mutagen.File(path, easy=True)
+    except Exception:
+        return False
+    tags = getattr(easy, "tags", None) or {}
+    found = tags.get("title") or tags.get("Title") or tags.get("TITLE") or []
+    return any(str(value).strip() for value in found)
 
 
 def _uses_id3(audio) -> bool:

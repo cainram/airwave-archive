@@ -134,6 +134,24 @@ def test_episode_numbers_come_off_title_tags(client):
     assert found["named 14.wav"].title == "Sorry, Wrong Number"
 
 
+def test_an_empty_title_shows_and_gets_its_stand_in(client):
+    make_wav(client.box / "Black Museum - 07 - .wav", 1)
+    make_wav(client.box / "nothing at all.wav", 1)
+    page = client.get("/inbox").text
+    found = items(client)
+    numbered, blank = found["Black Museum - 07 - .wav"], found["nothing at all.wav"]
+    assert numbered.title is None and numbered.episode_number == "7"
+    assert f'name="title-{numbered.id}" type="text" value="" placeholder="Episode 7"' in page
+    assert f'name="title-{blank.id}" type="text" value="" placeholder="Untitled Episode"' in page
+    form = {f"{key}-{numbered.id}": value for key, value in
+            {"series": "Black Museum", "episode_number": "7", "title": "", "date": ""}.items()}
+    client.post(f"/inbox/{numbered.id}/add", data=form)
+    import app.main as main
+    with Session(main._engine) as session:
+        episode = session.scalar(select(AudioFile)).episode
+        assert (episode.title, episode.sources["title"]) == ("Episode 7", "standin")
+
+
 def test_a_blank_episode_number_is_filled_in_but_a_typed_one_is_kept(client):
     import app.main as main
     make_wav(client.box / "Black Museum - 07 - A Can Of Weedkiller.wav", 1)

@@ -120,7 +120,7 @@ def test_the_feed_itself(client):
     items = channel.findall("item")
     # Oldest first, in air-date order (the undated one last); a serial show.
     assert channel.findtext(ITUNES + "type") == "serial"
-    assert [i.findtext("title") for i in items] == ["The Hitchhiker", "Sorry, Wrong Number", "c", "Donovan's Brain"]
+    assert [i.findtext("title") for i in items] == ["The Hitchhiker", "Sorry, Wrong Number", "Untitled Episode", "Donovan's Brain"]
     dates = [i.findtext("pubDate") for i in items]
     assert len(set(dates)) == 4      # a second apart, so apps keep the order
     # The real air date is only in the description; nothing is made up.

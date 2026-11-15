@@ -66,6 +66,7 @@ SCHEMA_VERSION = 23
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
 TAGS = "tags"   # read from the file's own tags
+STANDIN = "standin"   # a title the app made up because none is known (app/episodes.py)
 
 
 class Base(DeclarativeBase):
@@ -531,8 +532,9 @@ def make_engine(db_path: Path) -> Engine:
                 log.warning("Updating database to version %s; backup saved as %s",
                             SCHEMA_VERSION, backup)
 
-    from app import search   # here, to avoid a circular import
+    from app import episodes, search   # here, to avoid a circular import
     search.keep_index_up_to_date()
+    episodes.keep_titles_filled()
 
     Base.metadata.create_all(engine)   # creates any tables that don't exist yet
     with engine.begin() as conn:
