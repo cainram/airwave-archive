@@ -1282,3 +1282,8 @@ How it would work:
 - Multiple library folders, playlists / "collections", backups of the
   database, podcast RSS feed subscriptions. (Online episode logs: see
   "Look up episode details online" above.)
+- **A phone version that differs from the computer one** (owner's wish,
+  2026-11-15; not started, details to decide together): leave out
+  features nobody will use on a phone, the Inbox for example, so the
+  phone layout stays simple. Today the phone shows the same pages,
+  squeezed to fit.
