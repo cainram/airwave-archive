@@ -1,0 +1,8 @@
+{# A column heading that sorts the table when clicked (clicking the column
+   in use turns the order around). Needs `sorting` from read_sort in main.py. #}
+{% macro sort_th(label, key, sorting, class="") %}
+{% set on = sorting.by == key %}
+<th{% if class %} class="{{ class }}"{% endif %}{% if on %} aria-sort="{{ 'descending' if sorting.reverse else 'ascending' }}"{% endif %}>
+  <a class="sort{% if on %} is-on{% endif %}" href="{{ sorting.links[key] }}">{{ label }}{% if on %}<span aria-hidden="true"> {{ "▼" if sorting.reverse else "▲" }}</span>{% endif %}</a>
+</th>
+{% endmacro %}

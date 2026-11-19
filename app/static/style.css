@@ -112,6 +112,12 @@ code { font-size: 0.9em; color: var(--accent); }
 }
 .notice.warning { background: var(--warn-bg); border-color: var(--warn-line); }
 .notice.warning form { margin-top: 10px; }
+/* Inbox: one series name for every waiting file. */
+.series-warning p { margin: 0; }
+.series-all { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.series-all input { flex: 1 1 16rem; max-width: 28rem; }
+.series-all-fold { margin: 0 0 12px; }
+.series-all-fold summary { cursor: pointer; }
 .notice.error { background: var(--error-bg); border-color: var(--error-line); }
 .notice.success { background: var(--success-bg); border-color: var(--success-line); }
 
@@ -175,6 +181,10 @@ table.files { width: 100%; border-collapse: collapse; background: var(--panel); 
 .files .title:hover { text-decoration: underline; }
 .files .play { width: 1%; padding-right: 0; }
 .files .artist, .files .date { color: var(--muted); }
+/* Column headings that sort the table: the one in use is darker, with an arrow. */
+.files th a.sort { color: inherit; }
+.files th a.sort.is-on { color: var(--text); }
+.files td.added { white-space: nowrap; }
 
 /* Play buttons. The pause sign shows while that recording is playing. */
 .play-button {

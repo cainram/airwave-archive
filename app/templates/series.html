@@ -1,5 +1,6 @@
 {% extends layout %}
 {% from "_art.html" import picture %}
+{% from "_sort.html" import sort_th %}
 {% block title %}Series · Airwave Archive{% endblock %}
 {% block content %}
 <section class="summary">
@@ -61,11 +62,12 @@
     <thead>
       <tr>
         <th class="play"><span class="visually-hidden">Picture</span></th>
-        <th>Series</th>
+        {{ sort_th("Series", "series", sorting) }}
         <th class="num">Episodes</th>
         <th class="date">Years</th>
         <th class="num">Length</th>
         <th class="num size">Size</th>
+        {{ sort_th("Date added", "added", sorting, "date added") }}
       </tr>
     </thead>
     <tbody>
@@ -81,6 +83,7 @@
         <td class="date">{{ s.years }}</td>
         <td class="num">{{ s.seconds | duration }}</td>
         <td class="num size">{{ s.bytes | size }}</td>
+        <td class="date added">{{ s.added | added_date }}</td>
       </tr>
       {% endfor %}
     </tbody>

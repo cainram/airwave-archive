@@ -150,7 +150,12 @@ for large collections, copying files onto the server is faster).
    overwritten (duplicate names get a number added).
 2. **Review** — the inbox page shows each upload batch with what the app
    worked out from tags and filenames (series, date, title). You fix
-   anything that's wrong.
+   anything that's wrong. Usually one series is added at a time, so when
+   the waiting files' series names differ, a notice says so (with the
+   commonest names) and a **Series for all** box, filled in with the
+   commonest name, gives every waiting file that series at once. When
+   they already match, the same box is folded away under "Same series
+   for all…" (owner's request, 2026-11-19).
 3. **Add to library** — approved files are moved into the library, filed in
    a folder for their series (e.g. `library/Suspense/`).
 4. **Or reject** — rejected files are deleted from the inbox. The library is
@@ -174,7 +179,14 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
   computer, one line of as many as fit the window; on a phone, 10 in a
   line you swipe sideways. An empty row isn't shown.
 - **Series grid** (`/series`) — a wall of series with their artwork, like
-  album covers.
+  album covers. Its **List** view has a **Date added** column (when the
+  series' newest recording was added); clicking the **Series** or **Date
+  added** heading sorts by it, and clicking again turns it around. Every
+  visit starts in name order (owner's request, 2026-11-19).
+- **Library** (`/library`) — every file, series by series (each in
+  air-date order). Clicking the **Title / file**, **Series** or **Date
+  added** heading sorts by it (newest first for Date added); clicking
+  again turns it around (owner's request, 2026-11-19).
 - **Series page** — the episode list in **original air-date order**, with
   unknown dates grouped clearly.
 - **Episode detail page** — artwork, title, air date/time, station, host,

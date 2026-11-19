@@ -12,6 +12,8 @@
   {% if skipped %}{{ skipped }} {{ "wasn't an audio file" if skipped == 1 else "weren't audio files" }}, so
   {{ "it was" if skipped == 1 else "they were" }} left out.{% endif %}</div>
 {% endif %}
+{% if series_all %}<div class="notice success" role="status">All {{ series_all }} file{{ "" if series_all == 1 else "s" }}
+  waiting now {{ "has" if series_all == 1 else "have" }} the series “{{ series_name }}”.</div>{% endif %}
 {% if saved is not none %}<div class="notice success" role="status">Saved the details.</div>{% endif %}
 {% if added %}<div class="notice success" role="status">Added “{{ added.name }}” to your library,
   in the folder <strong>{{ added.folder or "(top of the library)" }}</strong>.
@@ -100,10 +102,35 @@
 {% endif %}
 <p class="muted small">Dates are written like 1939-04-14, 1939-04 (day unknown), or 1939 (only the year).</p>
 <form id="inbox-form" method="post" action="/inbox">
+  {# Pressing Enter in a box below saves the details (the first button in a
+     form is the one Enter presses), never "Use for all". #}
+  <button class="visually-hidden" type="submit" tabindex="-1" aria-hidden="true">Save details</button>
+  {% set mixed = series_names | length > 1 %}
+  {% macro series_for_all() %}
+  <div class="series-all">
+    <label for="series-all">Series for all</label>
+    <input id="series-all" name="series_all" type="text" value="{{ series_guess }}" data-enter-clicks="#series-all-use">
+    <button id="series-all-use" class="button" type="submit" formaction="/inbox/series-all">Use for all {{ rows | length }}</button>
+  </div>
+  {% endmacro %}
+  {% if mixed %}
+  <div class="notice warning series-warning" role="status">
+    <p>These files don't all have the same series name ({{ series_names | length }} different names). Usually one
+      series is added at a time, so some may need fixing:
+      {% for name, n in series_names[:3] %}{{ "“" ~ name ~ "”" if name else "no series" }} ({{ n }}){{ ", " if not loop.last }}{% endfor %}{% if series_names | length > 3 %}, and {{ series_names | length - 3 }} more{% endif %}.</p>
+    {{ series_for_all() }}
+  </div>
+  {% endif %}
   <div class="form-buttons">
     <button class="button primary" type="submit">Save details</button>
     {% if addable %}<button class="button primary" type="submit" formaction="/inbox/add-all">{{ "Add all " ~ addable if addable > 1 else "Add it" if rows | length == 1 else "Add the 1 new one" }} to library</button>{% endif %}
   </div>
+  {% if not mixed and rows | length > 1 %}
+  <details class="series-all-fold">
+    <summary class="muted small">Same series for all…</summary>
+    {{ series_for_all() }}
+  </details>
+  {% endif %}
   {% for row in rows %}
   {% set item = row.item %}
   {% set g = row.group %}
