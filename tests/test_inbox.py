@@ -378,3 +378,50 @@ def test_adding_everything_at_once(client):
     assert episode_of("c.wav")[4] == (1943, None, None)
     page = client.get(sent.headers["location"]).text
     assert "Added 3 files to your library" in page and "<strong>Unsorted</strong>" in page
+
+
+def fields(item, **values) -> dict:
+    """The boxes the inbox page sends for one file."""
+    return {f"{key}-{item.id}": values.get(key, "") for key in ("series", "episode_number", "date", "title")}
+
+
+def test_mixed_series_names_are_pointed_out_and_fixed_at_once(client):
+    for name in ("a.wav", "b.wav", "c.wav", "d.wav"):
+        make_wav(client.box / name, 1)
+    client.get("/inbox")
+    found = items(client)
+    names = {"a.wav": "Suspense", "b.wav": "Suspense", "c.wav": "Suspense 1943-05-13", "d.wav": ""}
+    client.post("/inbox", data={k: v for name, series in names.items()
+                                for k, v in fields(found[name], series=series, title=name).items()})
+    page = client.get("/inbox").text
+    assert "don't all have the same series name (3 different names)" in page
+    assert "“Suspense” (2), “Suspense 1943-05-13” (1), no series (1)" in page
+    assert 'name="series_all" type="text" value="Suspense"' in page     # the commonest, ready to use
+
+    # What's typed in the boxes is saved too; then every file gets the name.
+    data = {k: v for name in names for k, v in fields(found[name], series="x", title="T " + name).items()}
+    sent = client.post("/inbox/series-all", data={**data, "series_all": "  The   Shadow "},
+                       follow_redirects=False)
+    assert sent.status_code == 303
+    after = items(client)
+    assert {i.series for i in after.values()} == {"The Shadow"}
+    assert after["c.wav"].title == "T c.wav"
+    page = " ".join(client.get(sent.headers["location"]).text.split())
+    assert "All 4 files waiting now have the series “The Shadow”." in page
+    assert "different names" not in page
+    assert "Same series for all…" in page          # still there, folded away
+    assert list(client.lib.iterdir()) == []        # the library is untouched
+
+
+def test_series_for_all_needs_a_name(client):
+    make_wav(client.box / "a.wav", 1)
+    make_wav(client.box / "b.wav", 1)
+    client.get("/inbox")
+    sent = client.post("/inbox/series-all", data={"series_all": "  "})
+    assert sent.status_code == 400 and "Type the series name" in sent.text
+
+
+def test_one_file_or_matching_names_say_nothing(client):
+    make_wav(client.box / "a.wav", 1)
+    page = client.get("/inbox").text
+    assert "different names" not in page and "Same series for all" not in page

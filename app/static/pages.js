@@ -42,6 +42,16 @@
     if (set) set.checked = true;
   });
 
+  // Pressing Enter in a box with data-enter-clicks presses that button
+  // (instead of the form's first button).
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" || !event.target.matches || !event.target.matches("[data-enter-clicks]")) return;
+    const button = document.querySelector(event.target.getAttribute("data-enter-clicks"));
+    if (!button) return;
+    event.preventDefault();
+    button.click();
+  });
+
   // Uploads: show how far along a (possibly big) upload is.
   document.addEventListener("htmx:xhr:progress", function (event) {
     const form = event.target.closest && event.target.closest("[data-upload-progress]");

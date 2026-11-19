@@ -356,3 +356,48 @@ def test_home_page_rows_by_genre(client):
     client.post(escape, data={})
     assert genre_rows(client.get("/").text) == [
         ("/genre?name=Comedy", "Comedy", ["Abbott and Costello"])]
+
+
+def set_added(client, when: dict[str, datetime]) -> None:
+    """Pretend these files were first seen at these times."""
+    import app.main as main
+    with Session(main._engine) as session:
+        for f in session.scalars(select(AudioFile)):
+            f.first_seen = when.get(f.name, datetime(2020, 1, 1))
+        session.commit()
+
+
+def test_series_list_sorts_by_date_added(client):
+    set_added(client, {"rebecca.wav": datetime(2026, 11, 19, 12), "abbott.wav": datetime(2025, 3, 2, 12),
+                       "ep2.wav": datetime(2026, 1, 5, 12)})
+    names = lambda page: re.findall(r'<a class="title" href="[^"]*">([^<]+)</a>', page)
+    page = client.get("/series?view=list").text
+    assert names(page)[0] == "Abbott and Costello"         # every visit starts in name order
+    assert 'href="/series?view=list&amp;sort=added"' in page
+    assert 'href="/series?view=list&amp;dir=desc"' in page  # clicking "Series" again: Z to A
+    assert "Nov 19, 2026" in page                          # the newest recording's day
+    newest = names(client.get("/series?view=list&sort=added").text)
+    assert newest == ["The Campbell Playhouse", "Escape &amp; Suspense / Mixed", "Abbott and Costello",
+                      "No series yet"]
+    oldest = client.get("/series?view=list&sort=added&dir=asc").text
+    assert names(oldest)[:3] == ["Abbott and Costello", "Escape &amp; Suspense / Mixed",
+                                 "The Campbell Playhouse"]
+    assert names(client.get("/series?view=list&dir=desc").text)[:3] == [
+        "Escape &amp; Suspense / Mixed", "The Campbell Playhouse", "Abbott and Costello"]
+    assert names(client.get("/series?view=list&sort=nonsense").text)[0] == "Abbott and Costello"
+
+
+def test_library_sorts_by_series_title_and_date_added(client):
+    set_added(client, {"ep10.wav": datetime(2026, 11, 19, 12), "patriot.wav": datetime(2026, 11, 18, 12)})
+    page = client.get("/library").text
+    # Series by series ("The" ignored), each in air-date order; no series last.
+    assert titles_in_order(page) == ["Who&#39;s on First", "Rebecca", "The Patriot", "Private Lives",
+                                     "Some day in 1939", "No date at all", "Two", "Ten", "Untitled Episode"]
+    assert 'aria-sort="ascending"' in page and 'href="/library?sort=added"' in page
+    by_title = titles_in_order(client.get("/library?sort=title").text)
+    assert by_title[:4] == ["No date at all", "The Patriot", "Private Lives", "Rebecca"]
+    newest = client.get("/library?sort=added").text
+    assert titles_in_order(newest)[:2] == ["Ten", "The Patriot"]
+    assert "Nov 19, 2026" in newest
+    # The tick-box menu comes back to the same order.
+    assert 'name="back" value="/library?sort=added&amp;page=1"' in newest

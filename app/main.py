@@ -11,8 +11,9 @@ import json
 import logging
 import os
 import threading
+from collections import Counter
 from urllib.parse import quote, urlencode
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path, PurePath
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -39,7 +40,7 @@ from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
-    all_series, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
+    LIBRARY_SORTS, SERIES_SORTS, all_series, library_order, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
     recently_added_by_genre,
     series_files, set_uploaded_picture,
 )
@@ -79,6 +80,15 @@ def time_ago(when: datetime | None) -> str:
             n = seconds // size
             return f"{n} {unit}{'' if n == 1 else 's'} ago"
     return "just now"
+
+
+def added_date(when: datetime | None) -> str:
+    """A UTC time -> the day it was in the server's time zone, short and
+    the American way: 'Nov 19, 2026'."""
+    if when is None:
+        return ""
+    day = when.replace(tzinfo=timezone.utc).astimezone()
+    return f"{day:%b} {day.day}, {day.year}"
 
 
 # Plain names for tag codes. MP3 tags use short codes ("TIT2" = title);
@@ -141,6 +151,7 @@ templates.env.filters["size"] = format_size
 templates.env.filters["duration"] = format_duration
 templates.env.filters["bitrate"] = format_bitrate
 templates.env.filters["ago"] = time_ago
+templates.env.filters["added_date"] = added_date
 templates.env.filters["tag_label"] = tag_label
 templates.env.filters["air_date"] = format_air_date
 
@@ -366,9 +377,32 @@ def last_scan_or_scan() -> ScanRun:
     return last_scan or run_scan()
 
 
+def read_sort(path: str, sorts: dict[str, bool], sort: str, direction: str) -> dict:
+    """The order a table is in, from the address (?sort=added&dir=asc), and
+    the links of its column headings. The first of `sorts` is the default
+    (every fresh visit starts there); each sort starts in its own direction
+    (sorts[name]: True = Z to A, or newest first), and clicking the column
+    in use turns it around."""
+    by = sort if sort in sorts else next(iter(sorts))
+    reverse = {"asc": False, "desc": True}.get(direction, sorts[by])
+
+    def link(name: str) -> str:
+        flip = not reverse if name == by else sorts[name]
+        query = [*([("sort", name)] if name != next(iter(sorts)) else []),
+                 *([("dir", "desc" if flip else "asc")] if flip != sorts[name] else [])]
+        return path + (("&" if "?" in path else "?") + urlencode(query) if query else "")
+
+    query = urlencode([*([("sort", by)] if by != next(iter(sorts)) else []),
+                       *([("dir", "desc" if reverse else "asc")] if reverse != sorts[by] else [])])
+    return {"by": by, "reverse": reverse, "links": {name: link(name) for name in sorts},
+            "query": query}
+
+
 @app.get("/library", response_class=HTMLResponse)
-def library_page(request: Request, page: int = 1):
-    """Every file, in folder order."""
+def library_page(request: Request, page: int = 1, sort: str = "", dir: str = ""):
+    """Every file, series by series (or by title, or newest added first)."""
+    sorting = read_sort("/library", LIBRARY_SORTS, sort, dir)
+    here = "/library" + ("?" + sorting["query"] if sorting["query"] else "")
     engine = get_engine()
     last_scan = last_scan_or_scan()
 
@@ -387,12 +421,13 @@ def library_page(request: Request, page: int = 1):
         page = min(max(1, page), pages)
         files = session.scalars(
             select(AudioFile)
+            .outerjoin(Episode, AudioFile.episode_id == Episode.id)
             .where(FIRST_PARTS)
             .options(WITH_PARTS)
-            .order_by(AudioFile.folder, AudioFile.name)
+            .order_by(*library_order(sorting["by"], sorting["reverse"]))
             .offset((page - 1) * PAGE_SIZE)
             .limit(PAGE_SIZE)
-        ).all()
+        ).unique().all()
         new_groups = grouping.unseen(session)
         convert_info = library_convert_info(session)
 
@@ -402,7 +437,8 @@ def library_page(request: Request, page: int = 1):
         **convert_info,
         "count": count,
         "rows": rows,
-        "pager_url": "/library?page=",
+        "sorting": sorting,
+        "pager_url": here + ("&" if "?" in here else "?") + "page=",
         "missing": missing,
         "total_bytes": total_bytes or 0,
         "total_seconds": total_seconds or 0,
@@ -596,17 +632,20 @@ def home(request: Request):
 
 
 @app.get("/series", response_class=HTMLResponse)
-def series_list(request: Request, view: str = "tiles"):
-    """All series, as picture tiles or (view=list) as a table."""
+def series_list(request: Request, view: str = "tiles", sort: str = "", dir: str = ""):
+    """All series, as picture tiles or (view=list) as a table, which can be
+    sorted by name or by when each series last had a recording added."""
     last_scan_or_scan()
+    view = "list" if view == "list" else "tiles"
+    sorting = read_sort("/series?view=list", SERIES_SORTS, sort if view == "list" else "", dir)
     with Session(get_engine()) as session:
-        found = all_series(session)
+        found = all_series(session, sorting["by"], sorting["reverse"])
         genre_list = genres.with_counts(session)
         new_groups = grouping.unseen(session)
         convert_info = library_convert_info(session)
         session.expunge_all()
     return render(request, "series.html",
-                  {"series": found, "view": "list" if view == "list" else "tiles",
+                  {"series": found, "view": view, "sorting": sorting,
                    "genre_list": genre_list,
                    "new_groups": new_groups, **convert_info})
 
@@ -739,8 +778,14 @@ def render_inbox(request: Request, typed=None, errors=None, problems=(), **notic
                          "convert": convert.needs_converting(item.name),
                          "plan": convert.Plan.from_json(item.convert_json)})
         session.expunge_all()
+    names = Counter(" ".join(row["vals"]["series"].split()) for row in rows)
+    shared = [(name, n) for name, n in names.most_common() if name and n > 1]
     return render(request, "inbox.html", {
         "rows": rows, "fields": INBOX_FIELDS, "errors": errors or {},
+        # Series names: when they differ, the page says so (one series is
+        # usually added at a time) and offers the commonest for all.
+        "series_names": names.most_common(), "series_guess": shared[0][0] if shared else (
+            next(iter(names), "") if len(names) == 1 else ""),
         "duplicates": sum(1 for row in rows if row["have"]),
         "converting": sum(1 for row in rows if row["convert"] and not row["have"]),
         "busy": [row["item"] for row in rows if row["item"].convert_status in converting.BUSY],
@@ -757,7 +802,8 @@ def inbox_page(request: Request, uploaded: int | None = None, skipped: int | Non
                added: int | None = None, added_all: int | None = None,
                skipped_have: int | None = None, unpacked: int | None = None,
                with_details: int | None = None, folder: list[str] = Query(default=[]),
-               not_grouped: int | None = None, grouped: int | None = None):
+               not_grouped: int | None = None, grouped: int | None = None,
+               series_all: int | None = None, series_name: str = ""):
     added_file = None
     if added is not None:
         with Session(get_engine()) as session:
@@ -767,7 +813,7 @@ def inbox_page(request: Request, uploaded: int | None = None, skipped: int | Non
                         rejected=rejected, added=added_file, added_all=added_all,
                         skipped_have=skipped_have, unpacked=unpacked,
                         with_details=with_details, folders=folder, not_grouped=not_grouped,
-                        grouped=grouped)
+                        grouped=grouped, series_all=series_all, series_name=series_name)
 
 
 @app.post("/inbox/upload", response_class=HTMLResponse)
@@ -867,6 +913,25 @@ async def inbox_save(request: Request):
     if errors:
         return render_inbox(request, typed, errors)
     return go_to(request, f"/inbox?saved={saved}")
+
+
+@app.post("/inbox/series-all", response_class=HTMLResponse)
+async def inbox_series_all(request: Request):
+    """Save what was typed, then give every waiting file the same series
+    (the inbox's details only; nothing is written into the files)."""
+    form = await read_request_form(request)
+    typed, errors, _saved = save_inbox_details(form)
+    if errors:
+        return render_inbox(request, typed, errors)
+    name = " ".join(str(form.get("series_all", "")).split())
+    if not name:
+        return render_inbox(request, problems=["Type the series name to use for all the files."])
+    with Session(get_engine()) as session:
+        items = session.scalars(select(InboxItem)).all()
+        for item in items:
+            item.series = name
+        session.commit()
+    return go_to(request, "/inbox?" + urlencode([("series_all", len(items)), ("series_name", name)]))
 
 
 @app.post("/inbox/add-all", response_class=HTMLResponse)

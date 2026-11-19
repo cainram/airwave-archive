@@ -1,4 +1,5 @@
 {% extends layout %}
+{% from "_sort.html" import sort_th %}
 {% block content %}
 {% include "_done_notice.html" %}
 <nav class="back"><a class="button" href="/series">← Series</a></nav>
@@ -58,7 +59,7 @@
   {% endif %}
 {% else %}
   {% if pages > 1 %}{% include "_pager.html" %}{% endif %}
-  {% set back = "/library?page=" ~ page %}
+  {% set back = pager_url ~ page %}
   {% include "_pick_toolbar.html" %}
   <div class="table-wrap">
     <table class="files">
@@ -66,11 +67,12 @@
         <tr>
           <th class="pick"><input type="checkbox" form="pick" data-select-all aria-label="Tick all on this page"></th>
           <th class="play"><span class="visually-hidden">Play</span></th>
-          <th>Title / file</th>
-          <th class="artist">Series</th>
+          {{ sort_th("Title / file", "title", sorting) }}
+          {{ sort_th("Series", "series", sorting, "artist") }}
           <th class="date">Aired</th>
           <th class="num">Length</th>
           <th class="num size">Size</th>
+          {{ sort_th("Date added", "added", sorting, "date added") }}
         </tr>
       </thead>
       <tbody>
@@ -91,6 +93,7 @@
           <td class="date">{{ (ep | air_date(short=true)) or f.tag_date or "" }}</td>
           <td class="num">{{ (ep.length if parts | length > 1 else f.duration_seconds) | duration }}</td>
           <td class="num size">{{ parts | sum(attribute="size_bytes") | size }}</td>
+          <td class="date added">{{ f.first_seen | added_date }}</td>
         </tr>
         {% endfor %}
       </tbody>

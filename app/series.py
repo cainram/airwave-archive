@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import Integer, cast, func, select
+from sqlalchemy import Integer, case, cast, desc, func, select
 from sqlalchemy.orm import Session
 
 from app import genres
@@ -28,6 +28,15 @@ LEADING_ARTICLE = re.compile(r"^(?:the|a|an)\s+", re.I)
 
 def sort_key(name: str) -> list:
     return natural_key(LEADING_ARTICLE.sub("", name.strip()))
+
+
+def sql_sort_key(column):
+    """sort_key for the database: lower case, without "The", "A" or "An"
+    at the start (numbers sort as text here)."""
+    low = func.lower(func.trim(column))
+    return case((low.like("the %"), func.trim(func.substr(low, 5))),
+                (low.like("an %"), func.trim(func.substr(low, 4))),
+                (low.like("a %"), func.trim(func.substr(low, 3))), else_=low)
 
 
 def years_text(first: int | None, last: int | None) -> str:
@@ -52,12 +61,13 @@ def _totals(session: Session, where=None) -> list[dict]:
         .join(AudioFile, AudioFile.episode_id == Episode.id)
         .group_by(Episode.series)
     )
+    query = query.add_columns(func.max(AudioFile.first_seen))
     if where is not None:
         query = query.where(where)
     return [
         {"name": name, "episodes": episodes, "seconds": seconds or 0, "bytes": size or 0,
-         "years": years_text(first, last)}
-        for name, episodes, seconds, size, first, last in session.execute(query)
+         "years": years_text(first, last), "added": added}
+        for name, episodes, seconds, size, first, last, added in session.execute(query)
     ]
 
 
@@ -102,14 +112,22 @@ def _add_art(session: Session, found: list[dict], where=None) -> None:
             ((where, art) for where, art in choices if art), (None, None))
 
 
-def all_series(session: Session) -> list[dict]:
-    """Every series with its totals (episodes, seconds, bytes, years) and
-    picture, in name order. Episodes without a series come last, under the
-    name None."""
+# The Series list's orders: sort -> whether it starts newest / Z first.
+SERIES_SORTS = {"series": False, "added": True}
+
+
+def all_series(session: Session, sort: str = "series", reverse: bool = False) -> list[dict]:
+    """Every series with its totals (episodes, seconds, bytes, years,
+    "added": when its newest recording was added) and picture, in name
+    order, or (sort="added") by when added; reverse: Z to A, or newest
+    first. Episodes without a series come last, under the name None."""
     found = _totals(session)
     _add_art(session, found)
     genres.add_genres(session, found)
-    return sorted(found, key=lambda s: (s["name"] is None, sort_key(s["name"] or "")))
+    found.sort(key=lambda s: sort_key(s["name"] or ""), reverse=reverse and sort != "added")
+    if sort == "added":   # (a stable sort: ties stay in name order)
+        found.sort(key=lambda s: s["added"], reverse=reverse)
+    return sorted(found, key=lambda s: s["name"] is None)
 
 
 def one_series(session: Session, name: str | None) -> dict | None:
@@ -245,6 +263,26 @@ AIR_ORDER = (Episode.air_year.is_(None), Episode.air_year,
              Episode.episode_number.is_(None),
              cast(Episode.episode_number, Integer), Episode.episode_number,
              Episode.title)
+
+
+# The Library page's orders: sort -> (columns, newest / Z first by default).
+# The series order is the series' episodes in air-date order, series by
+# series; files with no episode use their artist tag.
+_LIBRARY_SERIES = func.coalesce(Episode.series, func.nullif(AudioFile.tag_artist, ""))
+_LIBRARY_TITLE = func.coalesce(func.nullif(Episode.title, ""), func.nullif(AudioFile.tag_title, ""),
+                               AudioFile.name)
+LIBRARY_SORTS = {"series": False, "title": False, "added": True}
+
+
+def library_order(sort: str, reverse: bool) -> list:
+    """The order_by columns for the Library page (see LIBRARY_SORTS)."""
+    turn = desc if reverse else (lambda column: column)
+    if sort == "title":
+        return [turn(sql_sort_key(_LIBRARY_TITLE)), AudioFile.name]
+    if sort == "added":
+        return [turn(AudioFile.first_seen), AudioFile.folder, AudioFile.name]
+    return [_LIBRARY_SERIES.is_(None), turn(sql_sort_key(_LIBRARY_SERIES)), _LIBRARY_SERIES,
+            *AIR_ORDER, AudioFile.folder, AudioFile.name]
 
 
 def series_files(session: Session, name: str | None, page: int, page_size: int):
