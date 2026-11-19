@@ -6,10 +6,21 @@
 <p class="muted">A few sentences about the series, shown on its page under its genres.
   New podcast feeds of the series start with it as their description.</p>
 
+{% if error %}<div class="notice error" role="alert">Nothing was saved yet: {{ error }}</div>{% endif %}
 <form class="upload-form" method="post" action="/series/about?name={{ name | urlencode }}">
-  <label for="about">About this series</label>
-  <textarea id="about" name="about" rows="6" maxlength="{{ max_about }}">{{ text }}</textarea>
-  <p class="muted small">Up to {{ max_about }} characters. Leave it empty to take it off.</p>
+  <div class="label-row">
+    <label for="about">About this series</label>
+    {# Opened by the browser, in a new tab: the app itself never contacts Wikipedia. #}
+    <a class="button" href="{{ search }}" target="_blank" rel="noopener noreferrer">Search Wikipedia <span aria-hidden="true">↗</span></a>
+  </div>
+  <textarea id="about" name="about" rows="8" maxlength="{{ max_about * 2 }}">{{ text }}</textarea>
+  <p class="muted small">Up to {{ max_about }} characters. Text pasted from Wikipedia keeps its paragraphs,
+    and its footnote marks (like [1]) are taken out when you save. Leave it empty to take it off.</p>
+  <label for="source">Source <span class="muted small">(optional)</span></label>
+  <input id="source" name="source" type="text" inputmode="url" value="{{ source }}"
+         placeholder="https://en.wikipedia.org/wiki/…"{% if error %} aria-invalid="true"{% endif %}>
+  <p class="muted small">The web address the text came from, shown as a small credit under it.
+    Wikipedia asks to be credited when its words are used.</p>
   <div class="form-buttons">
     <button class="button primary" type="submit">Save</button>
     <a class="button" href="{{ name | series_url }}">Cancel</a>

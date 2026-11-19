@@ -170,7 +170,7 @@ def test_a_failure_leaves_the_file_as_it_was(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def broken(path, episode, part=None, parts=1, genres=None, standin=True, about=None):
+    def broken(path, episode, part=None, parts=1, genres=None, standin=True, **more):
         path.write_bytes(b"half written")
         raise OSError(28, "No space left on device")
     monkeypatch.setattr(tagwriting, "write_tags", broken)
@@ -185,7 +185,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def shortened(copy, episode, part=None, parts=1, genres=None, standin=True, about=None):
+    def shortened(copy, episode, part=None, parts=1, genres=None, standin=True, **more):
         copy.write_bytes(copy.read_bytes()[:417 * 3])     # much shorter: something went wrong
         return True
     monkeypatch.setattr(tagwriting, "write_tags", shortened)
@@ -196,7 +196,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
 def test_a_file_changed_meanwhile_isnt_replaced(client, monkeypatch):
     path = client.lib / SUSPENSE
 
-    def meddling(copy, episode, part=None, parts=1, genres=None, standin=True, about=None):
+    def meddling(copy, episode, part=None, parts=1, genres=None, standin=True, **more):
         tagging.write_tags(copy, episode, part, parts)
         make_mp3(path, frames=401)                        # edited outside the app
         return True

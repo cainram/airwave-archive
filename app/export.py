@@ -30,7 +30,7 @@ from app.db import STANDIN, Episode
 from app.filenames import date_text
 from app.genres import genres_of
 from app.inbox import folder_name
-from app.series import about_of, one_series
+from app.series import about_row, one_series
 from app.tagging import write_tags
 
 FORMAT = "airwave-archive-export"
@@ -69,7 +69,7 @@ class Plan:
     pictures: dict[str, Path]      # series name -> picture file
     missing: int                   # files that couldn't be included (missing)
     genres: dict[str, list[str]] = field(default_factory=dict)   # series name -> its genres
-    about: dict[str, str] = field(default_factory=dict)          # series name -> its "About" text
+    about: dict[str, tuple[str, str | None]] = field(default_factory=dict)   # series -> ("About", source)
 
     @property
     def size(self) -> int:
@@ -109,7 +109,7 @@ def make_plan(session: Session, episodes: list[Episode], library: Path,
             if art is not None:
                 pictures[episode.series] = art
     names = sorted({e.series for e in episodes if e.series})
-    about = {name: text for name in names if (text := about_of(session, name))}
+    about = {name: (row.text, row.source) for name in names if (row := about_row(session, name))}
     return Plan(items, episodes, pictures, missing, genres_of(session, names), about)
 
 
@@ -154,7 +154,9 @@ def manifest(plan: Plan, picture_names: dict[str, str]) -> dict:
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "episodes": episodes,
         "series": [{"name": name, "picture": picture_names.get(name),
-                    "genres": plan.genres.get(name, []), "about": plan.about.get(name)}
+                    "genres": plan.genres.get(name, []),
+                    "about": plan.about.get(name, (None, None))[0],
+                    "about_source": plan.about.get(name, (None, None))[1]}
                    for name in sorted(set(picture_names) | set(plan.genres) | set(plan.about))],
     }
 
@@ -191,10 +193,11 @@ def stream_zip(plan: Plan, work_dir: Path) -> Iterator[bytes]:
             for item in plan.items:
                 copy = temporary.with_suffix(item.source.suffix.lower())
                 shutil.copyfile(item.source, copy)
+                about, source = plan.about.get(item.episode.series, (None, None))
                 try:
                     write_tags(copy, item.episode, item.part, item.parts,
                                plan.genres.get(item.episode.series),
-                               about=plan.about.get(item.episode.series))
+                               about=about, about_source=source)
                 except Exception:
                     shutil.copyfile(item.source, copy)   # untagged: the manifest has it all
                 info = zipfile.ZipInfo.from_file(copy, item.path)

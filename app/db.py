@@ -61,7 +61,7 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -242,12 +242,13 @@ class SeriesGenre(Base):
 class SeriesAbout(Base):
     """A few sentences about a series ("About this series"), written by
     the owner. Kept under the series name, like its genres; renaming the
-    series moves it too. (Version 24.)"""
+    series moves it too. (Version 24; the source, version 25.)"""
 
     __tablename__ = "series_about"
 
     series: Mapped[str] = mapped_column(primary_key=True)
     text: Mapped[str]
+    source: Mapped[str | None]     # where the text came from: a web address
     updated_at: Mapped[datetime]   # UTC
 
 
@@ -511,6 +512,9 @@ def _migrate(conn) -> None:
     # Version 21: converting library files.
     if "convert_json" not in _columns(conn, "audio_files"):
         conn.exec_driver_sql("ALTER TABLE audio_files ADD COLUMN convert_json VARCHAR")
+    # Version 25: where a series' "About" text came from.
+    if "source" not in _columns(conn, "series_about"):
+        conn.exec_driver_sql("ALTER TABLE series_about ADD COLUMN source VARCHAR")
     # Version 20: converting inbox files.
     inbox_columns = _columns(conn, "inbox_items")
     for column, kind in (("convert_status", "VARCHAR"), ("convert_progress", "FLOAT"),

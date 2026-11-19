@@ -54,7 +54,7 @@ AIRWAVE_LABELS = {
     "TITLE": "Title", "AIR_DATE": "Air date", "AIR_TIME": "Air time",
     "TIME_ZONE": "Time zone", "NETWORK": "Station / network", "HOST": "Host",
     "CAST": "Cast", "NOTES": "Notes", "PART": "Part", "GENRES": "Genres",
-    "SERIES_ABOUT": "About the series",
+    "SERIES_ABOUT": "About the series", "SERIES_ABOUT_SOURCE": "About: source",
 }
 NEW_ID = "(a new permanent ID)"
 
@@ -108,10 +108,10 @@ def plan_file(f: AudioFile, episode: Episode, library: Path) -> FilePlan:
         plan.problem = "This kind of file can't hold tags."
         return plan
     part, parts = part_of(f, episode)
-    genres, about = of_episode(episode), about_of_episode(episode)
+    genres, (about, source) = of_episode(episode), about_of_episode(episode)
     common = common_values(episode, part, parts, genres, standin=False)   # never a stand-in title
     wanted = {key[len(PREFIX):]: value
-              for key, value in airwave_values(episode, part, parts, genres, about).items()}
+              for key, value in airwave_values(episode, part, parts, genres, about, source).items()}
     if not common and not set(wanted) - {"ID"}:
         plan.no_details = True       # (just an ID would be no use to anyone)
         return plan
@@ -139,7 +139,7 @@ def write_file(f: AudioFile, episode: Episode, library: Path) -> None:
     Raises TagError, leaving the file as it was, if that can't be done."""
     path = path_of(f, library)
     part, parts = part_of(f, episode)
-    genres, about = of_episode(episode), about_of_episode(episode)
+    genres, (about, source) = of_episode(episode), about_of_episode(episode)
     with LIBRARY_LOCK:
         try:
             before = path.stat()
@@ -151,7 +151,7 @@ def write_file(f: AudioFile, episode: Episode, library: Path) -> None:
             try:
                 shutil.copy2(path, temporary)
                 written = write_tags(temporary, episode, part, parts, genres, standin=False,
-                                     about=about)
+                                     about=about, about_source=source)
             except OSError as error:
                 raise TagError(f"The tags couldn't be written ({error.strerror or error}).") from None
             except Exception:

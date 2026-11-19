@@ -114,6 +114,8 @@ code { font-size: 0.9em; color: var(--accent); }
 .notice.warning form { margin-top: 10px; }
 /* A series' "About" text, under its genres: line breaks kept, a comfortable width. */
 .upload-form textarea { resize: vertical; font: inherit; line-height: 1.5; }
+.series-about-source { margin: 4px 0 0; }
+.label-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .series-about { white-space: pre-line; max-width: 42rem; margin: 10px 0 0; line-height: 1.5; }
 /* Inbox: one series name for every waiting file. */
 .series-warning p { margin: 0; }

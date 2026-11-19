@@ -233,53 +233,97 @@ def set_uploaded_picture(session: Session, name: str, art_hash: str | None) -> N
     row.art_hash, row.uploaded_at = art_hash, utcnow()
 
 
-# "About this series": a few sentences, plain text (line breaks kept).
+# "About this series": a few sentences, plain text (line breaks kept),
+# and where they came from (a web address, shown as a small credit).
 MAX_ABOUT = 1000   # characters
+MAX_SOURCE = 500   # characters in the source's address
+
+# Wikipedia's footnote marks, pasted along with its text: [1], [12], [a],
+# [note 3], [nb 1], [citation needed], [clarification needed]...
+FOOTNOTE = re.compile(r"\[(?:\d{1,3}|[a-z]|(?:note|nb|n) ?\d{1,3}|[a-z ]{0,30}needed)\]", re.I)
 
 
 def tidy_about(text: str) -> str:
-    """Typed "About" text: spaces at the ends of lines and extra blank
-    lines taken out, Windows line ends made plain."""
-    lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    """Typed "About" text: footnote marks pasted from Wikipedia ([1])
+    taken out, then spaces at the ends of lines and extra blank lines,
+    and Windows line ends made plain."""
+    text = FOOTNOTE.sub("", text.replace("\r\n", "\n").replace("\r", "\n"))
+    lines = [re.sub(r"[ \t]{2,}", " ", line).rstrip() for line in text.split("\n")]
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def read_source(text: str) -> tuple[str | None, str | None]:
+    """A typed source address -> (address or None, what's wrong with it)."""
+    text = (text or "").strip()
+    if not text:
+        return None, None
+    if not re.match(r"^https?://[^\s/]+\.[^\s]+$", text) or len(text) > MAX_SOURCE:
+        return None, "Type the web address the text came from, starting with https://."
+    return text, None
+
+
+def source_name(address: str) -> str:
+    """How a source is credited: "Wikipedia", or the site's name
+    ("otrr.org")."""
+    host = re.sub(r"^https?://", "", address).split("/")[0].split(":")[0].lower()
+    host = host.removeprefix("www.")
+    return "Wikipedia" if host == "wikipedia.org" or host.endswith(".wikipedia.org") else host
+
+
+def wikipedia_search(name: str) -> str:
+    """The address of Wikipedia's search results for a series' name plus
+    "radio" (opened by the owner's browser; the app never contacts
+    Wikipedia itself)."""
+    from urllib.parse import urlencode
+    return "https://en.wikipedia.org/w/index.php?" + urlencode(
+        {"search": f"{name} radio", "fulltext": "1"})
+
+
+def about_row(session: Session, name: str | None) -> SeriesAbout | None:
+    """A series' "About" text and its source (None if it has none)."""
+    return session.get(SeriesAbout, name) if name else None
 
 
 def about_of(session: Session, name: str | None) -> str | None:
     """A series' "About" text, or None."""
-    row = session.get(SeriesAbout, name) if name else None
+    row = about_row(session, name)
     return row.text if row else None
 
 
-def set_about(session: Session, name: str, text: str) -> None:
-    """Save a series' "About" text (empty: take it off)."""
+def set_about(session: Session, name: str, text: str, source: str | None = None) -> None:
+    """Save a series' "About" text and its source (no text: take both
+    off). ``source`` should be checked first (read_source)."""
     text = tidy_about(text)[:MAX_ABOUT].strip()
+    source = (source or "").strip()[:MAX_SOURCE] or None
     row = session.get(SeriesAbout, name)
     if not text:
         if row is not None:
             session.delete(row)
     elif row is None:
-        session.add(SeriesAbout(series=name, text=text, updated_at=utcnow()))
-    elif row.text != text:
-        row.text, row.updated_at = text, utcnow()
+        session.add(SeriesAbout(series=name, text=text, source=source, updated_at=utcnow()))
+    elif (row.text, row.source) != (text, source):
+        row.text, row.source, row.updated_at = text, source, utcnow()
 
 
-def about_of_episode(episode: Episode) -> str | None:
-    """The "About" text of an episode's series, for writing into its
-    files' tags. The episode must still be in an open session."""
+def about_of_episode(episode: Episode) -> tuple[str | None, str | None]:
+    """The "About" text of an episode's series and its source, for writing
+    into its files' tags. The episode must still be in an open session."""
     session = object_session(episode)
     if session is None:
         raise ValueError("The episode isn't in an open session")
-    return about_of(session, episode.series)
+    row = about_row(session, episode.series)
+    return (row.text, row.source) if row else (None, None)
 
 
-def use_imported_about(session: Session, name: str | None, text: str | None) -> None:
-    """Give a series the "About" text that came with an imported file, but
-    only if it has none of its own yet."""
+def use_imported_about(session: Session, name: str | None, text: str | None,
+                       source: str | None = None) -> None:
+    """Give a series the "About" text (and source) that came with an
+    imported file, but only if it has none of its own yet."""
     if not name or not text or not isinstance(text, str):
         return
     session.flush()
     if session.get(SeriesAbout, name) is None:
-        set_about(session, name, text)
+        set_about(session, name, text, read_source(source)[0] if isinstance(source, str) else None)
 
 
 def follow_rename(session: Session, old: str | None, new: str | None) -> None:
@@ -298,7 +342,8 @@ def follow_rename(session: Session, old: str | None, new: str | None) -> None:
     about = session.get(SeriesAbout, old)
     if about is not None:
         if session.get(SeriesAbout, new) is None:
-            session.add(SeriesAbout(series=new, text=about.text, updated_at=about.updated_at))
+            session.add(SeriesAbout(series=new, text=about.text, source=about.source,
+                                    updated_at=about.updated_at))
         session.delete(about)
     picture = session.get(SeriesArt, old)
     if picture is None or session.get(SeriesArt, new) is not None:
