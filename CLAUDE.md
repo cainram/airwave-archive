@@ -6,9 +6,10 @@ tells you (Claude) how to work on this project and with its owner.
 ## About the project
 
 Airwave Archive is a self-hosted web app for managing a personal collection of
-downloaded radio programs (old-time radio, podcasts). The full plan lives in
-[`docs/PLAN.md`](docs/PLAN.md). **Read it before starting any work**, and keep
-it up to date if a decision changes.
+recorded radio broadcasts (old-time radio, talk radio and the like; not
+podcasts, though the app makes podcast feeds of its recordings). The full
+plan lives in [`docs/PLAN.md`](docs/PLAN.md). **Read it before starting any
+work**, and keep it up to date if a decision changes.
 
 ## Guiding principle: a personal project
 

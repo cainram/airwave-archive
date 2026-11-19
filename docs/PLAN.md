@@ -3,8 +3,13 @@
 ## 1. Purpose
 
 Airwave Archive is a **self-hosted, homelab-first web app** for managing a
-personal collection of downloaded radio programs — old-time radio shows,
-podcasts, and similar recordings.
+personal collection of recorded **radio broadcasts**: old-time radio, talk
+radio, and anything else that went out over the air.
+
+It isn't for archiving podcasts (owner's choice, 2026-11-19; a separate
+version for podcasts may come later, as a fork). That's different from the
+app's own **podcast feeds** (Phase 12), which let podcast apps play your
+radio recordings: those are a key feature.
 
 Think of it as a music library (like Plex or iTunes), but built around the
 information that matters for radio:
@@ -1365,6 +1370,6 @@ improvements starts from those.
 
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
-  database, podcast RSS feed subscriptions. (Online episode logs: see
+  database. (Online episode logs: see
   "Look up episode details online" above.)
 
