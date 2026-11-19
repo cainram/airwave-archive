@@ -268,8 +268,8 @@ opposed to the sound itself. The app gets it from several sources:
 When the app writes information into files (tag write-back, section 5 item 5,
 or exports, section 5a), it uses a documented set of **custom tags** for the
 radio-specific fields: air date (including partial dates), air time, time
-zone, station/network, series, episode number, host, cast, notes, and a
-stable episode ID. Each audio format stores custom tags its own way (MP3: ID3
+zone, station/network, series, episode number, host, cast, notes, a
+stable episode ID, and the series' genres and "About" text. Each audio format stores custom tags its own way (MP3: ID3
 "TXXX" frames; FLAC/OGG: Vorbis comments; M4A: freeform atoms), but the field
 names are the same everywhere. Another Airwave Archive server can then read
 them back exactly.
@@ -1264,6 +1264,25 @@ keeps the genres of both.
   pictures). "Write details into the files" (Phase 10a) writes them too
   (owner's choice), so they show in its preview. A series without
   genres leaves the file's own genre tag alone.
+
+### About this series (owner's request, 2026-11-19) ✅ *done*
+Each series can have a few sentences about it, written by the owner
+(called **About**, owner's choice: "synopsis" in radio logs usually means
+one episode's plot). Kept under the series name (`series_about` table,
+database version 24), like genres: renaming a series moves it; joining two
+keeps the one renamed into.
+- **Edit about…** in a series' ☰ Actions: one text box, plain text with
+  line breaks kept, up to 1,000 characters; empty takes it off.
+- Shown on the series' page **under its genre labels**, on phones too
+  (editing is computer-only). A series without one shows nothing.
+- A new **podcast feed** of a series (or of ticked episodes all from one
+  series) starts with it as the feed's description (still changeable).
+- Its own Airwave tag, **`AIRWAVE_SERIES_ABOUT`** (no usual tag fits: the
+  comment holds each episode's notes): written into export copies and by
+  Write details into files, and listed in the export's manifest
+  (`series[].about`). Importing an export (or a lone tagged copy) shows it
+  in the inbox and gives it to the series only if it has none yet.
+- Not searched (owner's choice, for now).
 
 ### Air times not shown (owner's choice, 2026-11-15)
 The dates matter; the time of day doesn't, so pages show **dates only**:

@@ -112,6 +112,9 @@ code { font-size: 0.9em; color: var(--accent); }
 }
 .notice.warning { background: var(--warn-bg); border-color: var(--warn-line); }
 .notice.warning form { margin-top: 10px; }
+/* A series' "About" text, under its genres: line breaks kept, a comfortable width. */
+.upload-form textarea { resize: vertical; font: inherit; line-height: 1.5; }
+.series-about { white-space: pre-line; max-width: 42rem; margin: 10px 0 0; line-height: 1.5; }
 /* Inbox: one series name for every waiting file. */
 .series-warning p { margin: 0; }
 .series-all { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
@@ -511,7 +514,7 @@ mark { background: var(--mark); color: var(--text); border-radius: 2px; padding:
 .import-unmatched li { margin: 4px 0; }
 @media (pointer: coarse) { .import-columns select { min-height: 44px; } }
 .example-download { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 12px 0 16px; }
-.upload-form input[type="text"] {
+.upload-form input[type="text"], .upload-form textarea {
   font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--panel); color: var(--text); width: 100%;
 }

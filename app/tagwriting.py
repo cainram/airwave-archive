@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.db import AudioFile, Episode
 from app.genres import of_episode
+from app.series import about_of_episode
 from app.scanner import LIBRARY_LOCK, _apply, read_audio
 from app.tagging import PREFIX, airwave_values, common_values, read_airwave_tags, write_tags
 
@@ -53,6 +54,7 @@ AIRWAVE_LABELS = {
     "TITLE": "Title", "AIR_DATE": "Air date", "AIR_TIME": "Air time",
     "TIME_ZONE": "Time zone", "NETWORK": "Station / network", "HOST": "Host",
     "CAST": "Cast", "NOTES": "Notes", "PART": "Part", "GENRES": "Genres",
+    "SERIES_ABOUT": "About the series",
 }
 NEW_ID = "(a new permanent ID)"
 
@@ -106,10 +108,10 @@ def plan_file(f: AudioFile, episode: Episode, library: Path) -> FilePlan:
         plan.problem = "This kind of file can't hold tags."
         return plan
     part, parts = part_of(f, episode)
-    genres = of_episode(episode)
+    genres, about = of_episode(episode), about_of_episode(episode)
     common = common_values(episode, part, parts, genres, standin=False)   # never a stand-in title
     wanted = {key[len(PREFIX):]: value
-              for key, value in airwave_values(episode, part, parts, genres).items()}
+              for key, value in airwave_values(episode, part, parts, genres, about).items()}
     if not common and not set(wanted) - {"ID"}:
         plan.no_details = True       # (just an ID would be no use to anyone)
         return plan
@@ -137,7 +139,7 @@ def write_file(f: AudioFile, episode: Episode, library: Path) -> None:
     Raises TagError, leaving the file as it was, if that can't be done."""
     path = path_of(f, library)
     part, parts = part_of(f, episode)
-    genres = of_episode(episode)
+    genres, about = of_episode(episode), about_of_episode(episode)
     with LIBRARY_LOCK:
         try:
             before = path.stat()
@@ -148,7 +150,8 @@ def write_file(f: AudioFile, episode: Episode, library: Path) -> None:
         try:
             try:
                 shutil.copy2(path, temporary)
-                written = write_tags(temporary, episode, part, parts, genres, standin=False)
+                written = write_tags(temporary, episode, part, parts, genres, standin=False,
+                                     about=about)
             except OSError as error:
                 raise TagError(f"The tags couldn't be written ({error.strerror or error}).") from None
             except Exception:

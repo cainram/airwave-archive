@@ -158,8 +158,9 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/parts.py`: episodes made of several files ("Hour 1", "Hour 2"):
   grouping, splitting, numbering the parts
 - `app/series.py`: the series list (with totals and pictures), one
-  series' episodes in air-date order, and the home page's rows of series
-  (recently added, most played)
+  series' episodes in air-date order, the home page's rows of series
+  (recently added, most played), the Library's sort orders, and each
+  series' "About" text
 - `app/genres.py`: genres for each series (the owner's free list):
   saving a series' genres, the genres in use (with how many series
   have each), a genre's series, and moving them when a series is

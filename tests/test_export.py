@@ -153,11 +153,25 @@ def test_exports_carry_the_series_genres(client):
     client.post("/series/genres?name=Suspense", data={"new_genres": "Thriller, Mystery"})
     zf = unzip(client.get("/export/download?whole_series=Suspense"))
     found = json.loads(zf.read("manifest.json"))
-    assert found["series"] == [{"name": "Suspense", "picture": None, "genres": ["Mystery", "Thriller"]}]
+    assert found["series"] == [{"name": "Suspense", "picture": None, "genres": ["Mystery", "Thriller"],
+                                "about": None}]
     copy = client.lib.parent / "copy.mp3"
     copy.write_bytes(zf.read("Suspense/Suspense 1942-10-08.mp3"))
     assert read_audio(copy).tags["genre"] == "Mystery; Thriller"
     assert "genre" not in read_audio(client.lib / "otr" / "Suspense 1942-10-08.mp3").tags
+
+
+def test_exports_carry_the_series_about(client):
+    from app.tagging import read_airwave_tags
+    client.post("/series/about?name=Suspense", data={"about": "Radio's outstanding theater.\nOn CBS."})
+    zf = unzip(client.get("/export/download?whole_series=Suspense"))
+    found = json.loads(zf.read("manifest.json"))
+    assert found["series"] == [{"name": "Suspense", "picture": None, "genres": [],
+                                "about": "Radio's outstanding theater.\nOn CBS."}]
+    copy = client.lib.parent / "copy.mp3"
+    copy.write_bytes(zf.read("Suspense/Suspense 1942-10-08.mp3"))
+    assert read_airwave_tags(copy)["SERIES_ABOUT"] == "Radio's outstanding theater.\nOn CBS."
+    assert "SERIES_ABOUT" not in read_airwave_tags(client.lib / "otr" / "Suspense 1942-10-08.mp3")
 
 
 def test_exporting_ticked_episodes_with_parts(client):
