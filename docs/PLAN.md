@@ -320,9 +320,10 @@ Airwave Archive is light. Recommended starting point (e.g. a Proxmox VM):
 
 - **OS:** Ubuntu Server LTS (26.04 or 24.04).
 - **CPU / RAM:** 2 cores, 4 GB RAM (2 GB minimum).
-- **Boot disk:** 32 GB — operating system, Docker, and the app.
-- **Recordings disk:** a second disk mounted at `/srv/airwave`, sized for
-  your collection plus room to grow (500 GB is a reasonable start).
+- **Disk:** about 32 GB for the operating system, Docker, and the app,
+  plus room for your collection to grow. The app's folders live in
+  `/srv/airwave`. (A separate disk for the recordings is fine too, but
+  the guide doesn't cover it: owner's choice, 2026-11-19.)
 - **Docker:** installed from Docker's own package repository, not the Ubuntu
   "snap" version (which restricts which folders containers can see).
 
