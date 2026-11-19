@@ -90,19 +90,20 @@ def _recordings(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
 
 
 def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str],
-                                                dict[str, list[str]]]:
+                                                dict[str, list[str]], dict[str, str]]:
     """What an Airwave export's manifest says: details by file path in the
-    zip (named like Airwave tags), picture paths by series, and genres by
-    series. Empty if there's no manifest, or it isn't one."""
+    zip (named like Airwave tags), picture paths by series, genres by
+    series, and "About" texts by series. Empty if there's no manifest, or
+    it isn't one."""
     try:
         info = zf.getinfo(MANIFEST)
         if info.file_size > MAX_MANIFEST_BYTES:
-            return {}, {}, {}
+            return {}, {}, {}, {}
         data = json.loads(zf.read(info))
     except (KeyError, ValueError, zipfile.BadZipFile, OSError):
-        return {}, {}, {}
+        return {}, {}, {}, {}
     if not isinstance(data, dict) or data.get("format") != FORMAT:
-        return {}, {}, {}
+        return {}, {}, {}, {}
     details: dict[str, dict] = {}
     for episode in data.get("episodes") or []:
         if not isinstance(episode, dict):
@@ -121,7 +122,8 @@ def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str],
               if isinstance(s, dict) and isinstance(s.get("name"), str)]
     pictures = {s["name"]: s["picture"] for s in series if isinstance(s.get("picture"), str)}
     genres = {s["name"]: found for s in series if (found := read_list(s.get("genres")))}
-    return details, pictures, genres
+    about = {s["name"]: s["about"] for s in series if isinstance(s.get("about"), str) and s["about"].strip()}
+    return details, pictures, genres, about
 
 
 def _save_pictures(zf: zipfile.ZipFile, pictures: dict[str, str],
@@ -163,7 +165,7 @@ def unpack(session: Session, zip_path: Path, inbox_folder: Path,
             raise ZipProblem(
                 f"There isn't enough free space to unpack “{zip_path.name}”: its recordings "
                 f"need {format_size(needed)}, and the disk has {format_size(free)} free.")
-        details, pictures, genres = read_manifest(zf)
+        details, pictures, genres, about = read_manifest(zf)
         picture_hashes = _save_pictures(zf, pictures, picture_dir)
         done = with_details = 0
         for member in members:
@@ -187,6 +189,8 @@ def unpack(session: Session, zip_path: Path, inbox_folder: Path,
                     found["extra"]["picture"] = picture_hashes[series]
                 if series in genres:
                     found["extra"]["genres"] = genres[series]
+                if series in about:
+                    found["extra"]["about"] = about[series]
             if found.get("extra"):
                 with_details += 1
             # (The inbox page may have noticed the file already.)

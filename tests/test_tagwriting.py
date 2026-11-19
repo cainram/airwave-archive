@@ -114,6 +114,18 @@ def test_writing_the_tags(client):
     assert "Already up to date: nothing to write." in page and "There's nothing to write." in page
 
 
+def test_the_series_about_is_written_too(client):
+    client.post("/series/about?name=Suspense", data={"about": "Radio's outstanding theater."})
+    ep = episode_of("Suspense 1943-05-13.mp3")
+    page = client.get(f"/tags/write?ids={ep.id}").text
+    assert "<td>About the series</td>" in page
+    write(client, "Suspense 1943-05-13.mp3")
+    assert read_airwave_tags(client.lib / SUSPENSE)["SERIES_ABOUT"] == "Radio's outstanding theater."
+    assert "Already up to date" in client.get(f"/tags/write?ids={ep.id}").text
+    client.post("/series/about?name=Suspense", data={"about": "Changed."})
+    assert "Already up to date" not in client.get(f"/tags/write?ids={ep.id}").text
+
+
 def test_the_series_genres_are_written_too(client):
     client.post("/series/genres?name=Suspense", data={"new_genres": "Thriller, Mystery"})
     ep = episode_of("Suspense 1943-05-13.mp3")
@@ -158,7 +170,7 @@ def test_a_failure_leaves_the_file_as_it_was(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def broken(path, episode, part=None, parts=1, genres=None, standin=True):
+    def broken(path, episode, part=None, parts=1, genres=None, standin=True, about=None):
         path.write_bytes(b"half written")
         raise OSError(28, "No space left on device")
     monkeypatch.setattr(tagwriting, "write_tags", broken)
@@ -173,7 +185,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
     path = client.lib / SUSPENSE
     before = path.read_bytes()
 
-    def shortened(copy, episode, part=None, parts=1, genres=None, standin=True):
+    def shortened(copy, episode, part=None, parts=1, genres=None, standin=True, about=None):
         copy.write_bytes(copy.read_bytes()[:417 * 3])     # much shorter: something went wrong
         return True
     monkeypatch.setattr(tagwriting, "write_tags", shortened)
@@ -184,7 +196,7 @@ def test_a_copy_that_doesnt_read_back_isnt_used(client, monkeypatch):
 def test_a_file_changed_meanwhile_isnt_replaced(client, monkeypatch):
     path = client.lib / SUSPENSE
 
-    def meddling(copy, episode, part=None, parts=1, genres=None, standin=True):
+    def meddling(copy, episode, part=None, parts=1, genres=None, standin=True, about=None):
         tagging.write_tags(copy, episode, part, parts)
         make_mp3(path, frames=401)                        # edited outside the app
         return True

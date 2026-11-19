@@ -401,3 +401,44 @@ def test_library_sorts_by_series_title_and_date_added(client):
     assert "Nov 19, 2026" in newest
     # The tick-box menu comes back to the same order.
     assert 'name="back" value="/library?sort=added&amp;page=1"' in newest
+
+
+CAMPBELL_PAGE = "/series/episodes?name=The%20Campbell%20Playhouse"
+
+
+def test_a_series_has_an_about_text(client):
+    assert "series-about" not in client.get(CAMPBELL_PAGE).text            # none to start with
+    assert "Edit about…" in client.get(CAMPBELL_PAGE).text
+    form = client.get("/series/about?name=The%20Campbell%20Playhouse")
+    assert form.status_code == 200 and "About this series" in form.text
+    client.post("/series/about?name=The%20Campbell%20Playhouse",
+                data={"about": "  Orson Welles' radio plays.   \r\n\r\n\r\n\r\nSponsored by Campbell's.  "})
+    page = client.get(CAMPBELL_PAGE).text
+    assert "<p class=\"series-about\">Orson Welles&#39; radio plays.\n\nSponsored by Campbell&#39;s.</p>" in page
+    # On a phone it's shown too (but not the Edit button).
+    phone = client.get(CAMPBELL_PAGE, headers={"User-Agent": "iPhone Mobile"}).text
+    assert "Orson Welles" in phone and "Edit about…" not in phone
+    # Too long is cut; empty takes it off.
+    client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "x" * 5000})
+    assert "x" * 1000 + "</p>" in client.get(CAMPBELL_PAGE).text
+    client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "  "})
+    assert "series-about" not in client.get(CAMPBELL_PAGE).text
+    assert client.get("/series/about?name=Nobody").status_code == 404
+
+
+def test_about_follows_a_renamed_series(client):
+    client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "Welles."})
+    client.post("/series/rename?name=The%20Campbell%20Playhouse", data={"new_name": "Campbell Playhouse"})
+    assert "Welles." in client.get("/series/episodes?name=Campbell%20Playhouse").text
+    # Joining two series: the one renamed into keeps its own text.
+    client.post("/series/about?name=Abbott%20and%20Costello", data={"about": "Comedy."})
+    client.post("/series/rename?name=Campbell%20Playhouse", data={"new_name": "Abbott and Costello"})
+    page = client.get("/series/episodes?name=Abbott%20and%20Costello").text
+    assert "Comedy." in page and "Welles." not in page
+
+
+def test_a_new_feed_starts_with_the_series_about(client):
+    client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "Welles & co."})
+    form = client.get("/feeds/new?series=The%20Campbell%20Playhouse").text
+    assert ">Welles &amp; co.</textarea>" in form
+    assert "></textarea>" in client.get("/feeds/new?series=Abbott%20and%20Costello").text

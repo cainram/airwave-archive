@@ -61,7 +61,7 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -237,6 +237,18 @@ class SeriesGenre(Base):
 
     series: Mapped[str] = mapped_column(primary_key=True)
     genre: Mapped[str] = mapped_column(primary_key=True, index=True)
+
+
+class SeriesAbout(Base):
+    """A few sentences about a series ("About this series"), written by
+    the owner. Kept under the series name, like its genres; renaming the
+    series moves it too. (Version 24.)"""
+
+    __tablename__ = "series_about"
+
+    series: Mapped[str] = mapped_column(primary_key=True)
+    text: Mapped[str]
+    updated_at: Mapped[datetime]   # UTC
 
 
 class Listening(Base):

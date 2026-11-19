@@ -40,7 +40,7 @@ from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
-    LIBRARY_SORTS, SERIES_SORTS, all_series, library_order, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
+    LIBRARY_SORTS, MAX_ABOUT, SERIES_SORTS, about_of, all_series, library_order, set_about, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
     recently_added_by_genre,
     series_files, set_uploaded_picture,
 )
@@ -270,6 +270,7 @@ MANAGING_PAGES = {
     "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
     "organize.html", "organized.html", "organize_history.html", "renaming.html",
     "library_convert.html", "rename.html", "series_picture.html", "series_genres.html",
+    "series_about.html",
     "parts.html", "feed_form.html", "feed_picture.html", "feed_new_link.html",
     "feed_delete.html", "feed_add.html",
 }
@@ -734,8 +735,9 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         pages = max(1, -(-totals["episodes"] // PAGE_SIZE))   # round up
         page = min(max(1, page), pages)
         files, rows = series_files(session, name, page, PAGE_SIZE)
+        about = about_of(session, name)
     return render(request, "series_page.html", {
-        "name": name, "totals": totals, "files": files, "rows": rows,
+        "name": name, "totals": totals, "files": files, "rows": rows, "about": about,
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
     })
@@ -1827,6 +1829,26 @@ async def save_series_genres(request: Request, name: str = ""):
     return go_to(request, series_url(name))
 
 
+@app.get("/series/about", response_class=HTMLResponse)
+def series_about_page(request: Request, name: str = ""):
+    """Write a few sentences about a series."""
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+        text = about_of(session, name) or ""
+    return render(request, "series_about.html",
+                  {"name": name, "text": text, "max_about": MAX_ABOUT})
+
+
+@app.post("/series/about")
+async def save_series_about(request: Request, name: str = ""):
+    form = await read_request_form(request)
+    with Session(get_engine()) as session:
+        series_or_404(session, name)
+        set_about(session, name, str(form.get("about", "")))
+        session.commit()
+    return go_to(request, series_url(name))
+
+
 # ------------------------------------------------------- parts (several files)
 
 
@@ -2127,8 +2149,11 @@ def new_feed(request: Request, series: str = "", ids: list[int] = Query(default=
         raise HTTPException(status_code=404, detail="No such series")
     names = {e.series for e in picked}
     title = series or (names.pop() if len(names) == 1 and None not in names else "")
+    # A series' "About" text is the description to start with.
+    with Session(get_engine()) as session:
+        description = about_of(session, title) or ""
     return render_new_feed(request, series, totals, picked, back,
-                           {"title": title or "", "description": "", "author": "",
+                           {"title": title or "", "description": description, "author": "",
                             "order": "oldest"}, {})
 
 

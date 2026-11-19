@@ -47,7 +47,7 @@ from app.episodes import (
 from app.filenames import clean_series, clean_title_and_number, date_text, marked_number, parse_filename
 from app.parts import set_parts
 from app.scanner import AUDIO_EXTENSIONS, add_one_file, read_audio
-from app.series import one_series, set_uploaded_picture
+from app.series import MAX_ABOUT, one_series, set_uploaded_picture, use_imported_about
 from app.tagging import read_airwave_tags
 
 UNSAFE = re.compile(r'[\x00-\x1f/\\:*?"<>|]')
@@ -138,6 +138,7 @@ def airwave_details(values: dict) -> tuple[dict, dict]:
     if part and 1 <= int(part[1]) <= int(part[2]) and int(part[2]) > 1:
         extra["part"], extra["parts"] = int(part[1]), int(part[2])
     extra["genres"] = genres.read_list(values.get("GENRES"))
+    extra["about"] = _text(values.get("SERIES_ABOUT"), MAX_ABOUT)
     return main, {key: value for key, value in extra.items() if value}
 
 
@@ -385,6 +386,7 @@ def add_to_library(session: Session, inbox_folder: Path, library: Path,
         episode.updated_at = utcnow()
     _use_picture(session, episode.series, extra.get("picture"))
     genres.use_imported(session, episode.series, extra.get("genres"))
+    use_imported_about(session, episode.series, extra.get("about"))
     session.delete(item)
     return row
 

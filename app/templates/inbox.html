@@ -176,6 +176,7 @@
       {% if x.cast %}<span>Cast: {{ x.cast | truncate(120) }}</span>{% endif %}
       {% if x.notes %}<span>Notes: {{ x.notes | truncate(160) }}</span>{% endif %}
       {% if x.genres %}<span>Genres: {{ x.genres | join(", ") }}</span>{% endif %}
+      {% if x.about %}<span>About the series: {{ x.about | truncate(160) }}</span>{% endif %}
       {% if x.picture %}<span>Series picture</span>{% endif %}
     </p>
     {% endif %}

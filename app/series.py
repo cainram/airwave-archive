@@ -11,12 +11,13 @@ from __future__ import annotations
 import re
 
 from sqlalchemy import Integer, case, cast, desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app import genres
 from app.artwork import folder_art
 from app.db import (
-    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, Feed, FolderArt, Listening, SeriesArt, SeriesGenre,
+    FIRST_PARTS, WITH_PARTS, AudioFile, Episode, Feed, FolderArt, Listening, SeriesAbout, SeriesArt,
+    SeriesGenre,
     natural_key, utcnow,
 )
 from app.listening import STARTED
@@ -232,11 +233,60 @@ def set_uploaded_picture(session: Session, name: str, art_hash: str | None) -> N
     row.art_hash, row.uploaded_at = art_hash, utcnow()
 
 
+# "About this series": a few sentences, plain text (line breaks kept).
+MAX_ABOUT = 1000   # characters
+
+
+def tidy_about(text: str) -> str:
+    """Typed "About" text: spaces at the ends of lines and extra blank
+    lines taken out, Windows line ends made plain."""
+    lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def about_of(session: Session, name: str | None) -> str | None:
+    """A series' "About" text, or None."""
+    row = session.get(SeriesAbout, name) if name else None
+    return row.text if row else None
+
+
+def set_about(session: Session, name: str, text: str) -> None:
+    """Save a series' "About" text (empty: take it off)."""
+    text = tidy_about(text)[:MAX_ABOUT].strip()
+    row = session.get(SeriesAbout, name)
+    if not text:
+        if row is not None:
+            session.delete(row)
+    elif row is None:
+        session.add(SeriesAbout(series=name, text=text, updated_at=utcnow()))
+    elif row.text != text:
+        row.text, row.updated_at = text, utcnow()
+
+
+def about_of_episode(episode: Episode) -> str | None:
+    """The "About" text of an episode's series, for writing into its
+    files' tags. The episode must still be in an open session."""
+    session = object_session(episode)
+    if session is None:
+        raise ValueError("The episode isn't in an open session")
+    return about_of(session, episode.series)
+
+
+def use_imported_about(session: Session, name: str | None, text: str | None) -> None:
+    """Give a series the "About" text that came with an imported file, but
+    only if it has none of its own yet."""
+    if not name or not text or not isinstance(text, str):
+        return
+    session.flush()
+    if session.get(SeriesAbout, name) is None:
+        set_about(session, name, text)
+
+
 def follow_rename(session: Session, old: str | None, new: str | None) -> None:
     """After an episode's series name changed: if no episode is left with
     the old name, the series' feeds and genres follow it to the new name,
-    and its uploaded picture moves too (unless the new name has one of its
-    own)."""
+    and its uploaded picture and "About" text move too (unless the new
+    name has its own)."""
     if not old or not new or old == new:
         return
     session.flush()
@@ -245,6 +295,11 @@ def follow_rename(session: Session, old: str | None, new: str | None) -> None:
     for feed in session.scalars(select(Feed).where(Feed.series == old)):
         feed.series = new
     genres.follow_rename(session, old, new)
+    about = session.get(SeriesAbout, old)
+    if about is not None:
+        if session.get(SeriesAbout, new) is None:
+            session.add(SeriesAbout(series=new, text=about.text, updated_at=about.updated_at))
+        session.delete(about)
     picture = session.get(SeriesArt, old)
     if picture is None or session.get(SeriesArt, new) is not None:
         return

@@ -1,0 +1,18 @@
+{% extends layout %}
+{% block title %}About {{ name }} · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="{{ name | series_url }}">← Back to {{ name }}</a></nav>
+<h1>About {{ name }}</h1>
+<p class="muted">A few sentences about the series, shown on its page under its genres.
+  New podcast feeds of the series start with it as their description.</p>
+
+<form class="upload-form" method="post" action="/series/about?name={{ name | urlencode }}">
+  <label for="about">About this series</label>
+  <textarea id="about" name="about" rows="6" maxlength="{{ max_about }}">{{ text }}</textarea>
+  <p class="muted small">Up to {{ max_about }} characters. Leave it empty to take it off.</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save</button>
+    <a class="button" href="{{ name | series_url }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
