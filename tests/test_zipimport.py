@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db import AudioFile, Episode, InboxItem, SeriesArt, SeriesGenre, make_engine
 from app.genres import genres_of
-from app.series import about_of, set_about
+from app.series import about_of, about_row, set_about
 from app.inbox import airwave_details
 from test_export import make_mp3
 from test_scanner import make_wav
@@ -65,7 +65,8 @@ def exported(tmp_path, monkeypatch) -> bytes:
     sender.post(f"/files/{ids[0]}/parts", data={"part": [str(i) for i in ids]})
     sender.post("/series/picture?name=Suspense", files={"picture": ("cover.png", png(), "image/png")})
     sender.post("/series/genres?name=Suspense", data={"new_genres": "Thriller, Mystery"})
-    sender.post("/series/about?name=Suspense", data={"about": "Tales well calculated."})
+    sender.post("/series/about?name=Suspense", data={"about": "Tales well calculated.",
+                                                     "source": "https://en.wikipedia.org/wiki/Suspense"})
     with Session(sender.engine) as session:
         episode_ids = [str(e.id) for e in session.scalars(select(Episode))]
     data = sender.get("/export/download", params={"ids": episode_ids}).content
@@ -128,6 +129,7 @@ def test_an_export_arrives_filled_in(tmp_path, monkeypatch, exported):
         assert session.get(SeriesArt, "Coast to Coast AM") is None
         assert genres_of(session) == {"Suspense": ["Mystery", "Thriller"]}   # the genres came too
         assert about_of(session, "Suspense") == "Tales well calculated."     # and the About text
+        assert about_row(session, "Suspense").source == "https://en.wikipedia.org/wiki/Suspense"
         assert about_of(session, "Coast to Coast AM") is None
 
 
@@ -258,3 +260,4 @@ def test_a_tagged_copy_on_its_own_brings_its_details(tmp_path, monkeypatch, expo
     assert item.extra["network"] == "CBS" and len(item.extra["uid"]) == 32
     assert item.extra["genres"] == ["Mystery", "Thriller"]          # from its Airwave tag
     assert item.extra["about"] == "Tales well calculated."
+    assert item.extra["about_source"] == "https://en.wikipedia.org/wiki/Suspense"

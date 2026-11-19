@@ -1273,8 +1273,11 @@ database version 24), like genres: renaming a series moves it; joining two
 keeps the one renamed into.
 - **Edit about…** in a series' ☰ Actions: one text box, plain text with
   line breaks kept, up to 1,000 characters; empty takes it off.
-- Shown on the series' page **under its genre labels**, on phones too
-  (editing is computer-only). A series without one shows nothing.
+- Shown on the series' page **under its genre labels**, folded (owner's
+  choice): on a computer, two lines with **more** / **less** (only when
+  it's longer than that; the source credit shows once it's opened); on a
+  phone, just an **About this series** button that opens it. Editing is
+  computer-only. A series without one shows nothing.
 - A new **podcast feed** of a series (or of ticked episodes all from one
   series) starts with it as the feed's description (still changeable).
 - Its own Airwave tag, **`AIRWAVE_SERIES_ABOUT`** (no usual tag fits: the
@@ -1283,6 +1286,19 @@ keeps the one renamed into.
   (`series[].about`). Importing an export (or a lone tagged copy) shows it
   in the inbox and gives it to the series only if it has none yet.
 - Not searched (owner's choice, for now).
+- **From Wikipedia** (owner's request, 2026-11-19): the edit page has a
+  **Search Wikipedia ↗** button, opening Wikipedia's search results for
+  the series' name plus "radio" (`…/w/index.php?search=…+radio&fulltext=1`)
+  in a new tab, to copy a description from. The browser opens it; the app
+  itself never contacts Wikipedia (and sends no address of its own along).
+  Footnote marks pasted with the text (`[1]`, `[a]`, `[note 3]`,
+  `[citation needed]`) are taken out on save. An optional **Source** box
+  takes the web address the text came from (database version 25,
+  `series_about.source`); the series page shows it as a small "Source:
+  Wikipedia" credit (another site: its name, like "otrr.org"), opening in a
+  new tab. Wikipedia asks to be credited when its words are used, so the
+  source travels with the text: `AIRWAVE_SERIES_ABOUT_SOURCE` and the
+  manifest's `series[].about_source`.
 
 ### Air times not shown (owner's choice, 2026-11-15)
 The dates matter; the time of day doesn't, so pages show **dates only**:

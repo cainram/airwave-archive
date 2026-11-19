@@ -40,9 +40,10 @@ from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
 from app.artwork import HASH_PATTERN, MAX_PICTURE_BYTES, art_path, save_picture
 from app.series import (
-    LIBRARY_SORTS, MAX_ABOUT, SERIES_SORTS, about_of, all_series, library_order, set_about, episode_art, follow_rename, in_genre, most_played, one_series, recently_added,
-    recently_added_by_genre,
-    series_files, set_uploaded_picture,
+    LIBRARY_SORTS, MAX_ABOUT, SERIES_SORTS, about_of, about_row, all_series, episode_art,
+    follow_rename, in_genre, library_order, most_played, one_series, read_source,
+    recently_added, recently_added_by_genre, series_files, set_about, set_uploaded_picture,
+    source_name, wikipedia_search,
 )
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
@@ -735,9 +736,11 @@ def series_page(request: Request, name: str | None = None, page: int = 1):
         pages = max(1, -(-totals["episodes"] // PAGE_SIZE))   # round up
         page = min(max(1, page), pages)
         files, rows = series_files(session, name, page, PAGE_SIZE)
-        about = about_of(session, name)
+        about = about_row(session, name)
+        session.expunge_all()
     return render(request, "series_page.html", {
         "name": name, "totals": totals, "files": files, "rows": rows, "about": about,
+        "about_credit": source_name(about.source) if about and about.source else None,
         "page": page, "pages": pages, "first_index": (page - 1) * PAGE_SIZE + 1,
         "pager_url": series_url(name) + ("&" if name else "?") + "page=",
     })
@@ -1829,22 +1832,35 @@ async def save_series_genres(request: Request, name: str = ""):
     return go_to(request, series_url(name))
 
 
+def render_about_form(request: Request, name: str, text: str, source: str,
+                      error: str | None = None):
+    return render(request, "series_about.html", {
+        "name": name, "text": text, "source": source, "error": error,
+        "max_about": MAX_ABOUT, "search": wikipedia_search(name),
+    }, status_code=400 if error else 200)
+
+
 @app.get("/series/about", response_class=HTMLResponse)
 def series_about_page(request: Request, name: str = ""):
-    """Write a few sentences about a series."""
+    """Write a few sentences about a series (or paste them from Wikipedia),
+    and where they came from."""
     with Session(get_engine()) as session:
         series_or_404(session, name)
-        text = about_of(session, name) or ""
-    return render(request, "series_about.html",
-                  {"name": name, "text": text, "max_about": MAX_ABOUT})
+        row = about_row(session, name)
+        text, source = (row.text, row.source or "") if row else ("", "")
+    return render_about_form(request, name, text, source)
 
 
-@app.post("/series/about")
+@app.post("/series/about", response_class=HTMLResponse)
 async def save_series_about(request: Request, name: str = ""):
     form = await read_request_form(request)
+    text, typed_source = str(form.get("about", "")), str(form.get("source", ""))
+    source, error = read_source(typed_source)
     with Session(get_engine()) as session:
         series_or_404(session, name)
-        set_about(session, name, str(form.get("about", "")))
+        if error:
+            return render_about_form(request, name, text, typed_source, error)
+        set_about(session, name, text, source)
         session.commit()
     return go_to(request, series_url(name))
 

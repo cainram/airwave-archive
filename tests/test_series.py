@@ -418,6 +418,9 @@ def test_a_series_has_an_about_text(client):
     # On a phone it's shown too (but not the Edit button).
     phone = client.get(CAMPBELL_PAGE, headers={"User-Agent": "iPhone Mobile"}).text
     assert "Orson Welles" in phone and "Edit about…" not in phone
+    # Folded: on a phone behind a button, on a computer to two lines with "more".
+    assert '<summary class="button">About this series</summary>' in phone and "data-about" not in phone
+    assert "data-about" in page and 'class="more-button"' in page and "About this series</summary>" not in page
     # Too long is cut; empty takes it off.
     client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "x" * 5000})
     assert "x" * 1000 + "</p>" in client.get(CAMPBELL_PAGE).text
@@ -442,3 +445,32 @@ def test_a_new_feed_starts_with_the_series_about(client):
     form = client.get("/feeds/new?series=The%20Campbell%20Playhouse").text
     assert ">Welles &amp; co.</textarea>" in form
     assert "></textarea>" in client.get("/feeds/new?series=Abbott%20and%20Costello").text
+
+
+def test_wikipedia_text_and_its_source(client):
+    form = client.get("/series/about?name=The%20Campbell%20Playhouse").text
+    # The search opens in a new tab, in the browser: the app never contacts Wikipedia.
+    assert ('href="https://en.wikipedia.org/w/index.php?search=The+Campbell+Playhouse+radio&amp;fulltext=1" '
+            'target="_blank" rel="noopener noreferrer">Search Wikipedia') in form
+    pasted = ("The Campbell Playhouse was an American radio drama series.[1] It starred Orson Welles.[2][a]\n\n"
+              "It ran on CBS[citation needed] from 1938 to 1940.[note 3] Box [13] stays? No: [13] goes.")
+    bad = client.post("/series/about?name=The%20Campbell%20Playhouse",
+                      data={"about": pasted, "source": "wikipedia"})
+    assert bad.status_code == 400 and "starting with https://" in bad.text
+    assert "American radio drama series.[1]" in bad.text                 # what was typed is kept
+    assert "series-about" not in client.get(CAMPBELL_PAGE).text         # nothing saved
+    client.post("/series/about?name=The%20Campbell%20Playhouse",
+                data={"about": pasted, "source": " https://en.wikipedia.org/wiki/The_Campbell_Playhouse "})
+    page = client.get(CAMPBELL_PAGE).text
+    assert ("The Campbell Playhouse was an American radio drama series. It starred Orson Welles.\n\n"
+            "It ran on CBS from 1938 to 1940. Box stays? No: goes.</p>") in page
+    assert ('Source:\n      <a href="https://en.wikipedia.org/wiki/The_Campbell_Playhouse" target="_blank" '
+            'rel="noopener noreferrer">Wikipedia</a>') in page
+    # It follows a renamed series, and another site is credited by its name.
+    client.post("/series/rename?name=The%20Campbell%20Playhouse", data={"new_name": "Campbell Playhouse"})
+    assert ">Wikipedia</a>" in client.get("/series/episodes?name=Campbell%20Playhouse").text
+    client.post("/series/about?name=Campbell%20Playhouse",
+                data={"about": "Welles.", "source": "https://www.otrr.org/campbell"})
+    assert ">otrr.org</a>" in client.get("/series/episodes?name=Campbell%20Playhouse").text
+    client.post("/series/about?name=Campbell%20Playhouse", data={"about": "Welles.", "source": ""})
+    assert "Source:" not in client.get("/series/episodes?name=Campbell%20Playhouse").text

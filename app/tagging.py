@@ -10,7 +10,7 @@ Two kinds of tags are written:
   series), date, genre (the series' genres, if it has any), comment (the
   notes), track (the part number);
   (a series' "About" text has no usual tag, so it's an Airwave tag only:
-  AIRWAVE_SERIES_ABOUT);
+  AIRWAVE_SERIES_ABOUT, with its source in AIRWAVE_SERIES_ABOUT_SOURCE);
 - "Airwave tags": every radio detail under a fixed name (AIRWAVE_SERIES,
   AIRWAVE_AIR_DATE...), so another Airwave Archive server can read them
   back exactly. Each format stores these its own way (MP3: ID3 "TXXX"
@@ -37,9 +37,11 @@ ASF_PREFIX = "Airwave/"
 
 
 def airwave_values(episode: Episode, part: int | None, parts: int,
-                   genres: list[str] | None = None, about: str | None = None) -> dict[str, str]:
+                   genres: list[str] | None = None, about: str | None = None,
+                   about_source: str | None = None) -> dict[str, str]:
     """The Airwave tags for one file of an episode (empty ones left out).
-    ``genres`` are its series' genres, ``about`` its series' "About" text."""
+    ``genres`` are its series' genres, ``about`` its series' "About" text
+    (``about_source``: where that came from)."""
     values = {
         "ID": episode.uid,
         "SERIES": episode.series,
@@ -57,6 +59,7 @@ def airwave_values(episode: Episode, part: int | None, parts: int,
         "PART": f"{part}/{parts}" if parts > 1 and part else None,
         "GENRES": SEPARATOR.join(genres) if genres else None,
         "SERIES_ABOUT": about,
+        "SERIES_ABOUT_SOURCE": about_source if about else None,
     }
     return {PREFIX + key: value for key, value in values.items() if value}
 
@@ -87,9 +90,10 @@ def common_values(episode: Episode, part: int | None, parts: int,
 
 def write_tags(path: Path, episode: Episode, part: int | None = None, parts: int = 1,
                genres: list[str] | None = None, standin: bool = True,
-               about: str | None = None) -> bool:
+               about: str | None = None, about_source: str | None = None) -> bool:
     """Write the episode's details into the file at ``path`` (a copy!).
-    ``genres`` are its series' genres, ``about`` its "About" text. Details the app doesn't know (a
+    ``genres`` are its series' genres, ``about`` its "About" text (and
+    ``about_source`` where that came from). Details the app doesn't know (a
     series without genres, say) are left as the file had them; so is a
     title tag, if the episode's title is only a stand-in. ``standin``:
     whether a stand-in title may be written at all (never into the
@@ -98,7 +102,7 @@ def write_tags(path: Path, episode: Episode, part: int | None = None, parts: int
     if standin and episode.sources.get("title") == STANDIN and _has_title(path):
         standin = False   # the file's own title tag beats a stand-in
     common = common_values(episode, part, parts, genres, standin)
-    airwave = airwave_values(episode, part, parts, genres, about)
+    airwave = airwave_values(episode, part, parts, genres, about, about_source)
     audio = mutagen.File(path)
     if audio is None:
         return False

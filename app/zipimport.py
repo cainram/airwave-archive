@@ -90,10 +90,11 @@ def _recordings(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
 
 
 def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str],
-                                                dict[str, list[str]], dict[str, str]]:
+                                                dict[str, list[str]],
+                                                dict[str, tuple[str, str | None]]]:
     """What an Airwave export's manifest says: details by file path in the
     zip (named like Airwave tags), picture paths by series, genres by
-    series, and "About" texts by series. Empty if there's no manifest, or
+    series, and "About" texts (with their sources) by series. Empty if there's no manifest, or
     it isn't one."""
     try:
         info = zf.getinfo(MANIFEST)
@@ -122,7 +123,8 @@ def read_manifest(zf: zipfile.ZipFile) -> tuple[dict[str, dict], dict[str, str],
               if isinstance(s, dict) and isinstance(s.get("name"), str)]
     pictures = {s["name"]: s["picture"] for s in series if isinstance(s.get("picture"), str)}
     genres = {s["name"]: found for s in series if (found := read_list(s.get("genres")))}
-    about = {s["name"]: s["about"] for s in series if isinstance(s.get("about"), str) and s["about"].strip()}
+    about = {s["name"]: (s["about"], s.get("about_source") if isinstance(s.get("about_source"), str) else None)
+             for s in series if isinstance(s.get("about"), str) and s["about"].strip()}
     return details, pictures, genres, about
 
 
@@ -190,7 +192,9 @@ def unpack(session: Session, zip_path: Path, inbox_folder: Path,
                 if series in genres:
                     found["extra"]["genres"] = genres[series]
                 if series in about:
-                    found["extra"]["about"] = about[series]
+                    found["extra"]["about"], source = about[series]
+                    if source:
+                        found["extra"]["about_source"] = source
             if found.get("extra"):
                 with_details += 1
             # (The inbox page may have noticed the file already.)
