@@ -36,6 +36,8 @@
       <button class="more-button" type="button" aria-expanded="true" hidden>less</button>
     </div>
     {% endif %}
+    {% elif name is not none and not mobile %}
+    <p class="add-about small"><a href="/series/about?name={{ name | urlencode }}">Add a Description</a></p>
     {% endif %}
     {% if name is none and not mobile %}
     <p class="muted small">These episodes have no Series name yet. Open one and press

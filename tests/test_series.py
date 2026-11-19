@@ -409,11 +409,17 @@ CAMPBELL_PAGE = "/series/episodes?name=The%20Campbell%20Playhouse"
 def test_a_series_has_an_about_text(client):
     assert "series-about" not in client.get(CAMPBELL_PAGE).text            # none to start with
     assert "Edit about…" in client.get(CAMPBELL_PAGE).text
+    # Until there is one, a link under the genres leads to the edit page (not on phones).
+    add = '<a href="/series/about?name=The%20Campbell%20Playhouse">Add a Description</a>'
+    assert add in client.get(CAMPBELL_PAGE).text
+    assert add not in client.get(CAMPBELL_PAGE, headers={"User-Agent": "iPhone Mobile"}).text
+    assert "Add a Description" not in client.get("/series/episodes").text   # (episodes with no series)
     form = client.get("/series/about?name=The%20Campbell%20Playhouse")
     assert form.status_code == 200 and "About this series" in form.text
     client.post("/series/about?name=The%20Campbell%20Playhouse",
                 data={"about": "  Orson Welles' radio plays.   \r\n\r\n\r\n\r\nSponsored by Campbell's.  "})
     page = client.get(CAMPBELL_PAGE).text
+    assert "Add a Description" not in page
     assert "<p class=\"series-about\">Orson Welles&#39; radio plays.\n\nSponsored by Campbell&#39;s.</p>" in page
     # On a phone it's shown too (but not the Edit button).
     phone = client.get(CAMPBELL_PAGE, headers={"User-Agent": "iPhone Mobile"}).text

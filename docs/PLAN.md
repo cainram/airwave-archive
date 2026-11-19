@@ -1277,7 +1277,9 @@ keeps the one renamed into.
   choice): on a computer, two lines with **more** / **less** (only when
   it's longer than that; the source credit shows once it's opened); on a
   phone, just an **About this series** button that opens it. Editing is
-  computer-only. A series without one shows nothing.
+  computer-only. A series without one shows an **Add a Description**
+  link there instead (owner's request, 2026-11-19; not on phones), leading
+  to the edit page.
 - A new **podcast feed** of a series (or of ticked episodes all from one
   series) starts with it as the feed's description (still changeable).
 - Its own Airwave tag, **`AIRWAVE_SERIES_ABOUT`** (no usual tag fits: the
