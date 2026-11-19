@@ -235,7 +235,7 @@ def set_uploaded_picture(session: Session, name: str, art_hash: str | None) -> N
 
 # "About this series": a few sentences, plain text (line breaks kept),
 # and where they came from (a web address, shown as a small credit).
-MAX_ABOUT = 1000   # characters
+MAX_ABOUT = 2000   # characters (owner's choice, 2026-11-19: the text is folded)
 MAX_SOURCE = 500   # characters in the source's address
 
 # Wikipedia's footnote marks, pasted along with its text: [1], [12], [a],

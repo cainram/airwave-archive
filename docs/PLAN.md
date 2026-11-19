@@ -1272,7 +1272,8 @@ one episode's plot). Kept under the series name (`series_about` table,
 database version 24), like genres: renaming a series moves it; joining two
 keeps the one renamed into.
 - **Edit about…** in a series' ☰ Actions: one text box, plain text with
-  line breaks kept, up to 1,000 characters; empty takes it off.
+  line breaks kept, up to 2,000 characters (1,000 at first; raised once
+  the text was folded); empty takes it off.
 - Shown on the series' page **under its genre labels**, folded (owner's
   choice): on a computer, two lines with **more** / **less** (only when
   it's longer than that; the source credit shows once it's opened); on a
