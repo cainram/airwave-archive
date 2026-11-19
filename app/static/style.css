@@ -115,6 +115,7 @@ code { font-size: 0.9em; color: var(--accent); }
 /* A series' "About" text, under its genres: line breaks kept, a comfortable width. */
 .upload-form textarea { resize: vertical; font: inherit; line-height: 1.5; }
 .series-about-source { margin: 4px 0 0; }
+.add-about { margin: 8px 0 0; color: var(--muted); }
 /* Folded "About": two lines, and the source only once it's opened. */
 .about-wrap.is-folded .series-about {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
