@@ -3,8 +3,13 @@
 ## 1. Purpose
 
 Airwave Archive is a **self-hosted, homelab-first web app** for managing a
-personal collection of downloaded radio programs — old-time radio shows,
-podcasts, and similar recordings.
+personal collection of recorded **radio broadcasts**: old-time radio, talk
+radio, and anything else that went out over the air.
+
+It isn't for archiving podcasts (owner's choice, 2026-11-19; a separate
+version for podcasts may come later, as a fork). That's different from the
+app's own **podcast feeds** (Phase 12), which let podcast apps play your
+radio recordings: those are a key feature.
 
 Think of it as a music library (like Plex or iTunes), but built around the
 information that matters for radio:
@@ -49,24 +54,24 @@ Real-world air dates are often incomplete. The app must be honest about that:
 
 | What's known            | How it's stored         | How it's shown                          |
 |-------------------------|-------------------------|-----------------------------------------|
-| Year only (1943)        | year                    | Listed under "1943 — date unknown"      |
-| Year + month            | year, month             | Listed under that month, "day unknown"  |
-| Full date, no time      | year, month, day        | On that day, labelled "time unknown"    |
-| Full date and time      | date, time, time zone   | At that time slot                       |
+| Year only (1943)        | year                    | Counted under the year's months ("3 episodes from 1943 have only the year known"), never placed on a day |
+| Year + month            | year, month             | Under that month, "Sometime in May 1943" |
+| Full date, no time      | year, month, day        | On that day, after the ones with a known time |
+| Full date and time      | date, time, time zone   | On that day, in the order they aired    |
 
 Rules:
 
 - **Never invent missing parts.** No defaulting to January 1st or midnight.
 - **Dates are shown the American way** (owner's choice): "Friday, April
-  14th, 1939, 8:00 PM US Eastern"; short form "Apr 14, 1939". Typed dates
-  on the review page stay in the 1939-04-14 form, which can't be misread.
+  14th, 1939"; short form "Apr 14, 1939". Typed dates on the review page
+  stay in the 1939-04-14 form, which can't be misread. The time of day is
+  kept but not shown (see "Air times not shown" in section 9).
 - **Store the time zone** with any time (e.g. a broadcast at 8:00 PM US
   Eastern). Old-time radio was often aired at different local times for East
   and West coasts, so the time zone matters.
-- The calendar's month view can show date-only programs; the day and week
-  views put them in a "time unknown" strip at the top of each day.
-- Programs known only to the year or month appear in a side list ("Also from
-  this month / year") so they're never hidden.
+- Programs known only to the month are listed under the month ("Sometime
+  in …"); those known only to the year are counted on its months, so
+  they're never silently hidden.
 
 ### Overnight shows and multi-part broadcasts
 
@@ -82,12 +87,13 @@ Rules:
 
 ### Ground rule
 
-**The app never moves, renames, or changes files in your library.** The only
-ways files ever get added to the library are when *you* approve uploads from
-the inbox (below). Writing tags into files is a separate, opt-in action
-(section 5).
+**The app never moves, renames, or changes files in your library on its
+own.** Files are added to the library only when *you* approve uploads from
+the inbox (below). Anything else that changes library files is one of the
+four exceptions below: always an explicit action, after a page showing
+exactly what will happen.
 
-**The one exception is deleting** (owner's choice, 2026-11-06; the owner keeps
+**The first exception is deleting** (owner's choice, 2026-11-06; the owner keeps
 backups and snapshots): you can delete an episode's recordings from the disk,
 from its page ("Delete…") or by ticking episodes ("Delete ticked…"). It's
 always an explicit action, after a page listing exactly which files will go,
@@ -121,8 +127,7 @@ empty are removed (nothing else is ever deleted).
 
 ### Where things live
 
-The recommended layout on the server is one folder, `/srv/airwave`, ideally
-on its own disk:
+The recommended layout on the server is one folder, `/srv/airwave`:
 
 | Folder | What's in it |
 |--------|--------------|
@@ -133,10 +138,9 @@ on its own disk:
 - The app reads recordings **where they sit**; it never makes copies.
 - Deleting the app or its database never touches your recordings.
 - In Docker, the library is mounted **writable** (owner's choice, Phase 7)
-  so approved uploads can be added to it, and recordings can be deleted
-  when the owner asks (see the ground rule). The app never changes or
-  renames the recordings already there; the owner keeps backups and
-  snapshots.
+  so approved uploads can be added to it, and so the exceptions in the
+  ground rule (deleting, converting, writing tags, renaming) can work when
+  the owner asks. The owner keeps backups and snapshots.
 - Network shares (NFS/SMB) aren't a goal for now. Anything mounted into
   `/srv/airwave/library` by the operating system will simply work, though.
 
@@ -168,16 +172,20 @@ for large collections, copying files onto the server is faster).
 
 The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 
+- **Menu** — Home · Series · Calendar · Feeds · Inbox. The Library is
+  reached from the Series page (☰ Actions → All files). While recordings
+  wait in the inbox, its link carries a red number (99+ above 99). The
+  mobile version's menu is shorter (see "Mobile version" in section 9).
 - **Home page** (`/`, owner's choice 2026-11-07) — the first item in the
-  menu (Home · Series · Library · Calendar · Inbox) and where the app
-  opens. Rows, top to bottom: **Continue listening** (the 4 most recently
+  menu and where the app opens. Rows, top to bottom: **Continue listening** (the 4 most recently
   played unfinished episodes; starting another pushes the oldest off); **Recently added
   series** (series by their newest recording, so an old series with a new
   episode comes back to the front; no time limit); **Most played** (series
   by how many of their episodes have been listened to; the app doesn't
   count replays). The series rows are tiles like the Series page: on a
   computer, one line of as many as fit the window; on a phone, 10 in a
-  line you swipe sideways. An empty row isn't shown.
+  line you swipe sideways. An empty row isn't shown. Below them, up to
+  three "Recently added in [genre]" rows (see "Genres" in section 9).
 - **Series grid** (`/series`) — a wall of series with their artwork, like
   album covers. Its **List** view has a **Date added** column (when the
   series' newest recording was added); clicking the **Series** or **Date
@@ -189,8 +197,11 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
   again turns it around (owner's request, 2026-11-19).
 - **Series page** — the episode list in **original air-date order**, with
   unknown dates grouped clearly.
-- **Episode detail page** — artwork, title, air date/time, station, host,
-  cast, notes, file info, and a Play button.
+- **Episode detail page** — artwork, title, air date, station, host,
+  cast, notes, and a Play button. The air date links to its month in the
+  calendar (when the month is known). Its ← Back button goes to the
+  episode's series. The **File** and **Tags in the file** sections start
+  folded away; clicking a heading opens them.
 - **Easy metadata editing** — edit any field right on the page. **Bulk edit**:
   select many episodes and set the same field (e.g. network = "CBS") on all of
   them at once.
@@ -198,13 +209,14 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 - **Series totals** — number of episodes, total listening time, and total
   size for each series.
 - **Continue listening** — remembers where you stopped in each episode and
-  lists partly-played episodes on the home page.
+  lists partly-played episodes on the home page. Each card has a small ×
+  to take it off the row (its place is kept; listening again brings it
+  back).
 - **Persistent player bar** — a player at the bottom of the screen that keeps
   playing while you browse to other pages. A × at its right end stops it and hides the
   bar, to free the screen (the place is kept, so Resume still works).
-- **Calendar** — day / week / month (section 2).
-- **Continue listening** cards have a small × to take one off the row (its
-  place is kept; listening again brings it back).
+- **Calendar** — day / week / month (section 2). The month grid shows
+  each episode's series, with its title under it.
 - **Action menus** (owner's choice, 2026-11-07) — to save space, mostly
   on phones, a page's main action stays a button (Play, Rescan) and the
   rest go in a **☰ Actions** drop-down; ticked episodes have a **☰ With
@@ -216,8 +228,12 @@ The look and feel is inspired by **Plex**: clean, visual, easy to browse.
 
 Design goals:
 
-- Intuitive and uncluttered.
-- **Works well on phones** as well as computers.
+- **Clean and easy** (owner's principle, see `CLAUDE.md`): the calm
+  alternative to bigger apps like AudioBookshelf. Fewer buttons, notices
+  and settings; the app quietly does the right thing. Behind-the-scenes
+  tools go on the Advanced page, not the everyday pages.
+- **Works well on phones** as well as computers. On a phone it's for
+  listening only (see "Mobile version" in section 9).
 - **Not a heavy JavaScript app.** Pages are built on the server and sent
   ready to display; a small library (htmx) handles the interactive parts. This
   keeps it fast, simple, and easy to maintain.
@@ -239,13 +255,13 @@ opposed to the sound itself. The app gets it from several sources:
    can prepare episode logs in a spreadsheet (or use one found online) and
    import them, matched to files by filename or by series + date.
 4. **Manual and bulk editing** in the web interface.
-5. **Optional: write tags back to files.** If you choose, the app can save
+5. **Optional: write tags back to files.** If you choose, the app saves
    its information into the files' own tags (including custom radio fields
-   like air date and network), so other players can see it too. Off by
-   default; always an explicit action.
-6. **Later: rename files from their details.** File names and folders can
-   follow the app's details, like classic MP3 software's "organise" feature.
-   Always previewed and undoable (Phase 10b).
+   like air date and network), so other players can see it too. Never
+   automatic; always previewed first (Phase 10a).
+6. **Optional: rename files from their details.** File names and folders
+   follow the app's details, like classic MP3 software's "organise"
+   feature. Always previewed and undoable (Phase 10b).
 
 ### Airwave tags
 
@@ -340,6 +356,11 @@ text is in the `LICENSE` file.
 
 Each phase ends with something you can see and try. Later phases build on
 earlier ones. Phases may be split into smaller steps as we go.
+
+Released versions (GitHub Releases): **v1.0** (2026-11-07: Phases 0–9,
+11 and 12) and **v2.0** (2026-11-10: suggested groups, converting, writing
+tags, renaming, the Advanced page). Everything after that is on `main`,
+waiting for the next version (only when the owner asks for one).
 
 ### Phase 0 — Project setup ✅ *done*
 - `CLAUDE.md` (how to work together) and this plan.
@@ -642,8 +663,9 @@ Split into three smaller steps, done in order.
 ### Phase 7 — Upload inbox
 Split into two steps. Owner's choice (2026-11-05): the whole library is
 mounted writable, and approved files go into `library/<Series>/` next to
-existing ones (they keep backups and snapshots). The app still never
-overwrites, renames or deletes library files.
+existing ones (they keep backups and snapshots). Adding never overwrites
+anything. (Changing files already in the library came later, as the
+exceptions in section 3.)
 
 #### 7a — Upload and review ✅ *done*
 - Upload files through the web page into the inbox (`/srv/airwave/inbox`,
@@ -655,7 +677,10 @@ overwrites, renames or deletes library files.
   under a hidden name until complete. Files copied into the inbox by hand
   appear too. Details come from tags first, with the file name filling
   gaps and giving the date if fuller. Each waiting file can be played. The
-  `inbox_items` table (database version 9) holds the details.
+  `inbox_items` table (database version 9) holds the details. Big batches
+  work: hundreds of waiting files, and over 1,000 uploaded at once (fixed
+  2026-11-10; the web framework's usual limit of 1,000 boxes per page is
+  raised, since the app runs in one household).
 
 #### 7b — Add to the library ✅ *done*
 - Approve files: moved into `library/<Series>/`, scanned, with the
@@ -715,12 +740,11 @@ overwrites, renames or deletes library files.
 - **Try it:** open the week of a famous broadcast and see everything you own
   from that week.
 
-### Phase 10 — Writing tags back and renaming files (after v1.0)
+### Phase 10 — Writing tags back and renaming files ✅ *done* (v2.0)
 
-**Not part of v1.0** (owner's decision, 2026-11-07). The owner still wants
-it, in a later version. Both parts change files that are already in the
-library, so when they're built, the ground rule in section 3 gets a second
-exception alongside deleting. Until then the rule stands unchanged.
+Left out of v1.0 (owner's decision, 2026-11-07) and built for v2.0. Both
+parts change files that are already in the library, so each is an
+exception in the ground rule (section 3).
 
 Rules for both parts:
 - Always an **explicit action**: one episode, ticked episodes, a series, or
@@ -784,18 +808,16 @@ ticked episodes, or a series.
 Like the "organise my music folder" feature in classic MP3 software
 (Winamp, iTunes, MusicBrainz Picard): file names and folders follow the
 app's details.
-- A **naming pattern** the owner picks once, e.g.
-  `{series}/{series} {air_date} - {title}` →
-  `Suspense/Suspense 1943-05-13 - Donovan's Brain.mp3`. Multi-part
-  episodes add `- Part 1`, `- Part 2`...
+- A **naming pattern**, fixed rather than a setting (owner's choice, see
+  step 1): `Suspense/Suspense - 1943-05-13 - Donovan's Brain.mp3`.
+  Multi-part episodes add `- Part 1`, `- Part 2`...
 - **Never invent dates** (ground rule): a partial date is written as known,
   e.g. `1943` or `1943-05`. Empty fields are left out cleanly, with no
   stray dashes or brackets.
 - Names are made **safe on Windows and Mac too**: characters like `: ? " / \`
   are replaced, and names are kept to a sensible length.
-- **Clashes** (two episodes that would get the same name) are shown on the
-  preview and get a number added, or are skipped and reported. An existing
-  file is never overwritten.
+- **Clashes** (two episodes that would get the same name) get a number
+  added. An existing file is never overwritten.
 - **The app updates its own records in the same step**, so edits, listening
   history, artwork and podcast feeds keep working. Feed entries use file
   IDs, not names, so podcast apps won't see "new" episodes. (Renaming files
@@ -855,8 +877,7 @@ app's details.
   (no compression), and deleted. Zip: `<Series>/<file>`, `manifest.json`
   (format "airwave-archive-export", version 1), `pictures/`, `README.txt`.
   Episodes get a permanent ID (`episodes.uid`, database version 11) the
-  first time they're exported. Phase 10 is on hold (owner's choice,
-  2026-11-06).
+  first time they're exported.
 - 11b (import) ✅ *done*: the inbox's upload takes zips (`app/zipimport.py`);
   a zip copied into the inbox folder gets an "Unpack" button. Recordings
   are unpacked into the inbox (folder names in the zip ignored, names made
@@ -1147,7 +1168,7 @@ The plan: **ffmpeg** (the standard free converter) inside the inbox.
 - Meanwhile, a batch can be converted by hand with ffmpeg on the dev VM and
   then uploaded as normal.
 
-### Later — The Advanced page (`/advanced`, after v1.0) ✅ *done*
+### The Advanced page (`/advanced`) ✅ *done* (v2.0)
 A page of **power-user tools** that work on the whole library at once
 (owner's request, 2026-11-07). Examples:
 - converting the entire library's odd formats (see ffmpeg above)
@@ -1168,8 +1189,8 @@ How it works:
 - The everyday pages keep the small-scale versions (one episode, ticked
   episodes, a series). Whole-library versions live only here.
 - **Ground rules:** these tools change existing library files, so each one
-  is an owner-approved exception to "never change files in the library."
-  The exceptions get written into section 3 when each tool is built.
+  is an owner-approved exception to "never change files in the library"
+  (section 3).
 - **Step 1 ✅ *done* (2026-11-10).** `/advanced`: the red bar, the totals,
   and two tools. **Write details into every file**: `/advanced/tags` is
   the preview (the totals, and the changes for the first 50 files as an
@@ -1301,9 +1322,11 @@ on first run. Built automatically by GitHub for each release.
 ### Later — Going public
 - ✅ The GitHub repository is public (2026-11-10), with **Issues**,
   **Discussions** and the **Wiki** off, since there's no support channel.
-- Publish finished versions on GitHub **Releases** (installers and
-  Docker image).
-- **airwavearchive.org**: one static page covering what it is,
+- ✅ Finished versions are published on GitHub **Releases** (v1.0, v2.0).
+  Still to come there: the desktop installers and a ready-made Docker
+  image.
+- **airwavearchive.org** (in progress: its own public repository,
+  `airwave-archive-website`, previewed on the dev VM): one static page covering what it is,
   screenshots, download links (pointing to GitHub Releases), how to get
   past install warnings, Docker instructions, GPL v3, and "provided as-is,
   no support." No contact info.
@@ -1337,8 +1360,16 @@ How it would work:
 - Partial dates stay partial. A lookup never "completes" a date unless a
   source actually gives the full date.
 
+### Next — Better guessing from messy tags
+The owner's main focus for the project (2026-11-19): there's no standard
+way to fit old-time radio into music tags, so every collection does it
+differently. The app already cleans up a lot (Phase 4b's clean titles,
+4c's file names, and the inbox's warning when series names differ). The
+owner is collecting examples of messy tags; the next round of
+improvements starts from those.
+
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
-  database, podcast RSS feed subscriptions. (Online episode logs: see
+  database. (Online episode logs: see
   "Look up episode details online" above.)
 
