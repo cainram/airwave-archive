@@ -1273,8 +1273,11 @@ database version 24), like genres: renaming a series moves it; joining two
 keeps the one renamed into.
 - **Edit about…** in a series' ☰ Actions: one text box, plain text with
   line breaks kept, up to 1,000 characters; empty takes it off.
-- Shown on the series' page **under its genre labels**, on phones too
-  (editing is computer-only). A series without one shows nothing.
+- Shown on the series' page **under its genre labels**, folded (owner's
+  choice): on a computer, two lines with **more** / **less** (only when
+  it's longer than that; the source credit shows once it's opened); on a
+  phone, just an **About this series** button that opens it. Editing is
+  computer-only. A series without one shows nothing.
 - A new **podcast feed** of a series (or of ticked episodes all from one
   series) starts with it as the feed's description (still changeable).
 - Its own Airwave tag, **`AIRWAVE_SERIES_ABOUT`** (no usual tag fits: the

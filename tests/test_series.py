@@ -418,6 +418,9 @@ def test_a_series_has_an_about_text(client):
     # On a phone it's shown too (but not the Edit button).
     phone = client.get(CAMPBELL_PAGE, headers={"User-Agent": "iPhone Mobile"}).text
     assert "Orson Welles" in phone and "Edit about…" not in phone
+    # Folded: on a phone behind a button, on a computer to two lines with "more".
+    assert '<summary class="button">About this series</summary>' in phone and "data-about" not in phone
+    assert "data-about" in page and 'class="more-button"' in page and "About this series</summary>" not in page
     # Too long is cut; empty takes it off.
     client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "x" * 5000})
     assert "x" * 1000 + "</p>" in client.get(CAMPBELL_PAGE).text

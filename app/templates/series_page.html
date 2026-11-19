@@ -18,9 +18,24 @@
     <p class="genres" aria-label="Genres">{% for genre in totals.genres %}<a class="genre" href="{{ genre | genre_url }}">{{ genre }}</a>{% endfor %}</p>
     {% endif %}
     {% if about %}
-    <p class="series-about">{{ about.text }}</p>
-    {% if about_credit %}<p class="series-about-source muted small">Source:
-      <a href="{{ about.source }}" target="_blank" rel="noopener noreferrer">{{ about_credit }}</a></p>{% endif %}
+    {% set credit %}{% if about_credit %}<p class="series-about-source muted small">Source:
+      <a href="{{ about.source }}" target="_blank" rel="noopener noreferrer">{{ about_credit }}</a></p>{% endif %}{% endset %}
+    {% if mobile %}
+    {# Phones: just a button that opens the text. #}
+    <details class="about-fold">
+      <summary class="button">About this series</summary>
+      <p class="series-about">{{ about.text }}</p>
+      {{ credit }}
+    </details>
+    {% else %}
+    {# Two lines, with "more" to open the rest (pages.js; the button only
+       appears when there is more to show). #}
+    <div class="about-wrap" data-about>
+      <p class="series-about">{{ about.text }}</p>
+      {{ credit }}
+      <button class="more-button" type="button" aria-expanded="true" hidden>less</button>
+    </div>
+    {% endif %}
     {% endif %}
     {% if name is none and not mobile %}
     <p class="muted small">These episodes have no Series name yet. Open one and press

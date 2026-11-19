@@ -138,4 +138,31 @@
 
   document.addEventListener("DOMContentLoaded", countTicked);
   document.addEventListener("htmx:afterSettle", countTicked);
+
+  // A series' "About" text: folded to two lines, with "more" / "less" when
+  // it's longer than that.
+  function foldAbout() {
+    document.querySelectorAll("[data-about]:not([data-ready])").forEach(function (wrap) {
+      wrap.dataset.ready = "";
+      const text = wrap.querySelector(".series-about");
+      const button = wrap.querySelector(".more-button");
+      wrap.classList.add("is-folded");
+      if (text.scrollHeight > text.clientHeight + 2) {
+        button.hidden = false;
+        button.textContent = "more";
+        button.setAttribute("aria-expanded", "false");
+      } else {
+        wrap.classList.remove("is-folded");   // short enough: nothing to fold
+      }
+    });
+  }
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest && event.target.closest("[data-about] .more-button");
+    if (!button) return;
+    const folded = button.closest("[data-about]").classList.toggle("is-folded");
+    button.textContent = folded ? "more" : "less";
+    button.setAttribute("aria-expanded", String(!folded));
+  });
+  document.addEventListener("DOMContentLoaded", foldAbout);
+  document.addEventListener("htmx:afterSettle", foldAbout);
 })();

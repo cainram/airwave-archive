@@ -115,6 +115,20 @@ code { font-size: 0.9em; color: var(--accent); }
 /* A series' "About" text, under its genres: line breaks kept, a comfortable width. */
 .upload-form textarea { resize: vertical; font: inherit; line-height: 1.5; }
 .series-about-source { margin: 4px 0 0; }
+/* Folded "About": two lines, and the source only once it's opened. */
+.about-wrap.is-folded .series-about {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.about-wrap.is-folded .series-about-source { display: none; }
+.more-button {
+  background: none; border: 0; padding: 0; margin: 2px 0 0; font: inherit; font-size: 0.9rem;
+  color: var(--muted); cursor: pointer;
+}
+.more-button:hover, .more-button:focus-visible { color: var(--text); text-decoration: underline; }
+/* Phones: an "About this series" button that opens the text. */
+.about-fold { margin: 10px 0 0; }
+.about-fold > summary { list-style: none; cursor: pointer; }
+.about-fold > summary::-webkit-details-marker { display: none; }
 .label-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .series-about { white-space: pre-line; max-width: 42rem; margin: 10px 0 0; line-height: 1.5; }
 /* Inbox: one series name for every waiting file. */
