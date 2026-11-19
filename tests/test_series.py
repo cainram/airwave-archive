@@ -428,8 +428,8 @@ def test_a_series_has_an_about_text(client):
     assert '<summary class="button">About this series</summary>' in phone and "data-about" not in phone
     assert "data-about" in page and 'class="more-button"' in page and "About this series</summary>" not in page
     # Too long is cut; empty takes it off.
-    client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "x" * 5000})
-    assert "x" * 1000 + "</p>" in client.get(CAMPBELL_PAGE).text
+    client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "x" * 9000})
+    assert ">" + "x" * 2000 + "</p>" in client.get(CAMPBELL_PAGE).text
     client.post("/series/about?name=The%20Campbell%20Playhouse", data={"about": "  "})
     assert "series-about" not in client.get(CAMPBELL_PAGE).text
     assert client.get("/series/about?name=Nobody").status_code == 404
