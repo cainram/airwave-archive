@@ -9,73 +9,24 @@ either at the console or over SSH. Type or paste each command block, press
 > your password the first time. Nothing appears while you type it; that's
 > normal.
 
-Recommended machine: 2 CPU cores, 4 GB RAM, a 32 GB boot disk, and a
-**second disk** for recordings. See "Recommended server" in
-[`PLAN.md`](PLAN.md).
+Recommended machine: 2 CPU cores, 4 GB RAM, and a disk with room for the
+operating system (about 32 GB) plus your recordings and room to grow. See
+"Recommended server" in [`PLAN.md`](PLAN.md).
 
 ---
 
-## Step 1 — Prepare the recordings disk
+## Step 1 — Create the app's folders
 
-This formats the second disk and makes it appear at `/srv/airwave`.
+The app keeps everything in `/srv/airwave`: your recordings (`library`),
+uploads waiting for review (`inbox`), and its own information (`data`).
 
-> ⚠️ Formatting erases a disk. Make sure you pick the **empty** second disk,
-> not the one Ubuntu is installed on.
-
-1. List the disks:
-
-   ```bash
-   lsblk -o NAME,SIZE,TYPE,MOUNTPOINTS
-   ```
-
-   You'll see something like this:
-
-   ```
-   NAME    SIZE TYPE MOUNTPOINTS
-   sda      32G disk
-   ├─sda1    1G part /boot/efi
-   └─sda2   31G part /
-   sdb     500G disk
-   ```
-
-   The recordings disk is the one with **no partitions and no mount
-   points**: `sdb` in this example. Below, replace `sdb` with your disk's
-   name if it's different.
-
-2. Format it (creates an empty ext4 filesystem):
-
-   ```bash
-   sudo mkfs.ext4 -L airwave /dev/sdb
-   ```
-
-3. Create the folder it will appear at, and set it to mount automatically at
-   every boot:
-
-   ```bash
-   sudo mkdir -p /srv/airwave
-   ```
-
-   ```bash
-   echo "LABEL=airwave /srv/airwave ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
-   ```
-
-   ```bash
-   sudo systemctl daemon-reload && sudo mount -a
-   ```
-
-4. Check it worked:
-
-   ```bash
-   df -h /srv/airwave
-   ```
-
-   The size shown should match your recordings disk.
-
-5. Create the app's folders and make them yours:
+1. Create the folders:
 
    ```bash
    sudo mkdir -p /srv/airwave/library /srv/airwave/inbox /srv/airwave/data
    ```
+
+2. Make them yours:
 
    ```bash
    sudo chown -R 1000:1000 /srv/airwave
@@ -84,6 +35,14 @@ This formats the second disk and makes it appear at `/srv/airwave`.
    (`1000` is the user number the app runs as. On a fresh Ubuntu install, the
    first user you created is also `1000`, so your files and the app's files
    match.)
+
+3. Check it worked:
+
+   ```bash
+   ls /srv/airwave
+   ```
+
+   You should see `data  inbox  library`.
 
 ## Step 2 — Install Docker
 
@@ -196,9 +155,10 @@ needs free disk space for the recordings, as well as the zip itself.
 
 The app keeps its database in `/srv/airwave/data`. It's small, and it will
 hold all the information you add, so include it in your backups. (The app
-never changes or renames the recordings in `/srv/airwave/library`; it only
-adds the files you approve in the inbox, and deletes recordings only when
-you ask it to, after a confirmation page. Back up your recordings too.)
+only changes the recordings in `/srv/airwave/library` when you ask it to,
+after a page showing exactly what will happen: adding the files you
+approve in the inbox, deleting, converting odd formats, writing details
+into files, or renaming and organizing them. Back up your recordings too.)
 
 The `artwork` folder inside it holds the app's small copies of pictures
 from your library. It doesn't need backing up: a scan makes the copies
