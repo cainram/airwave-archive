@@ -146,9 +146,11 @@ def test_the_series_pages_are_for_listening(client):
     page = phone(client, "/series/episodes?name=Suspense")
     assert "Edit genres…" not in page and "With ticked" not in page and 'type="checkbox"' not in page
     assert " KB" not in page and " MB" not in page                         # no size total
+    assert "of audio" not in page                                          # just the length
     assert "Donovan&#39;s Brain" in page and "data-play" in page or "play" in page
     desktop = computer(client, "/series/episodes?name=Suspense")
     assert "Edit genres…" in desktop and "With ticked" in desktop and 'type="checkbox"' in desktop
+    assert "of audio" in desktop
 
 
 # ------------------------------------------------------ step 3: feeds, and managing pages
