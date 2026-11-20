@@ -11,7 +11,7 @@
     <p class="muted">
       {{ totals.episodes }} episode{{ "" if totals.episodes == 1 else "s" }}
       {% if totals.years %}· {{ totals.years }}{% endif %}
-      · {{ totals.seconds | duration }} of audio
+      · {{ totals.seconds | duration }}{% if not mobile %} of audio{% endif %}
       {% if not mobile %}· {{ totals.bytes | size }}{% endif %}
     </p>
     {% if totals.genres %}
