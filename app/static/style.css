@@ -721,6 +721,7 @@ a.day-title:hover { text-decoration: underline; }
   border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text);
 }
 .feed-list .result { align-items: center; }
+.feed-list-own { margin-top: 20px; }   /* your own feeds, below On this day */
 /* Feeds: choosing a feed to add ticked episodes to; the ticked list. */
 .feed-choose fieldset {
   margin: 0 0 12px; padding: 8px 14px 10px; max-width: 700px;

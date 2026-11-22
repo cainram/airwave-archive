@@ -19,8 +19,7 @@
 {% if not rows and mobile %}
 <div class="notice">No feeds yet.</div>
 {% else %}
-<ul class="results feed-list">
-  {% for row in rows %}
+{% macro feed_row(row) %}
   {% set feed = row.feed %}
   <li class="result">
     {{ picture(row.art, feed.title, "small") }}
@@ -37,8 +36,20 @@
       </div>
     </div>
   </li>
+{% endmacro %}
+{% set special = rows | selectattr("on_this_day") | list %}
+{% if special %}
+<ul class="results feed-list">
+  {{ feed_row(special[0]) }}
+</ul>
+{% endif %}
+{% if others %}
+<ul class="results feed-list feed-list-own">
+  {% for row in others %}
+  {{ feed_row(row) }}
   {% endfor %}
 </ul>
+{% endif %}
 {% if not mobile %}<p class="muted small">To make {{ "another" if others else "a feed of your own" }}, open a series and choose <strong>☰ Actions → Make a feed…</strong></p>{% endif %}
 {% endif %}
 {% endblock %}
