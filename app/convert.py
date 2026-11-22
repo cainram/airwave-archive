@@ -335,19 +335,24 @@ def run(plan: Plan, source: Path, target: Path, progress=None, stop=None,
     how far it's got (0 to 1, when the length is known); ``stop()`` is
     asked now and then whether to give up (raises Stopped). Raises
     RuntimeError with ffmpeg's complaint if it fails."""
-    process = subprocess.Popen(command(plan, source, target, cover), stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, text=True)
+    run_command(command(plan, source, target, cover), plan.duration, progress, stop)
+
+
+def run_command(cmd: list[str], duration: float | None, progress=None, stop=None) -> None:
+    """Run an ffmpeg command that reports its progress ("-progress
+    pipe:1"): see ``run``. ``duration``: how long the result will be."""
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         for line in process.stdout:
             if stop is not None and stop():
                 process.kill()
                 raise Stopped()
-            if line.startswith("out_time_us=") and progress is not None and plan.duration:
+            if line.startswith("out_time_us=") and progress is not None and duration:
                 try:
                     done = int(line.split("=", 1)[1]) / 1_000_000
                 except ValueError:
                     continue
-                progress(max(0.0, min(1.0, done / plan.duration)))
+                progress(max(0.0, min(1.0, done / duration)))
         complaint = process.stderr.read()
         if process.wait() != 0:
             lines = [line for line in complaint.strip().splitlines() if line.strip()]
@@ -358,6 +363,15 @@ def run(plan: Plan, source: Path, target: Path, progress=None, stop=None,
             process.wait()
 
 
+def sound_length(found: dict | None) -> float | None:
+    """How long the sound is, in seconds, from what ffprobe found (None if
+    there's no sound or its length isn't known)."""
+    sounds = [s for s in (found or {}).get("streams") or [] if s.get("codec_type") == "audio"]
+    if not sounds:
+        return None
+    return _seconds(sounds[0].get("duration")) or _seconds((found.get("format") or {}).get("duration"))
+
+
 def check(plan: Plan, made: Path) -> str | None:
     """Is the new file all right? It must open, hold sound, and be as long
     as the original (within a second or two). Returns what's wrong, or
@@ -365,8 +379,7 @@ def check(plan: Plan, made: Path) -> str | None:
     found = probe(made)
     if not found or not any(s.get("codec_type") == "audio" for s in found.get("streams") or []):
         return "The new file couldn't be opened."
-    sounds = [s for s in found.get("streams") or [] if s.get("codec_type") == "audio"]
-    length = _seconds(sounds[0].get("duration")) or _seconds((found.get("format") or {}).get("duration"))
+    length = sound_length(found)
     if length is None:
         return "The new file's length couldn't be read."
     if plan.duration and abs(length - plan.duration) > max(2.0, plan.duration * 0.01):

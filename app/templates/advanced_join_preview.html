@@ -18,7 +18,18 @@
   <p class="muted small">Each joined file gets the episode's details in its tags and a chapter at each part.
     The parts are deleted once the joined file has been checked. <strong>Nothing has been changed yet.</strong></p>
 </div>
-<p class="muted small">Joining itself arrives in the next step: for now this page only shows what it would do.</p>
+{% if ready_count %}
+{% if busy %}
+<p><a class="button" href="/advanced/joining">Joining is under way: see how it's going</a></p>
+{% else %}
+<form method="post" action="/advanced/join" class="form-buttons">
+  {% for name in series %}<input type="hidden" name="series" value="{{ name }}">{% endfor %}
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button primary" type="submit">Join {{ plural(ready_count, "episode") }}</button>
+  <a class="button" href="/advanced/join">Cancel</a>
+</form>
+{% endif %}
+{% endif %}
 
 {% if ready %}
 <ul class="join-plans">
@@ -35,6 +46,9 @@
       <li><code>{{ p.file.name }}</code> <span class="muted">— chapter “{{ p.chapter }}”{% if p.reencode %}; {{ p.sound.words() }}, re-encoded at {{ p.target_kbps }} kbps{% endif %}</span></li>
       {% endfor %}
     </ol>
+    {% if plan.new_title %}
+    <p class="small">Title tidied: <q>{{ plan.episode.title }}</q> → <q>{{ plan.new_title }}</q></p>
+    {% endif %}
     {% for note in plan.notes_added %}
     <p class="small">Added to the notes: <q>{{ note }}</q></p>
     {% endfor %}

@@ -1,12 +1,17 @@
 """Tests for joining multi-part episodes (the plan and the preview). Run with:  pytest"""
 
+import shutil
+import subprocess
+import time
+
+import mutagen
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import joining
-from app.db import AudioFile, Episode, make_engine
+from app.db import AudioFile, Episode, Listening, make_engine, utcnow
 from test_export import make_flac
 
 
@@ -93,6 +98,9 @@ def test_chapter_names():
     # A part's own words are kept; "Hr 2" is tidied.
     files = [file("Show Hr1.mp3", "Show - Hour 1"), file("Show Hr2.mp3", "Show - Hour 2 - Open Lines")]
     assert joining.chapter_names(files, "Show") == ["Hour 1", "Show - Hour 2 - Open Lines"]
+    # The same words on every part don't tell them apart.
+    files = [file(f"Show Hr{n}.mp3", "Old title") for n in (1, 2)]
+    assert joining.chapter_names(files, "Show") == ["Hour 1", "Hour 2"]
 
 
 def test_the_series_to_choose_from(client):
@@ -136,3 +144,149 @@ def test_the_odd_one_out_is_the_one_with_less_time(client):
 
 def test_nothing_ticked(client):
     assert "No series were ticked." in client.get("/advanced/join/preview").text
+
+
+def test_tidying_a_leftover_hour_1_from_the_title():
+    assert joining.tidy_title("Coast to Coast AM - Hour 1") == "Coast to Coast AM"
+    assert joining.tidy_title("Coast To Coast AM - Dec 21 2009 - Hour 1 (part 1 of 4)") == \
+        "Coast To Coast AM - Dec 21 2009 - Hour 1"
+    assert joining.tidy_title("Show (part 1 of 4)") == "Show"
+    assert joining.tidy_title("Show Hr. 1") == "Show" and joining.tidy_title("Show, Pt 01") == "Show"
+    for title in ("Part 2 of the Mystery", "The Hour of Decision", "Show - Hour 2", "Hour 1", None):
+        assert joining.tidy_title(title) is None
+
+
+def test_the_preview_shows_the_title_tidied(client):
+    with Session(client.engine) as session:
+        episode = session.scalars(select(Episode).where(Episode.title == "Coast to Coast AM")).one()
+        episode.title = "Coast to Coast AM - Hour 1"
+        session.commit()
+    page = client.get("/advanced/join/preview", params={"series": "Coast to Coast AM"}).text
+    assert "Title tidied: <q>Coast to Coast AM - Hour 1</q> → <q>Coast to Coast AM</q>" in page
+    assert 'action="/advanced/join"' in page and "Join 2 episodes" in page
+
+
+def test_chapters_file():
+    text = joining.chapters_text(["Hour 1", "Open Lines; = calls"], [60.0, 30.5])
+    assert text.startswith(";FFMETADATA1\n")
+    assert "START=60000\nEND=90500\ntitle=Open Lines\; \\= calls" in text
+
+
+def test_joining_needs_the_preview_first(client):
+    assert client.post("/advanced/join", data={"series": "Suspense"}).status_code == 400
+
+
+# ------------------------------------------------------- with real ffmpeg
+
+needs_ffmpeg = pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg isn't installed here")
+
+
+def tone(path, seconds, mono=False, kbps=64, picture=None):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"sine=f=440:d={seconds}"]
+    if picture:
+        cmd += ["-i", str(picture), "-map", "0:a", "-map", "1:v", "-c:v", "copy",
+                "-disposition:v", "attached_pic"]
+    cmd += ["-ar", "44100", "-ac", "1" if mono else "2", "-b:a", f"{kbps}k",
+            "-metadata", "title=Old title", str(path)]
+    subprocess.run(cmd, check=True)
+
+
+@pytest.fixture
+def real(tmp_path, monkeypatch):
+    """A library with one three-part episode: parts 1 and 2 stereo, part 3 mono."""
+    import app.main as main
+    lib = tmp_path / "library"
+    picture = tmp_path / "cover.jpg"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=64x64:d=1",
+                    "-frames:v", "1", str(picture)], check=True)
+    tone(lib / "Night Show 1996-05-02 Hour 1.mp3", 6, picture=picture)
+    tone(lib / "Night Show 1996-05-02 Hour 2.mp3", 5)
+    tone(lib / "Night Show 1996-05-02 Hour 3.mp3", 4, mono=True, kbps=32)
+    monkeypatch.setattr(main, "LIBRARY_DIR", lib)
+    monkeypatch.setattr(main, "_engine", make_engine(tmp_path / "data" / "airwave.db"))
+    client = TestClient(main.app)
+    client.get("/")
+    with Session(main._engine) as session:
+        files = sorted(session.scalars(select(AudioFile)), key=lambda f: f.name)
+        ids = [f.id for f in files]
+        files[2].tag_comment = "Open lines."
+        session.commit()
+    client.post(f"/files/{ids[0]}/parts", data={"part": [str(i) for i in ids]})
+    with Session(main._engine) as session:
+        episode = session.get(AudioFile, ids[0]).episode
+        episode.series, episode.title, episode.notes = "Night Show", "Night Show - Hour 1", None
+        session.add(Listening(episode_id=episode.id, file_id=ids[1], position=2.0, updated_at=utcnow()))
+        session.commit()
+    client.lib, client.engine, client.ids = lib, main._engine, ids
+    return client
+
+
+def wait_for_joining():
+    for _ in range(600):
+        if not joining.busy():
+            return joining.current_job()
+        time.sleep(0.05)
+    raise AssertionError("joining didn't finish")
+
+
+@needs_ffmpeg
+def test_really_joining(real):
+    sent = real.post("/advanced/join", data={"series": "Night Show", "confirm": "yes"})
+    assert sent.status_code == 200
+    job = wait_for_joining()
+    assert (job.joined, job.deleted, job.problems) == (1, 3, [])
+    assert sorted(p.name for p in real.lib.iterdir()) == ["Night Show 1996-05-02.mp3"]
+    joined = real.lib / "Night Show 1996-05-02.mp3"
+    audio = mutagen.File(joined)
+    assert 14.5 < audio.info.length < 15.5
+    assert (audio.info.sample_rate, audio.info.channels) == (44100, 2)
+    chapters = sorted(audio.tags.getall("CHAP"), key=lambda c: c.start_time)
+    assert [c.sub_frames["TIT2"].text[0] for c in chapters] == ["Hour 1", "Hour 2", "Hour 3"]
+    assert [round(c.start_time / 1000) for c in chapters] == [0, 6, 11]
+    assert str(audio.tags["TIT2"]) == "Night Show" and audio.tags.getall("APIC")
+    with Session(real.engine) as session:
+        files = session.scalars(select(AudioFile)).all()
+        assert [(f.id, f.name, f.part_number) for f in files] == \
+            [(real.ids[0], "Night Show 1996-05-02.mp3", None)]
+        episode = files[0].episode
+        assert episode.title == "Night Show" and episode.notes == "Part 3: Open lines."
+        assert episode.sources["title"] == "manual"
+        place = session.get(Listening, episode.id)
+        assert place.file_id == real.ids[0] and 7.5 < place.position < 8.5   # 2 s into part 2
+        assert 14.5 < files[0].duration_seconds < 15.5
+    page = real.get("/advanced/joining").text
+    assert "Finished." in page and "Joined 1 episode; 3 parts deleted." in page
+
+
+@needs_ffmpeg
+def test_a_joined_file_that_doesnt_check_out_leaves_the_parts(real):
+    with Session(real.engine) as session:
+        session.get(AudioFile, real.ids[1]).duration_seconds = 50     # the parts "add up" to 60 s
+        session.commit()
+    before = {p.name: p.read_bytes() for p in real.lib.iterdir()}
+    real.post("/advanced/join", data={"series": "Night Show", "confirm": "yes"})
+    job = wait_for_joining()
+    assert job.joined == 0 and "the parts add up to 60" in job.problems[0][1]
+    assert {p.name: p.read_bytes() for p in real.lib.iterdir()} == before     # nothing left behind
+    with Session(real.engine) as session:
+        assert session.scalars(select(Episode)).one().title == "Night Show - Hour 1"
+        assert len(session.scalars(select(AudioFile)).all()) == 3
+
+
+@needs_ffmpeg
+def test_stopping_leaves_the_parts(real, monkeypatch):
+    real_run = joining.run_command
+
+    def slow(cmd, duration, progress=None, stop=None):
+        joining.stop()
+        time.sleep(1.1)              # the stop question is asked at most once a second
+        real_run(cmd, duration, progress, stop)
+
+    monkeypatch.setattr(joining, "run_command", slow)
+    before = sorted(p.name for p in real.lib.iterdir())
+    real.post("/advanced/join", data={"series": "Night Show", "confirm": "yes"})
+    job = wait_for_joining()
+    assert job.stop and job.joined == 0 and not job.problems
+    assert sorted(p.name for p in real.lib.iterdir()) == before
+    assert "Stopped." in real.get("/advanced/joining").text

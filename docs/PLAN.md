@@ -1323,8 +1323,9 @@ Decisions (owner, 2026-11-22):
 - **The parts are deleted** once the joined file has been checked (the
   owner keeps backups and snapshots). A ground-rule exception (the fifth).
 - **Chapters** at each part, named from the part's own title when it says
-  more than the episode's title and "Hour 2"; else "Hour 2" (from the
-  title or file name), else "Part 2".
+  more than the episode's title and "Hour 2" (and the parts' titles
+  aren't all the same); else "Hour 2" (from the file name or title), else
+  "Part 2".
 - **The least damage to the sound:** parts in the same format (MP3 or AAC,
   same sample rate and channels) are laid end to end without re-encoding.
   Otherwise the format most of the episode's time is in wins, and only the
@@ -1335,6 +1336,10 @@ Decisions (owner, 2026-11-22):
   them). A part's comment missing from the episode's notes (notes typed by
   hand) is added, as "Part 2: ...". Other tags that disagree give way to
   the episode's details.
+- **Title tidied** (owner's choice): a leftover part 1 marker at the end
+  of the episode's title ("- Hour 1", "(part 1 of 4)") is taken off, shown
+  on the preview. Real words ("Part 2 of the Mystery") stay. Tidying the
+  titles of episodes that aren't joined belongs to messy-tag recognition.
 - The joined file is named like part 1 without its "Hour 1", in part 1's
   folder (" (joined)" added if another file has that name). The episode
   keeps its record, so listening places, feeds and groups carry on.
@@ -1346,9 +1351,15 @@ Steps:
   re-encoded, chapter names, notes to add, and those that can't be joined
   yet (a part missing, to convert first, unreadable, in different
   folders). Changes nothing. `app/joining.py`.
-- Step 2: joining, in the background (one at a time, progress, Stop):
-  re-encode odd parts, join, chapters and tags, check, swap in for part 1,
-  delete the other parts, move listening places.
+- Step 2 ✅ *done* (2026-11-22): the preview's **Join** button. Joining
+  runs in the background, one episode at a time, with progress and Stop:
+  odd parts re-encoded (LAME's best setting), the parts laid end to end
+  (ffmpeg, no re-encoding), chapters, part 1's cover picture and the
+  episode's tags; the joined file is checked (it opens and is as long as
+  the parts together) under a hidden name before it takes its name. Then
+  part 1's record becomes the joined file, a place in a later part moves
+  to the same moment of the joined file, and the parts are deleted.
+  Anything wrong leaves the parts as they were, with the reason.
 
 ### Genres (owner's request, 2026-11-12)
 The owner gives each **series** one or more genres ("Western", "Comedy"),

@@ -1,0 +1,34 @@
+{# Progress of joining episodes; asks again every 2 seconds until it's done. #}
+<div id="joining"{% if job and not job.finished %} hx-get="/advanced/joining/status" hx-trigger="every 2s"
+     hx-target="this" hx-swap="outerHTML"{% endif %}>
+{% macro episodes(n) %}{{ n }} episode{{ "" if n == 1 else "s" }}{% endmacro %}
+{% if job is none %}
+  <div class="notice">Nothing is being joined.</div>
+{% elif not job.finished %}
+  <div class="notice" role="status">
+    <strong>{{ "Stopping…" if job.stop else "Joining…" }}</strong>
+    Episode {{ [job.done + 1, job.total] | min }} of {{ job.total }}{% if job.current %}: {{ job.current }}{% endif %}
+    <progress max="1000" value="{{ ((job.done + job.fraction) / (job.total or 1) * 1000) | round | int }}"></progress>
+    <p class="muted small">You can leave this page: joining carries on. Each episode is either joined or left as it was.</p>
+    {% if not job.stop %}
+    <form method="post" action="/advanced/joining/stop" hx-target="#content">
+      <button class="button" type="submit">Stop joining</button>
+    </form>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="notice{{ ' success' if job.joined and not job.problems and not job.stop }}" role="status">
+    <strong>{{ "Stopped." if job.stop else "Finished." }}</strong>
+    {% if job.joined %}Joined {{ episodes(job.joined) }}; {{ job.deleted }} part{{ "" if job.deleted == 1 else "s" }} deleted.{% else %}Nothing was joined.{% endif %}
+    {% if job.stop and job.done < job.total %}The other {{ episodes(job.total - job.done) }} were left as they were; starting again carries on with them.{% endif %}
+  </div>
+  {% if job.problems %}
+  <div class="notice error" role="alert">
+    {{ "This episode was" if job.problems | length == 1 else "These episodes were" }} left as {{ "it was" if job.problems | length == 1 else "they were" }}:
+    <ul>{% for title, what in job.problems[:200] %}<li>{% if title %}<strong>{{ title }}</strong>: {% endif %}{{ what }}</li>{% endfor %}
+    {% if job.problems | length > 200 %}<li>…and {{ job.problems | length - 200 }} more.</li>{% endif %}</ul>
+  </div>
+  {% endif %}
+  <p class="form-buttons"><a class="button primary" href="/advanced">Done</a></p>
+{% endif %}
+</div>
