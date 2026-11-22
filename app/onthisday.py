@@ -19,6 +19,10 @@ day, in any year: on December 21st, every December 21st broadcast.
   anniversaries from that day on; unticking it takes them out of the feed.
 - Nothing runs in the background: the feed is worked out whenever it's
   read, as rolling feeds are.
+- Its edit page warns when the ticked series could bring a lot in one
+  day (more than ``CROWDED`` episodes), naming the series to blame, so
+  a big nightly show can get a feed of its own instead (owner's idea,
+  2026-11-22). Only a warning: saving still works.
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ KIND = "on_this_day"
 TITLE = "On this day"
 DESCRIPTION = "Broadcasts that first aired on this day in years past, from Airwave Archive."
 DAYS = 7                  # the feed holds this many days
+CROWDED = 10              # more episodes than this on one day brings a warning
 FULL_DATE = and_(Episode.air_year.is_not(None), Episode.air_month.is_not(None),
                  Episode.air_day.is_not(None))
 
@@ -125,6 +130,69 @@ def series_to_choose(session: Session) -> list[dict]:
         .where(Episode.series.is_not(None)).group_by(Episode.series)).all()
     return sorted(({"name": name, "episodes": total, "dated": dated} for name, total, dated in rows),
                   key=lambda s: sort_key(s["name"]))
+
+
+# ------------------------------------------------------- too many in a day
+
+def _day_of_year_words(month: int, day: int) -> str:
+    return f"{calendar.month_name[month]} {ordinal(day)}"
+
+
+def _years_words(first: int, last: int) -> str:
+    return f"in {first}" if first == last else f"from {first} to {last}"
+
+
+def crowding(session: Session, names) -> dict | None:
+    """Whether these series could bring more than ``CROWDED`` episodes on
+    one day of the year, and which to blame. Each series with that many
+    on its own busiest day is named, with the day and its years; when
+    none does but together they do, the busiest day and the series
+    bringing the most to it. None when every day is fine.
+
+    Counts episodes (a show in several parts is one), with a full air
+    date; February 29th counts with the 28th, as it comes out then."""
+    names = sorted({name for name in names if name})
+    if not names:
+        return None
+    counts: dict[str, dict[tuple[int, int], list[int]]] = {}
+    for series, month, day, number, first, last in session.execute(
+            select(Episode.series, Episode.air_month, Episode.air_day, func.count(Episode.id),
+                   func.min(Episode.air_year), func.max(Episode.air_year))
+            .where(Episode.series.in_(names), FULL_DATE)
+            .group_by(Episode.series, Episode.air_month, Episode.air_day)):
+        if not (1 <= month <= 12 and 1 <= day <= 31):
+            continue
+        key = (2, 28) if (month, day) == (2, 29) else (month, day)
+        seen = counts.setdefault(series, {}).get(key)
+        if seen:
+            seen[:] = [seen[0] + number, min(seen[1], first), max(seen[2], last)]
+        else:
+            counts[series][key] = [number, first, last]
+
+    to_blame = []
+    for series, days in counts.items():
+        key, (number, first, last) = max(days.items(), key=lambda kv: (kv[1][0], [-n for n in kv[0]]))
+        if number > CROWDED:
+            to_blame.append({"name": series, "most": number,
+                             "day_words": _day_of_year_words(*key),
+                             "years_words": _years_words(first, last)})
+    if to_blame:
+        to_blame.sort(key=lambda s: (-s["most"], sort_key(s["name"])))
+        return {"to_blame": to_blame}
+
+    totals: dict[tuple[int, int], int] = {}
+    for days in counts.values():
+        for key, (number, _, _) in days.items():
+            totals[key] = totals.get(key, 0) + number
+    if not totals:
+        return None
+    key, most = max(totals.items(), key=lambda kv: (kv[1], [-n for n in kv[0]]))
+    if most <= CROWDED:
+        return None
+    biggest = sorted(((series, days[key][0]) for series, days in counts.items() if key in days),
+                     key=lambda pair: (-pair[1], sort_key(pair[0])))[:3]
+    return {"together": most, "day_words": _day_of_year_words(*key),
+            "biggest": [{"name": name, "most": number} for name, number in biggest]}
 
 
 # ------------------------------------------------------------- the days
