@@ -196,6 +196,12 @@ def test_the_choice_is_fixed_once_published(client):
     assert len(titles(client, other)) == 4
 
 
+def test_the_usual_schedule_is_3_am_central(client):
+    page = client.get("/feeds/new?series=Suspense").text
+    assert 'name="roll_time" type="time" value="03:00"' in page
+    assert '<option value="America/Chicago" selected>US Central</option>' in page
+
+
 def test_choosing_how_often(client):
     sent = client.post("/feeds", data={"series": "Suspense", "title": "S", "release": "rolling",
                                        "roll_every": "week", "roll_weekday": "6", "roll_days": "",

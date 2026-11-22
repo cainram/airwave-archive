@@ -32,8 +32,11 @@ from sqlalchemy.orm import Session
 from app.db import Episode, Feed, FeedRelease, utcnow
 from app.episodes import TIME_PATTERN, TIME_ZONES, ordinal
 
-DEFAULT_TIME = "06:00"
-DEFAULT_ZONE = "America/New_York"
+# 3 AM: podcast apps fetch new episodes overnight, so they're on the
+# phone by morning (owner's choice, 2026-11-22). Also clear of the hour
+# the clocks change (2 AM in the US).
+DEFAULT_TIME = "03:00"
+DEFAULT_ZONE = "America/Chicago"      # US Central (owner's choice, 2026-11-22)
 DEFAULT_START = 1
 MAX_START = 999
 MAX_AT_ONCE = 999        # "Release more now"
@@ -217,7 +220,7 @@ def schedule_words(feed: Feed) -> str:
         often = f"every {feed.roll_days or DEFAULT_DAYS} days"
     else:
         often = "every day"
-    return f"One episode {often} at {at} ({TIME_ZONES.get(feed.roll_zone or '', 'US Eastern')})"
+    return f"One episode {often} at {at} ({TIME_ZONES.get(feed.roll_zone or '', TIME_ZONES[DEFAULT_ZONE])})"
 
 
 # ------------------------------------------------------------ releasing
