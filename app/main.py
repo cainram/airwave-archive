@@ -374,6 +374,9 @@ def upload_dir() -> Path:
     return Path(get_engine().url.database).parent / "uploaded-artwork"
 
 
+onthisday.picture_folder = upload_dir    # the "On this day" feed's own picture is kept there
+
+
 def run_scan() -> ScanRun:
     return sync_library(get_engine(), LIBRARY_DIR, art_dir())   # one at a time (LIBRARY_LOCK)
 

@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import calendar
 from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Callable
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -41,6 +43,29 @@ DESCRIPTION = "Broadcasts that first aired on this day in years past, from Airwa
 DAYS = 7                  # the feed holds this many days
 FULL_DATE = and_(Episode.air_year.is_not(None), Episode.air_month.is_not(None),
                  Episode.air_day.is_not(None))
+
+
+# Its own picture (a tuning dial; the drawing is docs/artwork/on-this-day.svg),
+# used until the owner uploads one. Kept with uploaded pictures: main sets
+# where that folder is.
+PICTURE = Path(__file__).parent / "static" / "on-this-day.jpg"
+picture_folder: Callable[[], Path] | None = None
+_saved: dict[Path, str | None] = {}
+
+
+def picture() -> str | None:
+    """The fingerprint of the feed's own picture (saved with the uploaded
+    pictures the first time it's needed)."""
+    if picture_folder is None:
+        return None
+    folder = picture_folder()
+    if folder not in _saved:
+        from app.artwork import save_picture
+        try:
+            _saved[folder] = save_picture(PICTURE.read_bytes(), folder)
+        except OSError:
+            return None
+    return _saved[folder]
 
 
 def the_feed(session: Session) -> Feed:

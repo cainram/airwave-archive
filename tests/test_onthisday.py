@@ -178,3 +178,14 @@ def test_a_renamed_series_stays_ticked(client):
     with Session(client.engine) as session:
         assert session.scalars(select(FeedSeries.series)).all() == ["Suspense!"]
         assert session.get(Episode, ep_id).series == "Suspense!"
+
+
+def test_its_own_picture(client):
+    page = client.get("/feeds").text
+    with Session(client.engine) as session:
+        art = onthisday.picture()
+        assert art and art == __import__("app.feeds", fromlist=["x"]).feed_picture(
+            session, session.get(Feed, client.feed_id), [])
+    assert f"/art/{art}.jpg" in page
+    assert client.get(f"/art/{art}.jpg").status_code == 200
+    assert "the feed's own picture, a tuning dial" in client.get(f"/feeds/{client.feed_id}/picture").text

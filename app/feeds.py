@@ -181,6 +181,9 @@ def feed_picture(session: Session, feed: Feed, found: list[Item]) -> str | None:
     hand-picked feed, that of the first episode's series that has one)."""
     if feed.art_hash:
         return feed.art_hash
+    if feed.kind is not None:
+        from app import onthisday
+        return onthisday.picture()
     names = [feed.series] if feed.series is not None else list(dict.fromkeys(
         item.episode.series for item in found if item.episode.series))
     for name in names:
