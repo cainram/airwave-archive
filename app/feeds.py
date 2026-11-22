@@ -22,6 +22,8 @@ from this server. Two kinds:
   feed are likewise a second apart in air-date order. The real air date goes in the description.
 - A rolling feed (app/rolling.py) lists only the episodes out so far,
   each dated when it came out.
+- The "On this day" feed (app/onthisday.py) lists the ticked series'
+  anniversaries of the last 7 days, each dated when its day came out.
 - An episode in several parts (Hour 1, Hour 2) is one item per part,
   since a podcast item holds one recording.
 - Feeds are "serial" shows: podcast apps list them oldest first, in
@@ -154,6 +156,9 @@ def feed_episodes(session: Session, feed: Feed) -> list[Episode]:
 def feed_items(session: Session, feed: Feed) -> list[Item]:
     """The feed's recordings, in the order podcast apps list them (for a
     rolling feed, only those out so far, dated when they came out)."""
+    if feed.kind is not None:
+        from app import onthisday           # (here, to avoid a circular import)
+        return onthisday.items(session, feed)
     added = None
     if feed.rolling:
         from app.rolling import released    # (here, to avoid a circular import)
@@ -296,8 +301,13 @@ def rss(session: Session, feed: Feed, base: str) -> bytes:
 
     root = ET.Element("rss", {"version": "2.0"})
     channel = _add(root, "channel")
-    description = feed.description or (
-        f"{feed.series}, from Airwave Archive." if feed.series else "Episodes from Airwave Archive.")
+    if feed.kind is not None:
+        from app.onthisday import DESCRIPTION
+        default = DESCRIPTION
+    else:
+        default = (f"{feed.series}, from Airwave Archive." if feed.series
+                   else "Episodes from Airwave Archive.")
+    description = feed.description or default
     _add(channel, "title", feed.title)
     _add(channel, "link", f"{base}/feeds/{feed.id}")
     _add(channel, "description", description)
@@ -347,6 +357,9 @@ def in_feed(session: Session, feed: Feed, f: AudioFile) -> bool:
     """Whether a recording belongs to this feed."""
     if f.episode_id is None:
         return False
+    if feed.kind is not None:
+        from app import onthisday
+        return onthisday.in_feed(session, feed, f)
     if feed.rolling:
         return session.get(FeedRelease, (feed.id, f.episode_id)) is not None
     if feed.series is None:

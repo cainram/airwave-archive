@@ -28,14 +28,14 @@ from app.db import (
     LibraryConversion, RenameBatch, ScanRun, make_engine, utcnow,
 )
 from app.episodes import (
-    LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_ZONES, apply_confirmed, apply_edits,
+    LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_PATTERN, TIME_ZONES, apply_confirmed, apply_edits,
     day_heading, format_air_date, format_air_span, format_air_time, format_time, has_standin_title,
     read_date_text, read_form, standin_title,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
 from app import (airdates, convert, converting, csvimport, deleting, export, feeds, genres, grouping,
-                 joining, rolling,
+                 joining, onthisday, rolling,
                  inbox, listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
@@ -273,7 +273,7 @@ VIEW_COOKIE = "airwave-view"
 # ("use a computer"). Nothing on a phone leads to them; this covers old
 # bookmarks and the like.
 MANAGING_PAGES = {
-    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "joining.html", "import.html", "import_preview.html",
+    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "joining.html", "feed_on_this_day_form.html", "import.html", "import_preview.html",
     "review.html", "groups_suggested.html", "edit.html", "bulk_edit.html", "export.html",
     "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
     "organize.html", "organized.html", "organize_history.html", "renaming.html",
@@ -2217,9 +2217,14 @@ def read_feed_form(form) -> tuple[dict, dict]:
 @app.get("/feeds", response_class=HTMLResponse)
 def feeds_page(request: Request):
     """All the podcast feeds, newest first."""
-    with Session(get_engine()) as session:
-        rows = []
-        for feed in session.scalars(select(Feed).order_by(Feed.created_at.desc())):
+    with Session(get_engine(), expire_on_commit=False) as session:
+        special = onthisday.the_feed(session)
+        session.commit()
+        rows = [{"feed": special, "art": feeds.feed_picture(session, special,
+                                                            feeds.feed_items(session, special)),
+                 "on_this_day": onthisday.status(session, special)}]
+        for feed in session.scalars(select(Feed).where(Feed.kind.is_(None))
+                                    .order_by(Feed.created_at.desc())):
             rolling.bring_up_to_date(session, feed)
             found = feeds.feed_items(session, feed)
             status = (rolling.status(session, feed, feeds.feed_episodes(session, feed))
@@ -2315,7 +2320,7 @@ def add_to_feed_page(request: Request, ids: list[int] = Query(default=[]), back:
     with Session(get_engine()) as session:
         picked = picked_episodes(session, ids)
         choices = list(session.scalars(
-            select(Feed).where(Feed.series.is_(None)).order_by(Feed.title)))
+            select(Feed).where(Feed.series.is_(None), Feed.kind.is_(None)).order_by(Feed.title)))
         session.expunge_all()
     return render(request, "feed_add.html", {
         "picked": picked, "choices": choices, "back": safe_back(back) if back else "/feeds"})
@@ -2361,6 +2366,10 @@ def feed_page(request: Request, feed_id: int, made: bool = False, published: str
         art = feeds.feed_picture(session, feed, found)
         first = found if feed.series is None else found[:FEED_PAGE_ITEMS]
         status, coming, came_out, hidden_out, hidden_coming = None, [], {}, 0, 0
+        special = onthisday.status(session, feed) if onthisday.is_it(feed) else None
+        if special:
+            now = utcnow()
+            came_out = {item.episode.id: rolling.day_words(feed, item.added, now) for item in found}
         if feed.rolling:
             # Out so far (newest last, as they came out), then what's to come.
             episodes = feeds.feed_episodes(session, feed)
@@ -2383,7 +2392,7 @@ def feed_page(request: Request, feed_id: int, made: bool = False, published: str
         "address": address, "podcast_address": podcast_address,
         "qr": feeds.qr_svg(podcast_address) if feed.published else None,
         "made": made, "published_now": published,
-        "rolling": status, "coming": coming, "came_out": came_out,
+        "rolling": status, "coming": coming, "came_out": came_out, "on_this_day": special,
         "hidden_out": hidden_out, "hidden_coming": hidden_coming,
         "max_at_once": rolling.MAX_AT_ONCE,
     })
@@ -2446,10 +2455,26 @@ async def release_more(request: Request, feed_id: int):
     return go_to(request, f"/feeds/{feed_id}?released={out}")
 
 
+def render_on_this_day_form(request: Request, session: Session, feed: Feed, values: dict,
+                            errors: dict):
+    """The "On this day" feed's own edit page: the series to tick, and when
+    the day turns over."""
+    found = onthisday.series_to_choose(session)
+    session.expunge_all()
+    return render(request, "feed_on_this_day_form.html", {
+        "feed": feed, "series": found, "values": values, "errors": errors,
+        "time_zones": TIME_ZONES}, status_code=400 if errors else 200)
+
+
 @app.get("/feeds/{feed_id}/edit", response_class=HTMLResponse)
 def edit_feed_form(request: Request, feed_id: int):
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
+        if onthisday.is_it(feed):
+            return render_on_this_day_form(request, session, feed, {
+                "series": set(onthisday.chosen(session, feed)),
+                "roll_time": feed.roll_time or rolling.DEFAULT_TIME,
+                "roll_zone": feed.roll_zone or rolling.DEFAULT_ZONE}, {})
         session.expunge_all()
     return render(request, "feed_form.html", {
         "feed": feed, "series": feed.series, "totals": None,
@@ -2462,7 +2487,11 @@ def edit_feed_form(request: Request, feed_id: int):
 
 @app.post("/feeds/{feed_id}/edit", response_class=HTMLResponse)
 async def edit_feed(request: Request, feed_id: int):
-    values, errors = read_whole_feed_form(await read_request_form(request))
+    form = await read_request_form(request)
+    with Session(get_engine()) as session:
+        if onthisday.is_it(get_feed(session, feed_id)):
+            return save_on_this_day(request, session, get_feed(session, feed_id), form)
+    values, errors = read_whole_feed_form(form)
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
         if not rolling.can_switch(feed):
@@ -2484,6 +2513,24 @@ async def edit_feed(request: Request, feed_id: int):
         feed.updated_at = utcnow()
         session.commit()
     return go_to(request, f"/feeds/{feed_id}")
+
+
+def save_on_this_day(request: Request, session: Session, feed: Feed, form):
+    """Save the "On this day" feed's ticked series and release time."""
+    values = {"series": set(filter(None, (str(name) for name in form.getlist("series")))),
+              "roll_time": str(form.get("roll_time", "")).strip() or rolling.DEFAULT_TIME,
+              "roll_zone": str(form.get("roll_zone", "")) or rolling.DEFAULT_ZONE}
+    errors = {}
+    if not TIME_PATTERN.match(values["roll_time"]):
+        errors["roll_time"] = "Give a time of day, like 3:00 AM."
+    if values["roll_zone"] not in TIME_ZONES:
+        errors["roll_zone"] = "Pick a time zone from the list."
+    if errors:
+        return render_on_this_day_form(request, session, feed, values, errors)
+    onthisday.choose(session, feed, sorted(values["series"]))
+    feed.roll_time, feed.roll_zone = values["roll_time"], values["roll_zone"]
+    session.commit()
+    return go_to(request, f"/feeds/{feed.id}?saved=1")
 
 
 @app.get("/feeds/{feed_id}/picture", response_class=HTMLResponse)
@@ -2570,6 +2617,8 @@ async def publish_feed(request: Request, feed_id: int):
 def delete_feed_page(request: Request, feed_id: int):
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
+        if onthisday.is_it(feed):
+            return go_to(request, f"/feeds/{feed_id}")      # always there
         session.expunge_all()
     return render(request, "feed_delete.html", {"feed": feed})
 
@@ -2580,7 +2629,10 @@ async def delete_feed(request: Request, feed_id: int):
     if str((await read_request_form(request)).get("confirm", "")) != "yes":
         raise HTTPException(status_code=400, detail="Not confirmed")
     with Session(get_engine()) as session:
-        session.delete(get_feed(session, feed_id))
+        feed = get_feed(session, feed_id)
+        if onthisday.is_it(feed):
+            raise HTTPException(status_code=400, detail="The On this day feed is always there")
+        session.delete(feed)
         session.commit()
     return go_to(request, "/feeds?deleted=1")
 

@@ -15,11 +15,9 @@
 
 {# Mobile: only feeds a podcast app can open (published ones), no making-a-feed hints. #}
 {% set rows = rows | selectattr("feed.published") | list if mobile else rows %}
+{% set others = rows | rejectattr("on_this_day") | list %}
 {% if not rows and mobile %}
 <div class="notice">No feeds yet.</div>
-{% elif not rows %}
-<div class="notice">No feeds yet. To make one, open a series and choose
-  <strong>☰ Actions → Make a feed…</strong></div>
 {% else %}
 <ul class="results feed-list">
   {% for row in rows %}
@@ -30,13 +28,17 @@
       <a class="title" href="/feeds/{{ feed.id }}">{{ feed.title }}</a>
       {% if mobile %}{% elif feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
       <div class="muted small">
+        {% if row.on_this_day %}{% set otd = row.on_this_day %}
+        {% if not otd.series %}Anniversaries · no series chosen yet{% else %}Anniversaries of {{ otd.series }} series · {{ otd.today }} broadcast{{ "" if otd.today == 1 else "s" }} today{% endif %}
+        {% else %}
         {% if feed.series %}Series: {{ feed.series }}{% else %}Hand-picked{% endif %}{% if not row.rolling %} · {{ row.episodes }} episode{{ "" if row.episodes == 1 else "s" }}{% endif %}
         {% if row.rolling %}· rolling: {{ row.rolling.out }} of {{ row.rolling.total }} out{% if row.rolling.paused %} (paused){% endif %}{% elif row.recordings != row.episodes %}({{ row.recordings }} recordings){% endif %}
+        {% endif %}
       </div>
     </div>
   </li>
   {% endfor %}
 </ul>
-{% if not mobile %}<p class="muted small">To make another, open a series and choose <strong>☰ Actions → Make a feed…</strong></p>{% endif %}
+{% if not mobile %}<p class="muted small">To make {{ "another" if others else "a feed of your own" }}, open a series and choose <strong>☰ Actions → Make a feed…</strong></p>{% endif %}
 {% endif %}
 {% endblock %}

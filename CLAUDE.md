@@ -211,6 +211,9 @@ These come from the plan and should not be changed without the owner's OK:
   schedule's release times (in a time zone, through clock changes),
   letting episodes out (each written down in `feed_releases`), catching
   up whenever the feed is read (no background job), and "Release more now"
+- `app/onthisday.py`: the "On this day" feed (made by the app, always
+  first on the Feeds page): the chosen series' anniversaries of the last
+  7 days, when the day turns over, titles with the year first
 - `app/joining.py`: joining multi-part episodes into one file (Advanced
   page): each part's format, which parts can be joined as they are and
   which need re-encoding, the joined file's name, chapter names, notes

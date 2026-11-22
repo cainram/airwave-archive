@@ -338,6 +338,8 @@ def follow_rename(session: Session, old: str | None, new: str | None) -> None:
         return   # other episodes still use the old name
     for feed in session.scalars(select(Feed).where(Feed.series == old)):
         feed.series = new
+    from app import onthisday     # (here, to avoid a circular import)
+    onthisday.follow_rename(session, old, new)
     genres.follow_rename(session, old, new)
     about = session.get(SeriesAbout, old)
     if about is not None:
