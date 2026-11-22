@@ -1460,6 +1460,13 @@ on first run. Built automatically by GitHub for each release.
   screenshots, download links (pointing to GitHub Releases), how to get
   past install warnings, Docker instructions, GPL v3, and "provided as-is,
   no support." No contact info.
+- Website: **v1.7** (2026-11-22) is the version the owner loves, kept to
+  go back to. **v1.8** (2026-11-22, the website now) adds a "Radio, on a
+  schedule." section on rolling feeds (tried first on a branch, previewed
+  side by side). The **"Travel by date."** card
+  (the calendar) is taken off the page for now (owner, 2026-11-22), and
+  may come back: its wording and pictures are in v1.7, and the pictures
+  (`images/desktop-calendar-*.webp`) stay in the repository.
 - Hosted on a small, separate VM on the public-facing VLAN, using Caddy
   (automatic HTTPS), with only ports 80/443 open, SSH over Tailscale only,
   and automatic security updates.
