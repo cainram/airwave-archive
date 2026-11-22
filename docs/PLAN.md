@@ -1034,10 +1034,20 @@ Steps:
   an ordinary feed; episodes already out keep their dates (their
   `feed_releases` rows stay), later ones appear straight away.
 
-#### Later — Your time zone (owner's idea, 2026-11-22)
-There's no setting for the owner's own time zone: each rolling feed has
-its own. Maybe later: one time zone for the app (on the Advanced page, or
-a future **Settings** page) used as the starting choice.
+#### Your time zone ✅ *done* (owner's idea, 2026-11-22)
+On the **Settings** page (below). It's the starting choice for new
+rolling feeds and the "On this day" feed (US Central until it's set);
+feeds that exist keep their own, changed on their own pages.
+
+### Settings page ✅ *done* (owner's request, 2026-11-22)
+A **cog** in the top bar, between the light / dark switch and the search
+box (not on the phone: it's for listening), opens **Settings**
+(`/settings`, `app/settings.py`, kept in the `settings` table):
+- **Your time zone** (above).
+- A red **Advanced Tools** link to the Advanced page, whose "← Settings"
+  button leads back.
+- Later: **a name setting** (for the feeds' default name or author, like
+  "Ramsey's Airwave Archive"): the owner is still thinking about it.
 
 #### "On this day" ✅ *done* (owner's idea and decisions, 2026-11-22)
 A feed that's always there at the **top of the Feeds list**, made by the
@@ -1281,8 +1291,11 @@ A page of **power-user tools** that work on the whole library at once
 - and similar bulk jobs added later
 
 How it works:
-- **Reached only by typing the address**: `http://<server>:8000/advanced`.
-  No link to it anywhere in the app, not in menus, the footer, or help text.
+- **Reached from Settings** (owner's choice, 2026-11-22): the red
+  **Advanced Tools** link at the bottom of the Settings page (the cog in
+  the top bar), or by typing `http://<server>:8000/advanced`. No other
+  link to it in menus, the footer, or help text. (Until 2026-11-22 it
+  was reached only by typing the address.)
 - **A big red bar across the top** of the page saying, in effect: *"These
   tools change your library files. You're on your own: keep backups and
   take a snapshot first."*
@@ -1302,7 +1315,7 @@ How it works:
   big library); confirming starts the background writer (Phase 10a),
   which checks every file and skips those already up to date.
   **Convert odd formats in the whole library** links to the existing
-  confirmation page (Phase 13d). Nothing in the app links to `/advanced`.
+  confirmation page (Phase 13d).
 - **Library off the top menu** (owner's choice, 2026-11-10, done with
   step 1): the Series page has **☰ Actions** with Rescan, Review file
   names, Find possible groups, Import spreadsheet, Convert odd formats,

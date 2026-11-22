@@ -79,7 +79,7 @@ def read_form(form) -> tuple[dict, dict]:
 
 def form_values(feed: Feed | None, zone: str = DEFAULT_ZONE) -> dict:
     """The form's starting values: the feed's, or the usual ones for a new
-    feed: rolling (owner's choice, 2026-11-22), with the time zone used last."""
+    feed: rolling (owner's choice, 2026-11-22), in your time zone (Settings)."""
     if feed is None or not feed.rolling:
         return {"release": "rolling" if feed is None else "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
                 "roll_start": str(DEFAULT_START), "roll_every": "day",
@@ -90,12 +90,6 @@ def form_values(feed: Feed | None, zone: str = DEFAULT_ZONE) -> dict:
             "roll_every": feed.roll_every or "day",
             "roll_weekday": str(feed.roll_weekday if feed.roll_weekday is not None else DEFAULT_WEEKDAY),
             "roll_days": str(feed.roll_days or DEFAULT_DAYS)}
-
-
-def last_zone(session: Session) -> str:
-    """The time zone of the rolling feed made last (to suggest it again)."""
-    return session.scalar(select(Feed.roll_zone).where(Feed.roll_zone.is_not(None))
-                          .order_by(Feed.created_at.desc()).limit(1)) or DEFAULT_ZONE
 
 
 def can_switch(feed: Feed | None) -> bool:

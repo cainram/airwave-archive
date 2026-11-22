@@ -31,7 +31,7 @@ from typing import Callable
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app import rolling
+from app import rolling, settings
 from app.db import AudioFile, Episode, Feed, FeedSeries, utcnow
 from app.episodes import ordinal
 from app.feeds import PART_SECONDS, Item, air_key, episode_title, new_token
@@ -75,7 +75,7 @@ def the_feed(session: Session) -> Feed:
     if feed is None:
         now = utcnow()
         feed = Feed(kind=KIND, token=new_token(), title=TITLE, newest_first=True,
-                    roll_time=rolling.DEFAULT_TIME, roll_zone=rolling.last_zone(session),
+                    roll_time=rolling.DEFAULT_TIME, roll_zone=settings.time_zone(session),
                     created_at=now, updated_at=now)
         session.add(feed)
         session.flush()

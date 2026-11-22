@@ -249,8 +249,8 @@ def test_the_form_checks_the_schedule(client):
     assert sent.status_code == 400
     assert "Give a time of day" in sent.text and "Pick a time zone" in sent.text
     assert "A number from 0 to 999" in sent.text and "A number of days from 2 to 365" in sent.text
-    # The time zone used last is suggested next time.
-    make_rolling(client, zone="Europe/London")
+    # New feeds start in your time zone (Settings).
+    client.post("/settings", data={"time_zone": "Europe/London"})
     assert '<option value="Europe/London" selected>' in client.get("/feeds/new?series=Suspense").text
 
 

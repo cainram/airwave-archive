@@ -40,8 +40,8 @@ it. Airwave Archive exists to be the calm alternative. So:
   choose or configure.
 - **Behind-the-scenes tools** (maintenance, bulk fixes, diagnostics,
   anything that "needs to exist" but isn't part of everyday use) should
-  be suggested for the **Advanced page** (`/advanced`), not added to the
-  everyday pages.
+  be suggested for the **Advanced page** (`/advanced`, reached from
+  Settings), not added to the everyday pages.
 - The mobile version is stricter still: listening only.
 
 ## About the owner — read this first
@@ -211,6 +211,9 @@ These come from the plan and should not be changed without the owner's OK:
   schedule's release times (in a time zone, through clock changes),
   letting episodes out (each written down in `feed_releases`), catching
   up whenever the feed is read (no background job), and "Release more now"
+- `app/settings.py`: the owner's settings (the Settings page, behind the
+  cog in the top bar): for now, your time zone, the starting choice for
+  new feeds
 - `app/onthisday.py`: the "On this day" feed (made by the app, always
   first on the Feeds page): the chosen series' anniversaries of the last
   7 days, when the day turns over, titles with the year first

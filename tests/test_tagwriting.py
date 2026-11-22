@@ -363,13 +363,14 @@ def test_a_few_ticked_are_written_straight_away(series):
 
 # ------------------------------------------------------------ the Advanced page
 
-def test_the_advanced_page_is_only_reached_by_its_address(series):
+def test_the_advanced_page_is_only_reached_from_settings(series):
     page = series.get("/advanced").text
     assert "These tools change your library files, all of them at once." in page
     assert 'href="/advanced/tags">Preview…' in page
     assert "15 files" in page                     # Suspense, Art Bell's 2 parts, 12 Escape
+    assert 'href="/advanced"' in series.get("/settings").text
     for address in ["/", "/series", "/library", "/series/episodes?name=Escape", "/inbox", "/feeds"]:
-        assert "/advanced" not in series.get(address).text
+        assert 'href="/advanced' not in series.get(address).text
 
 
 def test_writing_details_into_every_file(series):
