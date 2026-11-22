@@ -64,7 +64,7 @@
     <legend>How episodes come out</legend>
     {% if can_switch %}
     <label class="choice"><input type="radio" name="release" value="all" {% if not is_rolling %}checked{% endif %}>
-      <span>All at once <span class="muted small">— every episode is there when it's published</span></span></label>
+      <span>All at once <span class="muted small">— every episode is there when it's published, this may clutter your podcast app</span></span></label>
     <label class="choice"><input type="radio" name="release" value="rolling" {% if is_rolling %}checked{% endif %}>
       <span>Rolling <span class="muted small">— one at a time on a schedule, like a station rerunning the series</span></span></label>
     {% else %}
