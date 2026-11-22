@@ -743,6 +743,9 @@ a.day-title:hover { text-decoration: underline; }
    there's no choice: the feed is already rolling). */
 .feed-release:has(input[name="release"][value="all"]:checked) .rolling-options { display: none; }
 .rolling-options { margin: 6px 0 0 28px; }
+.rolling-every .if-week, .rolling-every .if-days { display: none; }
+.rolling-every:has(option[value="week"]:checked) .if-week { display: inline-block; }
+.rolling-every:has(option[value="days"]:checked) .if-days { display: inline-flex; gap: 8px; align-items: center; }
 .rolling-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
 .edit-form .rolling-row label { margin: 0; font-weight: normal; }
 .edit-form .rolling-row input, .edit-form .rolling-row select { width: auto; margin: 0; }

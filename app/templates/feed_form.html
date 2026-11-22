@@ -66,13 +66,35 @@
     <label class="choice"><input type="radio" name="release" value="all" {% if not is_rolling %}checked{% endif %}>
       <span>All at once <span class="muted small">— every episode is there when it's published</span></span></label>
     <label class="choice"><input type="radio" name="release" value="rolling" {% if is_rolling %}checked{% endif %}>
-      <span>Rolling <span class="muted small">— one a day, like a station rerunning the series</span></span></label>
+      <span>Rolling <span class="muted small">— one at a time on a schedule, like a station rerunning the series</span></span></label>
     {% else %}
     <input type="hidden" name="release" value="rolling">
     {% endif %}
     <div class="rolling-options">
+      <div class="rolling-row rolling-every">
+        <label for="roll_every">One episode</label>
+        <select id="roll_every" name="roll_every"
+                {% if errors.roll_every %}aria-invalid="true" aria-describedby="roll_every-error"{% endif %}>
+          {% for value, words in [("day", "every day"), ("weekdays", "every weekday (Monday to Friday)"),
+                                  ("week", "once a week, on"), ("days", "every few days")] %}
+          <option value="{{ value }}" {% if values.roll_every == value %}selected{% endif %}>{{ words }}</option>
+          {% endfor %}
+        </select>
+        <select class="if-week" name="roll_weekday" aria-label="Day of the week">
+          {% for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] %}
+          <option value="{{ loop.index0 }}" {% if values.roll_weekday == loop.index0 | string %}selected{% endif %}>{{ day }}</option>
+          {% endfor %}
+        </select>
+        <span class="if-days">(every
+          <input id="roll_days" name="roll_days" type="number" min="2" max="365" inputmode="numeric"
+                 value="{{ values.roll_days }}" aria-label="How many days"
+                 {% if errors.roll_days %}aria-invalid="true" aria-describedby="roll_days-error"{% endif %}>
+          days)</span>
+      </div>
+      {% if errors.roll_every %}<p id="roll_every-error" class="field-error">{{ errors.roll_every }}</p>{% endif %}
+      {% if errors.roll_days %}<p id="roll_days-error" class="field-error">{{ errors.roll_days }}</p>{% endif %}
       <div class="rolling-row">
-        <label for="roll_time">One episode every day at</label>
+        <label for="roll_time">at</label>
         <input id="roll_time" name="roll_time" type="time" value="{{ values.roll_time }}"
                {% if errors.roll_time %}aria-invalid="true" aria-describedby="roll_time-error"{% endif %}>
         <select id="roll_zone" name="roll_zone" aria-label="Time zone"

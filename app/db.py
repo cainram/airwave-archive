@@ -61,7 +61,7 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -340,7 +340,7 @@ class Feed(Base):
     # Rolling feeds (app/rolling.py): episodes come out on a schedule
     # instead of all at once. Each release is written down (FeedRelease).
     rolling: Mapped[bool] = mapped_column(default=False)
-    roll_every: Mapped[str | None]       # "day" (more to come)
+    roll_every: Mapped[str | None]       # "day", "weekdays", "week" or "days"
     roll_time: Mapped[str | None]        # "06:00", in roll_zone
     roll_zone: Mapped[str | None]        # like "America/New_York"
     roll_start: Mapped[int | None]       # how many come out when it's published
@@ -349,6 +349,8 @@ class Feed(Base):
     roll_paused: Mapped[bool] = mapped_column(default=False)
     # UTC: releases due up to this moment are out (None: not started yet).
     roll_checked_at: Mapped[datetime | None]
+    # UTC: when it was first published ("every N days" counts from that day).
+    roll_since: Mapped[datetime | None]
 
     picks: Mapped[list[FeedItem]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True)
@@ -541,6 +543,11 @@ def _migrate(conn) -> None:
                          ("roll_checked_at", "DATETIME")):
         if column not in feed_columns:
             conn.exec_driver_sql(f"ALTER TABLE feeds ADD COLUMN {column} {kind}")
+    # Version 27: when a rolling feed's schedule started.
+    if "roll_since" not in feed_columns:
+        conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN roll_since DATETIME")
+        conn.exec_driver_sql("UPDATE feeds SET roll_since = published_at"
+                             " WHERE rolling AND roll_checked_at IS NOT NULL")
     # Version 19: what converting an inbox file will do.
     if "convert_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")
