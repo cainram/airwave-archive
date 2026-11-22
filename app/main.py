@@ -217,6 +217,12 @@ def clear_tag_leftovers() -> None:
 
 
 @app.on_event("startup")
+def clear_join_leftovers() -> None:
+    """Half-made joined files that a restart stopped (in the background)."""
+    threading.Thread(target=joining.clear_leftovers, args=(LIBRARY_DIR,), daemon=True).start()
+
+
+@app.on_event("startup")
 def finish_renaming() -> None:
     """A rename that a restart interrupted: bring the app's records in
     line with where the files really are, before anything scans."""
@@ -267,7 +273,7 @@ VIEW_COOKIE = "airwave-view"
 # ("use a computer"). Nothing on a phone leads to them; this covers old
 # bookmarks and the like.
 MANAGING_PAGES = {
-    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "import.html", "import_preview.html",
+    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "joining.html", "import.html", "import_preview.html",
     "review.html", "groups_suggested.html", "edit.html", "bulk_edit.html", "export.html",
     "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
     "organize.html", "organized.html", "organize_history.html", "renaming.html",
@@ -1582,7 +1588,43 @@ def advanced_join_preview(request: Request, series: list[str] = Query(default=[]
     return render(request, "advanced_join_preview.html", {
         "series": series, "ready": ready[:JOIN_SHOWN], "ready_count": len(ready),
         "quick": sum(1 for p in ready if p.quick), "blocked": [p for p in plans if p.problem],
-        "files": sum(len(p.parts) for p in ready)})
+        "files": sum(len(p.parts) for p in ready), "busy": joining.busy()})
+
+
+@app.post("/advanced/join", response_class=HTMLResponse)
+async def advanced_join_start(request: Request):
+    """Join the ticked series' multi-part episodes (confirmed on the
+    preview), in the background, one at a time."""
+    form = await read_request_form(request)
+    if form.get("confirm") != "yes":
+        raise HTTPException(status_code=400, detail="Please confirm on the preview page first")
+    series = sorted(set(filter(None, form.getlist("series"))), key=sort_key)
+    if not joining.busy() and series:
+        with Session(get_engine()) as session:
+            ids = [p.episode.id for p in joining.plans_for(session, series, LIBRARY_DIR)
+                   if not p.problem]
+        joining.start(get_engine(), LIBRARY_DIR, ids, art_dir())
+    return go_to(request, "/advanced/joining")
+
+
+@app.get("/advanced/joining", response_class=HTMLResponse)
+def advanced_joining_page(request: Request):
+    """Progress of joining, with Stop; then what happened."""
+    if joining.current_job() is None:
+        return go_to(request, "/advanced/join")
+    return render(request, "joining.html", {"job": joining.current_job()})
+
+
+@app.get("/advanced/joining/status", response_class=HTMLResponse)
+def advanced_joining_status(request: Request):
+    """The progress box, asked for every couple of seconds while joining."""
+    return templates.TemplateResponse(request, "_joining.html", {"job": joining.current_job()})
+
+
+@app.post("/advanced/joining/stop", response_class=HTMLResponse)
+def advanced_joining_stop(request: Request):
+    joining.stop()
+    return go_to(request, "/advanced/joining")
 
 
 @app.get("/advanced/tags", response_class=HTMLResponse)

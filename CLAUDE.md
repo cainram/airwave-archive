@@ -213,8 +213,9 @@ These come from the plan and should not be changed without the owner's OK:
   up whenever the feed is read (no background job), and "Release more now"
 - `app/joining.py`: joining multi-part episodes into one file (Advanced
   page): each part's format, which parts can be joined as they are and
-  which need re-encoding, the joined file's name, chapter names and notes
-  to add, and the preview
+  which need re-encoding, the joined file's name, chapter names, notes
+  to add and the tidied title, the preview, and the joining itself (in
+  the background, one at a time, with Stop; checked before the parts go)
 - `app/convert.py`: converting formats that don't play well (video
   files, RealAudio, WMA, Ogg, Opus, and lossless FLAC, WAV and AIFF)
   with ffmpeg: looking inside a file
