@@ -1044,7 +1044,7 @@ A **cog** in the top bar, between the light / dark switch and the search
 box (not on the phone: it's for listening), opens **Settings**
 (`/settings`, `app/settings.py`, kept in the `settings` table):
 - **Your time zone** (above).
-- A red **Advanced Tools** link to the Advanced page, whose "← Settings"
+- A red **Advanced Tools** button to the Advanced page, whose "← Settings"
   button leads back.
 - Later: **a name setting** (for the feeds' default name or author, like
   "Ramsey's Airwave Archive"): the owner is still thinking about it.
@@ -1292,7 +1292,7 @@ A page of **power-user tools** that work on the whole library at once
 
 How it works:
 - **Reached from Settings** (owner's choice, 2026-11-22): the red
-  **Advanced Tools** link at the bottom of the Settings page (the cog in
+  **Advanced Tools** button at the bottom of the Settings page (the cog in
   the top bar), or by typing `http://<server>:8000/advanced`. No other
   link to it in menus, the footer, or help text. (Until 2026-11-22 it
   was reached only by typing the address.)

@@ -669,9 +669,8 @@ a.day-title:hover { text-decoration: underline; }
 .settings-cog:hover { color: var(--accent); background: var(--hover); }
 .settings-cog[aria-current="page"] { color: var(--tint-text); background: var(--tint); }
 .settings-cog:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-/* Settings: the way to the Advanced tools, in red. */
+/* Settings: the way to the Advanced tools (a red button), set apart. */
 .advanced-link { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
-.advanced-link a { color: var(--error-text); font-weight: 600; }
 
 /* Deleting: the red button, and the list of files that will go. */
 .button.danger { background: var(--error-text); border-color: var(--error-text); color: var(--panel); font-weight: 600; }

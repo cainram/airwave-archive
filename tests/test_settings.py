@@ -34,7 +34,7 @@ def test_the_cog_and_the_page(client):
     assert home.index("theme-switch") < home.index("settings-cog") < home.index("search-box")
     page = client.get("/settings").text
     assert '<option value="America/Chicago" selected>' in page       # US Central to start
-    assert '<p class="advanced-link"><a href="/advanced">Advanced Tools</a></p>' in page
+    assert '<p class="advanced-link"><a class="button danger" href="/advanced">Advanced Tools</a></p>' in page
     assert 'aria-current="page"' in page.split("settings-cog")[1].split("</a>")[0]
     assert 'href="/settings">← Settings</a>' in client.get("/advanced").text
 
