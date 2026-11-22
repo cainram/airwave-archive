@@ -200,6 +200,11 @@ def test_the_usual_schedule_is_3_am_central(client):
     page = client.get("/feeds/new?series=Suspense").text
     assert 'name="roll_time" type="time" value="03:00"' in page
     assert '<option value="America/Chicago" selected>US Central</option>' in page
+    assert 'value="rolling" checked' in page                  # rolling to start with
+    feed_id = int(re.search(r"/feeds/(\d+)", client.post(
+        "/feeds", data={"series": "Suspense", "title": "S", "release": "all"},
+        follow_redirects=False).headers["location"])[1])
+    assert 'value="all" checked' in client.get(f"/feeds/{feed_id}/edit").text
 
 
 def test_choosing_how_often(client):

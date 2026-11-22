@@ -78,9 +78,9 @@ def read_form(form) -> tuple[dict, dict]:
 
 def form_values(feed: Feed | None, zone: str = DEFAULT_ZONE) -> dict:
     """The form's starting values: the feed's, or the usual ones for a new
-    feed (with the time zone used last)."""
+    feed: rolling (owner's choice, 2026-11-22), with the time zone used last."""
     if feed is None or not feed.rolling:
-        return {"release": "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
+        return {"release": "rolling" if feed is None else "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
                 "roll_start": str(DEFAULT_START), "roll_every": "day",
                 "roll_weekday": str(DEFAULT_WEEKDAY), "roll_days": str(DEFAULT_DAYS)}
     return {"release": "rolling", "roll_time": feed.roll_time or DEFAULT_TIME,

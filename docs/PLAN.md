@@ -981,7 +981,8 @@ use Airwave Archive as a podcast feeder that fills their phones overnight
 while they sleep. (The mobile version stays and keeps being refined.)
 
 Decisions (owner, 2026-11-22):
-- **Chosen when making the feed**, or while it's still a draft. A rolling
+- **Chosen when making the feed** (Rolling is picked to start with, owner's
+  choice 2026-11-22), or while it's still a draft. A rolling
   feed can later be switched to All at once (the rest come out then); not
   the other way (episodes would vanish from podcast apps).
 - **Schedule:** every day, weekdays, weekly on a chosen day, or every N
