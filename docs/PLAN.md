@@ -1020,7 +1020,8 @@ Steps:
   Going back to a draft and publishing again carries on from then (the
   missed releases don't all come out). `app/rolling.py`.
 - Step 2 ✅ *done* (2026-11-22): the other schedules: every weekday
-  (Monday to Friday), once a week on a chosen day, every few days (2 to
+  (Monday to Friday), **Weekend Warrior** (Friday, Saturday and Sunday;
+  owner's idea), once a week on a chosen day, every few days (2 to
   365, counted from the day it was first published: `feeds.roll_since`,
   database version 27). The schedule can be changed after publishing.
 - Step 3 ✅ *done* (2026-11-22): **Pause releases** (☰ Actions; what was

@@ -55,6 +55,19 @@ def test_weekdays_skip_the_weekend():
         "Monday, November 23rd at 6:00 AM"
 
 
+def test_weekend_warrior():
+    feed = daily()
+    feed.roll_every = "weekend"
+    # Monday, November 16th to Monday, November 23rd, 2026.
+    found = rolling.release_times(feed, datetime(2026, 11, 16, 0), datetime(2026, 11, 23, 23))
+    assert [d.day for d in found] == [20, 21, 22]
+    assert rolling.schedule_words(feed) == \
+        "One episode every Friday, Saturday and Sunday at 6:00 AM (US Eastern)"
+    now = datetime(2026, 11, 23, 12)             # Monday
+    assert rolling.when_words(feed, rolling.next_release(feed, now), now) == \
+        "Friday, November 27th at 6:00 AM"
+
+
 def test_once_a_week():
     feed = daily()
     feed.roll_every, feed.roll_weekday = "week", 5     # Saturdays

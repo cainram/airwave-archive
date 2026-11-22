@@ -2,7 +2,8 @@
 station rerunning a series), instead of all at once.
 
 - The schedule: one episode at a set time of day, in a chosen time zone,
-  every day, every weekday (Monday to Friday), once a week on a chosen
+  every day, every weekday (Monday to Friday), every Friday, Saturday and
+  Sunday ("Weekend Warrior"), once a week on a chosen
   day, or every few days (counted from the day it was first published).
   The time stays the same local time when the clocks change.
 - When the feed is published, the first few (how many is chosen) come
@@ -40,7 +41,7 @@ DEFAULT_ZONE = "America/Chicago"      # US Central (owner's choice, 2026-11-22)
 DEFAULT_START = 1
 MAX_START = 999
 MAX_AT_ONCE = 999        # "Release more now"
-EVERY = ("day", "weekdays", "week", "days")
+EVERY = ("day", "weekdays", "weekend", "week", "days")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 DEFAULT_WEEKDAY = 5      # Saturday
 DEFAULT_DAYS = 2
@@ -144,6 +145,8 @@ def _is_release_day(feed: Feed, day: date) -> bool:
     every = feed.roll_every or "day"
     if every == "weekdays":
         return day.weekday() < 5
+    if every == "weekend":          # "Weekend Warrior" (owner's idea, 2026-11-22)
+        return day.weekday() >= 4
     if every == "week":
         return day.weekday() == (feed.roll_weekday if feed.roll_weekday is not None
                                  else DEFAULT_WEEKDAY)
@@ -214,6 +217,8 @@ def schedule_words(feed: Feed) -> str:
     every = feed.roll_every or "day"
     if every == "weekdays":
         often = "every weekday (Monday to Friday)"
+    elif every == "weekend":
+        often = "every Friday, Saturday and Sunday"
     elif every == "week":
         often = f"every {WEEKDAYS[feed.roll_weekday if feed.roll_weekday is not None else DEFAULT_WEEKDAY]}"
     elif every == "days":
