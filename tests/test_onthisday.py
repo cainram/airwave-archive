@@ -189,3 +189,84 @@ def test_its_own_picture(client):
     assert f"/art/{art}.jpg" in page
     assert client.get(f"/art/{art}.jpg").status_code == 200
     assert "the feed's own picture, a tuning dial" in client.get(f"/feeds/{client.feed_id}/picture").text
+
+
+# ------------------------------------------------- too many in one day
+
+def add_episodes(client, series, month, day, years):
+    """Episodes of a series broadcast on this day of the year in these
+    years (records only: no files needed to count them)."""
+    with Session(client.engine) as session:
+        for year in years:
+            session.add(Episode(series=series, title=f"{series} {year}", air_year=year,
+                                air_month=month, air_day=day, created_at=utcnow(), updated_at=utcnow()))
+        session.commit()
+
+
+def crowding(client, *series):
+    with Session(client.engine) as session:
+        return onthisday.crowding(session, series)
+
+
+def test_no_warning_while_every_day_is_fine(client):
+    add_episodes(client, "Dreamland", 11, 22, range(1994, 2003))    # 9 ...
+    add_episodes(client, "Escape", 11, 22, [1950])                   # ... and 1: 10 is fine
+    assert crowding(client) is None
+    assert crowding(client, "Escape", "Dreamland") is None
+
+
+def test_a_series_with_too_many_on_one_day_is_named(client):
+    add_episodes(client, "Dreamland", 11, 22, range(1993, 2008))    # 15 on November 22nd
+    add_episodes(client, "Dreamland", 11, 23, range(1993, 1998))    # 5 on the 23rd
+    found = crowding(client, "Escape", "Dreamland")
+    assert found == {"to_blame": [{"name": "Dreamland", "most": 15,
+                                   "day_words": "November 22nd", "years_words": "from 1993 to 2007"}]}
+
+
+def test_a_show_in_parts_counts_once_and_feb_29th_counts_with_the_28th(client):
+    add_episodes(client, "Dimension X", 2, 28, range(1950, 1960))           # 10 on the 28th
+    assert crowding(client, "Dimension X") is None
+    add_episodes(client, "Dimension X", 2, 29, [1952])                       # an 11th that day
+    assert crowding(client, "Dimension X")["to_blame"][0]["day_words"] == "February 28th"
+
+
+def test_several_series_together(client):
+    add_episodes(client, "Fort Laramie", 4, 14, range(1950, 1956))
+    add_episodes(client, "Escape", 4, 14, range(1950, 1954))
+    add_episodes(client, "Dragnet", 4, 14, [1951])
+    add_episodes(client, "X Minus One", 4, 14, [1955])
+    found = crowding(client, "Fort Laramie", "Escape", "Dragnet", "X Minus One")
+    assert found == {"together": 12, "day_words": "April 14th",
+                     "biggest": [{"name": "Fort Laramie", "most": 6}, {"name": "Escape", "most": 4},
+                                 {"name": "Dragnet", "most": 1}]}
+    assert crowding(client, "Fort Laramie", "Escape") is None
+
+
+def test_the_edit_page_warns_above_both_save_buttons(client):
+    add_episodes(client, "Dreamland", 11, 22, range(1993, 2008))
+    page = client.get(f"/feeds/{client.feed_id}/edit").text
+    assert "Some days could bring" not in page
+    assert page.count('class="crowding"') == 2
+    tick(client, "Dreamland")
+    page = client.get(f"/feeds/{client.feed_id}/edit").text
+    assert page.count("<strong>Dreamland</strong> alone has up to 15 on one day") == 2
+    assert page.index('id="crowding-top"') < page.index("<h2>Series</h2>") < page.index('id="crowding-bottom"')
+
+
+def test_the_warning_is_checked_again_as_series_are_ticked(client):
+    add_episodes(client, "Dreamland", 11, 22, range(1993, 2008))
+    add_episodes(client, "<Odd> & Co", 11, 22, range(1980, 1992))
+    url = f"/feeds/{client.feed_id}/crowding"
+    sent = client.post(url, data={"series": ["Dreamland", "<Odd> & Co"]}, headers={"HX-Request": "true"})
+    assert sent.status_code == 200
+    assert sent.text.count('hx-swap-oob="true"') == 2
+    assert 'id="crowding-top"' in sent.text and 'id="crowding-bottom"' in sent.text
+    assert "<strong>Dreamland</strong>: up to 15 on one day (November 22nd, from 1993 to 2007)" in sent.text
+    assert "&lt;Odd&gt; &amp; Co" in sent.text and "<Odd>" not in sent.text
+    assert "feeds of their own" in sent.text
+    sent = client.post(url, data={"series": ["Suspense"]})
+    assert "Some days could bring" not in sent.text and sent.text.count('class="crowding"') == 2
+    client.post("/feeds", data={"series": "Gunsmoke", "title": "Gunsmoke", "description": ""})
+    with Session(client.engine) as session:
+        ordinary = session.scalar(select(Feed).where(Feed.id != client.feed_id))
+    assert client.post(f"/feeds/{ordinary.id}/crowding", data={}).status_code == 404

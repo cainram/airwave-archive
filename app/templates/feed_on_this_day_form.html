@@ -6,6 +6,10 @@
 <p class="muted">Each day, the ticked series' broadcasts that first aired on that day, in any year.
   Tick a series to bring in its anniversaries from today; untick it to take them out of the feed.</p>
 
+{# As the owner ticks, the warnings above both Save buttons are checked again. #}
+<div hidden hx-post="/feeds/{{ feed.id }}/crowding" hx-trigger="change from:#on-this-day delay:150ms"
+     hx-include="#on-this-day" hx-swap="none"></div>
+
 <form id="on-this-day" class="edit-form" method="post" action="/feeds/{{ feed.id }}/edit">
   <fieldset class="feed-order">
     <legend>When the day turns over</legend>
@@ -25,6 +29,7 @@
     <p class="muted small">The feed holds the last 7 days, so a phone that missed a day still catches up.</p>
   </fieldset>
 
+  {% with place = "top" %}{% include "_crowding.html" %}{% endwith %}
   <div class="form-buttons">
     <button class="button primary" type="submit">Save</button>
     <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
@@ -54,6 +59,7 @@
       {% endfor %}
     </tbody>
   </table>
+  {% with place = "bottom" %}{% include "_crowding.html" %}{% endwith %}
   <div class="form-buttons">
     <button class="button primary" type="submit">Save</button>
     <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>

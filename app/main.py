@@ -2485,10 +2485,26 @@ def render_on_this_day_form(request: Request, session: Session, feed: Feed, valu
     """The "On this day" feed's own edit page: the series to tick, and when
     the day turns over."""
     found = onthisday.series_to_choose(session)
+    crowding = onthisday.crowding(session, values["series"])
     session.expunge_all()
     return render(request, "feed_on_this_day_form.html", {
         "feed": feed, "series": found, "values": values, "errors": errors,
-        "time_zones": TIME_ZONES}, status_code=400 if errors else 200)
+        "crowding": crowding, "time_zones": TIME_ZONES}, status_code=400 if errors else 200)
+
+
+@app.post("/feeds/{feed_id}/crowding", response_class=HTMLResponse)
+async def on_this_day_crowding(request: Request, feed_id: int):
+    """The "On this day" edit page's warnings, checked again as the owner
+    ticks series (both: above each Save button)."""
+    form = await read_request_form(request)
+    with Session(get_engine()) as session:
+        if not onthisday.is_it(get_feed(session, feed_id)):
+            raise HTTPException(status_code=404, detail="Not the On this day feed")
+        crowding = onthisday.crowding(session, (str(name) for name in form.getlist("series")))
+    template = templates.get_template("_crowding.html")
+    html = "".join(template.render(crowding=crowding, place=place, oob=True)
+                   for place in ("top", "bottom"))
+    return HTMLResponse(html)
 
 
 @app.get("/feeds/{feed_id}/edit", response_class=HTMLResponse)

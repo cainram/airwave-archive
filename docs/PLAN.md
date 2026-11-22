@@ -1072,6 +1072,17 @@ draft like any feed (Publish to switch its address on).
 - Only episodes with a **full air date** (day, month and year).
 - **February 29th** broadcasts come out on February 28th in other years.
 - Worked out whenever it's read; nothing runs in the background.
+- **A warning when a day could bring too many** (owner's idea and
+  decisions, 2026-11-22): if the ticked series could bring **more than 10
+  episodes on one day** of the year (a show in parts counts once), a
+  warning box appears **above both Save buttons** on the edit page,
+  checked again **as boxes are ticked** (before saving). It names the
+  series to blame, with its busiest day and years ("Coast to Coast AM
+  alone has up to 15 on one day (November 22nd, from 1993 to 2007). It
+  might be better as a feed of its own."), or, when no one series is
+  too big but together they are, the busiest day and the series bringing
+  the most. Only a warning: saving still works. No cap on the feed, and
+  no "make it its own feed" button (owner's choices).
 
 ### Suggested groups (v1.1 and v1.2)
 Owner's request, 2026-11-08: find files that are probably parts of one

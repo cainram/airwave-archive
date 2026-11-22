@@ -112,6 +112,9 @@ code { font-size: 0.9em; color: var(--accent); }
 }
 .notice.warning { background: var(--warn-bg); border-color: var(--warn-line); }
 .notice.warning form { margin-top: 10px; }
+/* "On this day": the warning above both Save buttons when a day could bring a lot. */
+.crowding .notice > :first-child { margin-top: 0; }
+.crowding .notice > :last-child { margin-bottom: 0; }
 /* A series' "About" text, under its genres: line breaks kept, a comfortable width. */
 .upload-form textarea { resize: vertical; font: inherit; line-height: 1.5; }
 .series-about-source { margin: 4px 0 0; }

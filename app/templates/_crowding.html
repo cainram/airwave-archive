@@ -1,0 +1,30 @@
+{#- The "On this day" edit page's warning when the ticked series could bring
+    a lot in one day. Shown above both Save buttons ("place" is top or
+    bottom); sent again as the owner ticks (oob: replaces both). -#}
+<div id="crowding-{{ place }}" class="crowding"{% if oob %} hx-swap-oob="true"{% endif %}{% if place == "top" %} aria-live="polite"{% endif %}>
+  {%- if crowding %}
+  <div class="notice warning">
+    {%- if crowding.to_blame|length == 1 %}{% set s = crowding.to_blame[0] %}
+    <p>⚠ Some days could bring a lot of episodes.
+      <strong>{{ s.name }}</strong> alone has up to {{ s.most }} on one day ({{ s.day_words }}, {{ s.years_words }}).
+      It might be better as a feed of its own.</p>
+    {%- elif crowding.to_blame %}
+    <p>⚠ Some days could bring a lot of episodes:</p>
+    <ul>
+      {%- for s in crowding.to_blame %}
+      <li><strong>{{ s.name }}</strong>: up to {{ s.most }} on one day ({{ s.day_words }}, {{ s.years_words }})</li>
+      {%- endfor %}
+    </ul>
+    <p>They might be better as feeds of their own.</p>
+    {%- else %}
+    <p>⚠ Some days could bring a lot of episodes.
+      Together, the ticked series have up to {{ crowding.together }} on one day ({{ crowding.day_words }}).
+      The most come from
+      {% for s in crowding.biggest -%}
+        <strong>{{ s.name }}</strong> ({{ s.most }}){% if not loop.last %}{% if loop.revindex == 2 %} and {% else %}, {% endif %}{% endif %}
+      {%- endfor %}.
+      One of them might be better as a feed of its own.</p>
+    {%- endif %}
+  </div>
+  {%- endif %}
+</div>
