@@ -1,0 +1,62 @@
+{% extends layout %}
+{% block title %}Join multi-part episodes: preview · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/advanced/join">← Back</a></nav>
+<h1>Join multi-part episodes</h1>
+{% macro plural(n, word) %}{{ n }} {{ word }}{{ "" if n == 1 else "s" }}{% endmacro %}
+
+{% if not series %}
+<div class="notice">No series were ticked.</div>
+{% elif not ready_count and not blocked %}
+<div class="notice">Those series have no episodes in several parts.</div>
+{% else %}
+<p class="muted">{{ series | join(", ") }}</p>
+<div class="notice" role="note">
+  <p><strong>{{ plural(ready_count, "episode") }} ({{ plural(files, "file") }}) can be joined.</strong>
+    {% if ready_count %}{{ quick }} without touching the sound{% if ready_count - quick %}; {{ ready_count - quick }} with a part re-encoded to match the others{% endif %}.{% endif %}
+    {% if blocked %}{{ plural(blocked | length, "episode") }} can't be joined yet (see below).{% endif %}</p>
+  <p class="muted small">Each joined file gets the episode's details in its tags and a chapter at each part.
+    The parts are deleted once the joined file has been checked. <strong>Nothing has been changed yet.</strong></p>
+</div>
+<p class="muted small">Joining itself arrives in the next step: for now this page only shows what it would do.</p>
+
+{% if ready %}
+<ul class="join-plans">
+  {% for plan in ready %}
+  <li class="join-plan">
+    <div class="join-head">
+      <strong>{{ plan.episode.title or "Untitled" }}</strong>
+      <span class="muted small">{% for part in [plan.episode.series, plan.episode | air_date(short=true), plan.seconds | duration] if part %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+      {% if plan.quick %}<span class="badge played">Quick join</span>{% else %}<span class="badge">Re-encode {{ "part" if plan.parts | selectattr("reencode") | list | length == 1 else "parts" }} {{ plan.parts | selectattr("reencode") | map(attribute="file.part_number") | join(", ") }}</span>{% endif %}
+    </div>
+    <p class="small">New file: <code>{{ plan.path }}</code> <span class="muted">({{ plan.sound.words() }})</span></p>
+    <ol class="join-parts small">
+      {% for p in plan.parts %}
+      <li><code>{{ p.file.name }}</code> <span class="muted">— chapter “{{ p.chapter }}”{% if p.reencode %}; {{ p.sound.words() }}, re-encoded at {{ p.target_kbps }} kbps{% endif %}</span></li>
+      {% endfor %}
+    </ol>
+    {% for note in plan.notes_added %}
+    <p class="small">Added to the notes: <q>{{ note }}</q></p>
+    {% endfor %}
+  </li>
+  {% endfor %}
+</ul>
+{% if ready_count > ready | length %}
+<p class="muted small">…and {{ ready_count - ready | length }} more, joined the same way.</p>
+{% endif %}
+{% endif %}
+
+{% if blocked %}
+<h2>Can't be joined yet</h2>
+<ul class="join-plans">
+  {% for plan in blocked %}
+  <li class="join-plan">
+    <strong>{{ plan.episode.title or "Untitled" }}</strong>
+    <span class="muted small">{{ plan.episode.series or "" }}</span>
+    <p class="small warning-text">{{ plan.problem }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+{% endblock %}

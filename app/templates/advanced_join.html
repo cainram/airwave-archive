@@ -1,0 +1,36 @@
+{% extends layout %}
+{% block title %}Join multi-part episodes · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/advanced">← Advanced</a></nav>
+<h1>Join multi-part episodes</h1>
+<p class="muted">Tick the series whose multi-part episodes you want joined, or tick all for the whole
+  library. The next page shows exactly what would happen; nothing changes until you confirm there.</p>
+
+{% if not series %}
+<div class="notice">No episodes are in several parts, so there's nothing to join.</div>
+{% else %}
+<form id="chosen" method="get" action="/advanced/join/preview">
+  <div class="pick-toolbar">
+    <button class="button primary" type="submit">Preview…</button>
+  </div>
+  <table class="files">
+    <thead>
+      <tr>
+        <th class="pick"><input type="checkbox" form="chosen" data-select-all="series" aria-label="Tick all series"></th>
+        <th>Series</th>
+        <th class="num">Episodes in parts</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in series %}
+      <tr>
+        <td class="pick"><input type="checkbox" form="chosen" name="series" value="{{ s.name }}" id="series-{{ loop.index }}"></td>
+        <td class="name"><label for="series-{{ loop.index }}">{{ s.name }}</label></td>
+        <td class="num">{{ s.episodes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% endif %}
+{% endblock %}

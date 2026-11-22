@@ -1314,6 +1314,42 @@ How it works:
   lock**. Anyone on the network who knows the address can open it. That's
   fine for a single household, but it isn't security.
 
+### Join multi-part episodes (owner's request, 2026-11-22)
+An Advanced page tool: join each episode's parts ("Hour 1", "Hour 2"...)
+into **one file**, by series or for the whole library. Mainly for podcast
+feeds (one item per broadcast instead of one per part) and other players.
+
+Decisions (owner, 2026-11-22):
+- **The parts are deleted** once the joined file has been checked (the
+  owner keeps backups and snapshots). A ground-rule exception (the fifth).
+- **Chapters** at each part, named from the part's own title when it says
+  more than the episode's title and "Hour 2"; else "Hour 2" (from the
+  title or file name), else "Part 2".
+- **The least damage to the sound:** parts in the same format (MP3 or AAC,
+  same sample rate and channels) are laid end to end without re-encoding.
+  Otherwise the format most of the episode's time is in wins, and only the
+  other parts are re-encoded, once, at the encoder's best quality and a
+  bitrate a little above their own. Parts to convert first (WMA, FLAC...)
+  wait until they've been converted.
+- **Details:** the joined file gets the episode's details (as the app shows
+  them). A part's comment missing from the episode's notes (notes typed by
+  hand) is added, as "Part 2: ...". Other tags that disagree give way to
+  the episode's details.
+- The joined file is named like part 1 without its "Hour 1", in part 1's
+  folder (" (joined)" added if another file has that name). The episode
+  keeps its record, so listening places, feeds and groups carry on.
+
+Steps:
+- Step 1 ✅ *done* (2026-11-22): Advanced → **Join multi-part episodes** →
+  choose series (tick all for the whole library) → a **preview** of every
+  episode: its parts, the new file, quick join or which part is
+  re-encoded, chapter names, notes to add, and those that can't be joined
+  yet (a part missing, to convert first, unreadable, in different
+  folders). Changes nothing. `app/joining.py`.
+- Step 2: joining, in the background (one at a time, progress, Stop):
+  re-encode odd parts, join, chapters and tags, check, swap in for part 1,
+  delete the other parts, move listening places.
+
 ### Genres (owner's request, 2026-11-12)
 The owner gives each **series** one or more genres ("Western", "Comedy"),
 or none. Every series starts with none, and genre tags inside files are

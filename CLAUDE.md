@@ -122,6 +122,12 @@ These come from the plan and should not be changed without the owner's OK:
   after a preview listing every old and new name. Every move is written
   down so it can be put back; an existing file is never replaced; only
   folders left completely empty are removed (`app/renaming.py`).
+  The fifth exception (owner's choice, 2026-11-22): **joining an
+  episode's parts** into one file (an Advanced page tool), only after a
+  preview listing every episode, its parts and the new file. Parts in
+  the same format are joined without re-encoding; only odd ones out are
+  re-encoded, once, at the best quality. The parts are deleted once the
+  joined file has been checked (`app/joining.py`).
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
 - **Single household, self-hosted.** No user accounts for strangers, no cloud
@@ -205,6 +211,10 @@ These come from the plan and should not be changed without the owner's OK:
   schedule's release times (in a time zone, through clock changes),
   letting episodes out (each written down in `feed_releases`), catching
   up whenever the feed is read (no background job), and "Release more now"
+- `app/joining.py`: joining multi-part episodes into one file (Advanced
+  page): each part's format, which parts can be joined as they are and
+  which need re-encoding, the joined file's name, chapter names and notes
+  to add, and the preview
 - `app/convert.py`: converting formats that don't play well (video
   files, RealAudio, WMA, Ogg, Opus, and lossless FLAC, WAV and AIFF)
   with ffmpeg: looking inside a file
