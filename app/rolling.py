@@ -2,7 +2,8 @@
 station rerunning a series), instead of all at once.
 
 - The schedule: one episode at a set time of day, in a chosen time zone,
-  every day, every weekday (Monday to Friday), once a week on a chosen
+  every day, every weekday (Monday to Friday), every Friday, Saturday and
+  Sunday ("Weekend Warrior"), once a week on a chosen
   day, or every few days (counted from the day it was first published).
   The time stays the same local time when the clocks change.
 - When the feed is published, the first few (how many is chosen) come
@@ -32,12 +33,15 @@ from sqlalchemy.orm import Session
 from app.db import Episode, Feed, FeedRelease, utcnow
 from app.episodes import TIME_PATTERN, TIME_ZONES, ordinal
 
-DEFAULT_TIME = "06:00"
-DEFAULT_ZONE = "America/New_York"
+# 3 AM: podcast apps fetch new episodes overnight, so they're on the
+# phone by morning (owner's choice, 2026-11-22). Also clear of the hour
+# the clocks change (2 AM in the US).
+DEFAULT_TIME = "03:00"
+DEFAULT_ZONE = "America/Chicago"      # US Central (owner's choice, 2026-11-22)
 DEFAULT_START = 1
 MAX_START = 999
 MAX_AT_ONCE = 999        # "Release more now"
-EVERY = ("day", "weekdays", "week", "days")
+EVERY = ("day", "weekdays", "weekend", "week", "days")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 DEFAULT_WEEKDAY = 5      # Saturday
 DEFAULT_DAYS = 2
@@ -75,9 +79,9 @@ def read_form(form) -> tuple[dict, dict]:
 
 def form_values(feed: Feed | None, zone: str = DEFAULT_ZONE) -> dict:
     """The form's starting values: the feed's, or the usual ones for a new
-    feed (with the time zone used last)."""
+    feed: rolling (owner's choice, 2026-11-22), with the time zone used last."""
     if feed is None or not feed.rolling:
-        return {"release": "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
+        return {"release": "rolling" if feed is None else "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
                 "roll_start": str(DEFAULT_START), "roll_every": "day",
                 "roll_weekday": str(DEFAULT_WEEKDAY), "roll_days": str(DEFAULT_DAYS)}
     return {"release": "rolling", "roll_time": feed.roll_time or DEFAULT_TIME,
@@ -141,6 +145,8 @@ def _is_release_day(feed: Feed, day: date) -> bool:
     every = feed.roll_every or "day"
     if every == "weekdays":
         return day.weekday() < 5
+    if every == "weekend":          # "Weekend Warrior" (owner's idea, 2026-11-22)
+        return day.weekday() >= 4
     if every == "week":
         return day.weekday() == (feed.roll_weekday if feed.roll_weekday is not None
                                  else DEFAULT_WEEKDAY)
@@ -211,13 +217,15 @@ def schedule_words(feed: Feed) -> str:
     every = feed.roll_every or "day"
     if every == "weekdays":
         often = "every weekday (Monday to Friday)"
+    elif every == "weekend":
+        often = "every Friday, Saturday and Sunday"
     elif every == "week":
         often = f"every {WEEKDAYS[feed.roll_weekday if feed.roll_weekday is not None else DEFAULT_WEEKDAY]}"
     elif every == "days":
         often = f"every {feed.roll_days or DEFAULT_DAYS} days"
     else:
         often = "every day"
-    return f"One episode {often} at {at} ({TIME_ZONES.get(feed.roll_zone or '', 'US Eastern')})"
+    return f"One episode {often} at {at} ({TIME_ZONES.get(feed.roll_zone or '', TIME_ZONES[DEFAULT_ZONE])})"
 
 
 # ------------------------------------------------------------ releasing

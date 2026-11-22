@@ -340,7 +340,7 @@ class Feed(Base):
     # Rolling feeds (app/rolling.py): episodes come out on a schedule
     # instead of all at once. Each release is written down (FeedRelease).
     rolling: Mapped[bool] = mapped_column(default=False)
-    roll_every: Mapped[str | None]       # "day", "weekdays", "week" or "days"
+    roll_every: Mapped[str | None]       # "day", "weekdays", "weekend", "week" or "days"
     roll_time: Mapped[str | None]        # "06:00", in roll_zone
     roll_zone: Mapped[str | None]        # like "America/New_York"
     roll_start: Mapped[int | None]       # how many come out when it's published

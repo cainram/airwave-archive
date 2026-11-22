@@ -55,6 +55,19 @@ def test_weekdays_skip_the_weekend():
         "Monday, November 23rd at 6:00 AM"
 
 
+def test_weekend_warrior():
+    feed = daily()
+    feed.roll_every = "weekend"
+    # Monday, November 16th to Monday, November 23rd, 2026.
+    found = rolling.release_times(feed, datetime(2026, 11, 16, 0), datetime(2026, 11, 23, 23))
+    assert [d.day for d in found] == [20, 21, 22]
+    assert rolling.schedule_words(feed) == \
+        "One episode every Friday, Saturday and Sunday at 6:00 AM (US Eastern)"
+    now = datetime(2026, 11, 23, 12)             # Monday
+    assert rolling.when_words(feed, rolling.next_release(feed, now), now) == \
+        "Friday, November 27th at 6:00 AM"
+
+
 def test_once_a_week():
     feed = daily()
     feed.roll_every, feed.roll_weekday = "week", 5     # Saturdays
@@ -194,6 +207,17 @@ def test_the_choice_is_fixed_once_published(client):
     with Session(client.engine) as session:
         assert not session.get(Feed, other).rolling
     assert len(titles(client, other)) == 4
+
+
+def test_the_usual_schedule_is_3_am_central(client):
+    page = client.get("/feeds/new?series=Suspense").text
+    assert 'name="roll_time" type="time" value="03:00"' in page
+    assert '<option value="America/Chicago" selected>US Central</option>' in page
+    assert 'value="rolling" checked' in page                  # rolling to start with
+    feed_id = int(re.search(r"/feeds/(\d+)", client.post(
+        "/feeds", data={"series": "Suspense", "title": "S", "release": "all"},
+        follow_redirects=False).headers["location"])[1])
+    assert 'value="all" checked' in client.get(f"/feeds/{feed_id}/edit").text
 
 
 def test_choosing_how_often(client):

@@ -973,13 +973,22 @@ published) or **Rolling**: episodes come out a few at a time on a
 schedule, like a station rerunning a series, so a new one is waiting each
 morning or each week.
 
+**A major feature** (owner, 2026-11-22): the owner's original idea for
+this project, about 30 years ago, was that the calendar would be its
+"killer app". Rolling feeds are the full realization of that idea:
+radio coming back on a schedule. Most people won't use Tailscale; they'll
+use Airwave Archive as a podcast feeder that fills their phones overnight
+while they sleep. (The mobile version stays and keeps being refined.)
+
 Decisions (owner, 2026-11-22):
-- **Chosen when making the feed**, or while it's still a draft. A rolling
+- **Chosen when making the feed** (Rolling is picked to start with, owner's
+  choice 2026-11-22), or while it's still a draft. A rolling
   feed can later be switched to All at once (the rest come out then); not
   the other way (episodes would vanish from podcast apps).
 - **Schedule:** every day, weekdays, weekly on a chosen day, or every N
-  days; a release time; a **time zone** chosen with it (the app's usual
-  list; the last one used is suggested next time). One episode per
+  days; a release time (**3:00 AM** to start with, so podcast apps have
+  it by morning); a **time zone** chosen with it (the app's usual list;
+  the last one used is suggested next time, else **US Central**). One episode per
   release. **How many to start with** come out when it's published.
 - **The clock starts when the feed is published.**
 - **Order:** the feed's usual order, oldest first. An episode in several
@@ -1011,7 +1020,8 @@ Steps:
   Going back to a draft and publishing again carries on from then (the
   missed releases don't all come out). `app/rolling.py`.
 - Step 2 ✅ *done* (2026-11-22): the other schedules: every weekday
-  (Monday to Friday), once a week on a chosen day, every few days (2 to
+  (Monday to Friday), **Weekend Warrior** (Friday, Saturday and Sunday;
+  owner's idea), once a week on a chosen day, every few days (2 to
   365, counted from the day it was first published: `feeds.roll_since`,
   database version 27). The schedule can be changed after publishing.
 - Step 3 ✅ *done* (2026-11-22): **Pause releases** (☰ Actions; what was
@@ -1021,6 +1031,11 @@ Steps:
   confirmation page): the waiting episodes come out now and it becomes
   an ordinary feed; episodes already out keep their dates (their
   `feed_releases` rows stay), later ones appear straight away.
+
+#### Later — Your time zone (owner's idea, 2026-11-22)
+There's no setting for the owner's own time zone: each rolling feed has
+its own. Maybe later: one time zone for the app (on the Advanced page, or
+a future **Settings** page) used as the starting choice.
 
 #### Later — "On this day" (owner's idea, 2026-11-22)
 A feed that's always there at the **top of the Feeds list**, made by the
