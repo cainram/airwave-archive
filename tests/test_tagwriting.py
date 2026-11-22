@@ -365,7 +365,7 @@ def test_a_few_ticked_are_written_straight_away(series):
 
 def test_the_advanced_page_is_only_reached_from_settings(series):
     page = series.get("/advanced").text
-    assert "These tools change your library files, all of them at once." in page
+    assert "These tools change your library files, use with extreme caution." in page
     assert 'href="/advanced/tags">Preview…' in page
     assert "15 files" in page                     # Suspense, Art Bell's 2 parts, 12 Escape
     assert 'href="/advanced"' in series.get("/settings").text
