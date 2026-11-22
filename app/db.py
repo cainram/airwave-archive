@@ -61,7 +61,7 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -337,6 +337,18 @@ class Feed(Base):
     created_at: Mapped[datetime]   # UTC; episodes already there count as added then
     updated_at: Mapped[datetime]   # UTC
     published_at: Mapped[datetime | None]   # UTC
+    # Rolling feeds (app/rolling.py): episodes come out on a schedule
+    # instead of all at once. Each release is written down (FeedRelease).
+    rolling: Mapped[bool] = mapped_column(default=False)
+    roll_every: Mapped[str | None]       # "day" (more to come)
+    roll_time: Mapped[str | None]        # "06:00", in roll_zone
+    roll_zone: Mapped[str | None]        # like "America/New_York"
+    roll_start: Mapped[int | None]       # how many come out when it's published
+    roll_days: Mapped[int | None]        # "every N days"
+    roll_weekday: Mapped[int | None]     # "weekly": 0 Monday ... 6 Sunday
+    roll_paused: Mapped[bool] = mapped_column(default=False)
+    # UTC: releases due up to this moment are out (None: not started yet).
+    roll_checked_at: Mapped[datetime | None]
 
     picks: Mapped[list[FeedItem]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True)
@@ -353,6 +365,20 @@ class FeedItem(Base):
     episode_id: Mapped[int] = mapped_column(
         ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True, index=True)
     added_at: Mapped[datetime]   # UTC: its date in podcast apps (never an air date)
+
+
+class FeedRelease(Base):
+    """An episode that has come out in a rolling feed, and when. Written
+    once and never changed, so what podcast apps have stays put. Removed
+    along with its feed or its episode."""
+
+    __tablename__ = "feed_releases"
+
+    feed_id: Mapped[int] = mapped_column(
+        ForeignKey("feeds.id", ondelete="CASCADE"), primary_key=True)
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True, index=True)
+    released_at: Mapped[datetime]   # UTC: its date in podcast apps
 
 
 # Load a file's episode and all that episode's parts along with it.
@@ -506,6 +532,15 @@ def _migrate(conn) -> None:
     if "newest_first" not in feed_columns:
         conn.exec_driver_sql(
             "ALTER TABLE feeds ADD COLUMN newest_first BOOLEAN NOT NULL DEFAULT 0")
+    # Version 26: rolling feeds.
+    for column, kind in (("rolling", "BOOLEAN NOT NULL DEFAULT 0"), ("roll_every", "VARCHAR"),
+                         ("roll_time", "VARCHAR"), ("roll_zone", "VARCHAR"),
+                         ("roll_start", "INTEGER"), ("roll_days", "INTEGER"),
+                         ("roll_weekday", "INTEGER"),
+                         ("roll_paused", "BOOLEAN NOT NULL DEFAULT 0"),
+                         ("roll_checked_at", "DATETIME")):
+        if column not in feed_columns:
+            conn.exec_driver_sql(f"ALTER TABLE feeds ADD COLUMN {column} {kind}")
     # Version 19: what converting an inbox file will do.
     if "convert_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")

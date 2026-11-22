@@ -35,6 +35,7 @@ from app.episodes import (
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
 from app import (airdates, convert, converting, csvimport, deleting, export, feeds, genres, grouping,
+                 rolling,
                  inbox, listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
@@ -2150,10 +2151,13 @@ def feeds_page(request: Request):
     with Session(get_engine()) as session:
         rows = []
         for feed in session.scalars(select(Feed).order_by(Feed.created_at.desc())):
+            rolling.bring_up_to_date(session, feed)
             found = feeds.feed_items(session, feed)
+            status = (rolling.status(session, feed, feeds.feed_episodes(session, feed))
+                      if feed.rolling else None)
             rows.append({"feed": feed, "recordings": len(found),
                          "episodes": len({i.episode.id for i in found}),
-                         "art": feeds.feed_picture(session, feed, found)})
+                         "art": feeds.feed_picture(session, feed, found), "rolling": status})
         session.expunge_all()
     return render(request, "feeds.html", {"rows": rows})
 
@@ -2172,7 +2176,15 @@ def render_new_feed(request: Request, series: str, totals, picked, back: str,
     return render(request, "feed_form.html", {
         "feed": None, "series": series, "totals": totals, "picked": picked,
         "back": safe_back(back) if back else (series_url(series) if series else "/feeds"),
-        "values": values, "errors": errors}, status_code=400 if errors else 200)
+        "values": values, "errors": errors, "can_switch": True, "time_zones": TIME_ZONES},
+        status_code=400 if errors else 200)
+
+
+def read_whole_feed_form(form) -> tuple[dict, dict]:
+    """The feed form: its details, and how episodes come out."""
+    values, errors = read_feed_form(form)
+    release, release_errors = rolling.read_form(form)
+    return {**values, **release}, {**errors, **release_errors}
 
 
 @app.get("/feeds/new", response_class=HTMLResponse)
@@ -2191,9 +2203,10 @@ def new_feed(request: Request, series: str = "", ids: list[int] = Query(default=
     # A series' "About" text is the description to start with.
     with Session(get_engine()) as session:
         description = about_of(session, title) or ""
+        release = rolling.form_values(None, rolling.last_zone(session))
     return render_new_feed(request, series, totals, picked, back,
                            {"title": title or "", "description": description, "author": "",
-                            "order": "oldest"}, {})
+                            "order": "oldest", **release}, {})
 
 
 @app.post("/feeds", response_class=HTMLResponse)
@@ -2202,7 +2215,7 @@ async def create_feed(request: Request):
     series = str(form.get("series", ""))
     ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
     back = str(form.get("back", ""))
-    values, errors = read_feed_form(form)
+    values, errors = read_whole_feed_form(form)
     with Session(get_engine()) as session:
         totals = one_series(session, series) if series else None
         picked = [] if series else picked_episodes(session, ids)
@@ -2221,6 +2234,7 @@ async def create_feed(request: Request):
                                           values["description"] or None)
         feed.author = values["author"] or None
         feed.newest_first = values["order"] == "newest"
+        rolling.apply_form(feed, values)
         session.commit()
         feed_id = feed.id
     return go_to(request, f"/feeds/{feed_id}?made=1")
@@ -2273,9 +2287,23 @@ def feed_page(request: Request, feed_id: int, made: bool = False, published: str
     hand-picked feed's, with ticks to remove some)."""
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
+        rolling.bring_up_to_date(session, feed)
         found = feeds.feed_items(session, feed)
         art = feeds.feed_picture(session, feed, found)
         first = found if feed.series is None else found[:FEED_PAGE_ITEMS]
+        status, coming, came_out, hidden_out, hidden_coming = None, [], {}, 0, 0
+        if feed.rolling:
+            # Out so far (newest last, as they came out), then what's to come.
+            episodes = feeds.feed_episodes(session, feed)
+            status = rolling.status(session, feed, episodes)
+            first = feeds.in_order(found) if feed.series is None else feeds.in_order(found)[-FEED_PAGE_ITEMS:]
+            queue = rolling.waiting(session, feed, episodes)
+            coming = feeds.items(feed, queue if feed.series is None else queue[:FEED_PAGE_ITEMS],
+                                 {e.id: utcnow() for e in queue})
+            now = utcnow()
+            came_out = {item.episode.id: rolling.day_words(feed, item.added, now) for item in found}
+            hidden_out = len(found) - len(first)
+            hidden_coming = len(queue) - len({item.episode.id for item in coming})
         session.expunge_all()
     address = f"{server_address(request)}/feeds/{feed.token}/feed.xml"
     podcast_address = "podcast://" + address.split("://", 1)[1]
@@ -2286,7 +2314,26 @@ def feed_page(request: Request, feed_id: int, made: bool = False, published: str
         "address": address, "podcast_address": podcast_address,
         "qr": feeds.qr_svg(podcast_address) if feed.published else None,
         "made": made, "published_now": published,
+        "rolling": status, "coming": coming, "came_out": came_out,
+        "hidden_out": hidden_out, "hidden_coming": hidden_coming,
+        "max_at_once": rolling.MAX_AT_ONCE,
     })
+
+
+@app.post("/feeds/{feed_id}/release")
+async def release_more(request: Request, feed_id: int):
+    """A rolling feed: let out the next few episodes now."""
+    form = await read_request_form(request)
+    text = str(form.get("count", "1")).strip()
+    count = min(int(text), rolling.MAX_AT_ONCE) if text.isdigit() else 0
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        if not feed.rolling:
+            raise HTTPException(status_code=400, detail="Not a rolling feed")
+        rolling.catch_up(session, feed)
+        out = rolling.release_now(session, feed, count)
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?released={out}")
 
 
 @app.get("/feeds/{feed_id}/edit", response_class=HTMLResponse)
@@ -2298,22 +2345,32 @@ def edit_feed_form(request: Request, feed_id: int):
         "feed": feed, "series": feed.series, "totals": None,
         "values": {"title": feed.title, "description": feed.description or "",
                    "author": feed.author or "",
-                   "order": "newest" if feed.newest_first else "oldest"}, "errors": {}})
+                   "order": "newest" if feed.newest_first else "oldest",
+                   **rolling.form_values(feed)}, "errors": {},
+        "can_switch": rolling.can_switch(feed), "time_zones": TIME_ZONES})
 
 
 @app.post("/feeds/{feed_id}/edit", response_class=HTMLResponse)
 async def edit_feed(request: Request, feed_id: int):
-    values, errors = read_feed_form(await read_request_form(request))
+    values, errors = read_whole_feed_form(await read_request_form(request))
     with Session(get_engine()) as session:
         feed = get_feed(session, feed_id)
+        if not rolling.can_switch(feed):
+            values["release"] = "rolling" if feed.rolling else "all"
+        if errors and values["release"] == "all":
+            errors = {k: v for k, v in errors.items() if not k.startswith("roll_")}
         if errors:
             session.expunge_all()
             return render(request, "feed_form.html", {
                 "feed": feed, "series": feed.series, "totals": None,
-                "values": values, "errors": errors}, status_code=400)
+                "values": values, "errors": errors,
+                "can_switch": rolling.can_switch(feed), "time_zones": TIME_ZONES},
+                status_code=400)
+        rolling.catch_up(session, feed)    # (releases due by the old time come out first)
         feed.title, feed.description = values["title"], values["description"] or None
         feed.author = values["author"] or None
         feed.newest_first = values["order"] == "newest"
+        rolling.apply_form(feed, values)
         feed.updated_at = utcnow()
         session.commit()
     return go_to(request, f"/feeds/{feed_id}")
@@ -2390,6 +2447,9 @@ async def publish_feed(request: Request, feed_id: int):
         feed = get_feed(session, feed_id)
         if publish and not feed.published:
             feed.published_at = utcnow()
+            rolling.start(session, feed)
+        elif not publish and feed.published:
+            rolling.catch_up(session, feed)    # (what was due came out before it stopped)
         feed.published = publish
         feed.updated_at = utcnow()
         session.commit()
@@ -2429,6 +2489,7 @@ def feed_xml(request: Request, token: str):
     """The feed itself, for podcast apps."""
     with Session(get_engine()) as session:
         feed = published_feed(session, token)
+        rolling.bring_up_to_date(session, feed)
         body = feeds.rss(session, feed, server_address(request))
     return Response(body, media_type="application/rss+xml; charset=utf-8",
                     headers={"Cache-Control": "no-cache"})

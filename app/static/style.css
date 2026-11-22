@@ -739,6 +739,21 @@ a.day-title:hover { text-decoration: underline; }
 .edit-form .feed-order .choice input { flex: none; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
 .feed-order .choice { align-items: flex-start; }
 .feed-order p { margin: 4px 0 0; }
+/* Rolling feeds: the schedule shows only when "Rolling" is picked (or
+   there's no choice: the feed is already rolling). */
+.feed-release:has(input[name="release"][value="all"]:checked) .rolling-options { display: none; }
+.rolling-options { margin: 6px 0 0 28px; }
+.rolling-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.edit-form .rolling-row label { margin: 0; font-weight: normal; }
+.edit-form .rolling-row input, .edit-form .rolling-row select { width: auto; margin: 0; }
+.edit-form .rolling-row input[type="number"] { width: 5em; }
+.rolling-status { margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.rolling-status p { margin: 0 0 6px; }
+.rolling-status p:last-child { margin-bottom: 0; }
+.release-more { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.release-more input { width: 4.5em; }
+.files tr.coming td { color: var(--muted); }
+.files tr.coming .title { color: var(--muted); font-weight: normal; }
 
 /* Suggested groups (files that look like parts of one broadcast). */
 .suggestions { list-style: none; padding: 0; max-width: 760px; }

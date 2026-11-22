@@ -20,6 +20,8 @@ from this server. Two kinds:
   in air-date order (so apps list them in that order); later ones, when
   they arrived in the library. Episodes picked together for a hand-picked
   feed are likewise a second apart in air-date order. The real air date goes in the description.
+- A rolling feed (app/rolling.py) lists only the episodes out so far,
+  each dated when it came out.
 - An episode in several parts (Hour 1, Hour 2) is one item per part,
   since a podcast item holds one recording.
 - Feeds are "serial" shows: podcast apps list them oldest first, in
@@ -46,7 +48,7 @@ import segno
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import AudioFile, Episode, Feed, FeedItem, utcnow
+from app.db import AudioFile, Episode, Feed, FeedItem, FeedRelease, utcnow
 from app.episodes import format_air_date
 from app.series import AIR_ORDER, one_series, uploaded_pictures
 
@@ -114,7 +116,11 @@ PART_SECONDS = 100
 
 def remove_episodes(feed: Feed, episode_ids: set[int]) -> int:
     """Take episodes out of a hand-picked feed (never out of the library)."""
+    from sqlalchemy.orm import object_session
+    from app.rolling import forget
     gone = [pick for pick in feed.picks if pick.episode_id in episode_ids]
+    if gone and feed.rolling:
+        forget(object_session(feed), feed, {pick.episode_id for pick in gone})
     for pick in gone:
         feed.picks.remove(pick)
     if gone:
@@ -146,8 +152,14 @@ def feed_episodes(session: Session, feed: Feed) -> list[Episode]:
 
 
 def feed_items(session: Session, feed: Feed) -> list[Item]:
-    """The feed's recordings, in the order podcast apps list them."""
+    """The feed's recordings, in the order podcast apps list them (for a
+    rolling feed, only those out so far, dated when they came out)."""
     added = None
+    if feed.rolling:
+        from app.rolling import released    # (here, to avoid a circular import)
+        added = released(session, feed)
+        episodes = [e for e in feed_episodes(session, feed) if e.id in added]
+        return in_order(items(feed, episodes, added), feed.newest_first)
     if feed.series is None:
         added = {pick.episode_id: pick.added_at for pick in session.scalars(
             select(FeedItem).where(FeedItem.feed_id == feed.id))}
@@ -330,6 +342,8 @@ def in_feed(session: Session, feed: Feed, f: AudioFile) -> bool:
     """Whether a recording belongs to this feed."""
     if f.episode_id is None:
         return False
+    if feed.rolling:
+        return session.get(FeedRelease, (feed.id, f.episode_id)) is not None
     if feed.series is None:
         return session.get(FeedItem, (feed.id, f.episode_id)) is not None
     episode = session.get(Episode, f.episode_id)

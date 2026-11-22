@@ -967,6 +967,59 @@ Decisions (owner, 2026-11-07):
 - **Try it:** make a feed of a series, publish it, add it on the iPhone
   (QR code), and play an episode in Podcasts.
 
+### Rolling feeds (owner's request, 2026-11-22)
+A feed is either **All at once** (as before: everything is there when it's
+published) or **Rolling**: episodes come out a few at a time on a
+schedule, like a station rerunning a series, so a new one is waiting each
+morning or each week.
+
+Decisions (owner, 2026-11-22):
+- **Chosen when making the feed**, or while it's still a draft. A rolling
+  feed can later be switched to All at once (the rest come out then); not
+  the other way (episodes would vanish from podcast apps).
+- **Schedule:** every day, weekdays, weekly on a chosen day, or every N
+  days; a release time; a **time zone** chosen with it (the app's usual
+  list; the last one used is suggested next time). One episode per
+  release. **How many to start with** come out when it's published.
+- **The clock starts when the feed is published.**
+- **Order:** the feed's usual order, oldest first. An episode in several
+  parts comes out all at once. A new episode added to a series feed takes
+  its air-date place among those still waiting (rare: OTR collections are
+  fairly complete); nothing already out is reshuffled.
+- **Podcast apps see only what's out**, each dated with its release
+  time (never an air date). Releases due while nobody asked (the server
+  was off, the phone didn't check) come out, with their own times, the
+  next time the feed is read.
+- **Feed page:** a status line ("12 of 52 out · next: …, Tuesday at 6:00
+  AM"), **Release more now** (with a number), **Pause** / **Resume**.
+  Resuming carries on with the next episode at the next release time; the
+  ones missed while paused don't all come out at once.
+- **No background helper:** what's due is worked out whenever the feed
+  or its page is opened, and each release is written down (episode and
+  time), so what's out never changes afterwards.
+- **Phone:** the status line only, no buttons.
+- Tests cover time zones, the clock changes in spring and fall, and
+  weekdays.
+
+Steps:
+- Step 1 ✅ *done* (2026-11-22): Rolling feeds with a daily schedule: the
+  choice when making a feed ("How episodes come out", the schedule
+  folded away until Rolling is picked), release time, time zone, how
+  many to start with; the status line, Release more now, and the feed's
+  list (what's out, with the day it came out, then what's coming).
+  Database version 26 (`feeds.rolling` and `roll_*`, `feed_releases`).
+  Going back to a draft and publishing again carries on from then (the
+  missed releases don't all come out). `app/rolling.py`.
+- Step 2: the other schedules (weekdays, weekly, every N days).
+- Step 3: Pause / Resume, and switching to All at once.
+
+#### Later — "On this day" (owner's idea, 2026-11-22)
+A feed that's always there at the **top of the Feeds list**, made by the
+app itself (not by hand): each day it holds the episodes first broadcast
+on that day of the year, in earlier years. Subscribe to it or not; it
+can't be deleted, only left alone. Only episodes with a complete air date
+(day, month and year) are used.
+
 ### Suggested groups (v1.1 and v1.2)
 Owner's request, 2026-11-08: find files that are probably parts of one
 broadcast and suggest grouping them. **Never group without approval.**
