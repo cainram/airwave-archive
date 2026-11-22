@@ -1,0 +1,23 @@
+{% extends layout %}
+{% block title %}Let everything out · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/feeds/{{ feed.id }}">← Back without changing</a></nav>
+<h1>Let everything out in “{{ feed.title }}”</h1>
+<div class="notice warning" role="alert">
+  {% if waiting %}
+  <p>The {{ waiting }} episode{{ " that's" if waiting == 1 else "s that are" }} still waiting come{{ "s" if waiting == 1 else "" }} out now,
+    and podcast apps get {{ "it" if waiting == 1 else "them" }}
+    the next time they check.</p>
+  {% else %}
+  <p>Every episode is out already.</p>
+  {% endif %}
+  <p>From then on it's an ordinary feed (<strong>All at once</strong>){% if feed.series %}: episodes added
+    to {{ feed.series }} later appear straight away{% endif %}. Episodes already out keep their dates.</p>
+  <p><strong>This can't be undone:</strong> the feed can't go back to rolling.</p>
+</div>
+<form method="post" action="/feeds/{{ feed.id }}/all-at-once" class="form-buttons">
+  <input type="hidden" name="confirm" value="yes">
+  <button class="button primary" type="submit">Let everything out</button>
+  <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
+</form>
+{% endblock %}

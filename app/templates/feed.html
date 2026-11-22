@@ -26,6 +26,13 @@
 <div class="notice success" role="status">{% if out %}{{ out }} more episode{{ "" if out == 1 else "s" }} came out.
   Podcast apps get {{ "it" if out == 1 else "them" }} the next time they check.{% else %}Nothing
   more to let out: every episode is out.{% endif %}</div>
+{% elif request.query_params.get("paused") == "yes" %}
+<div class="notice success" role="status">Paused. Nothing more comes out on schedule until you resume.</div>
+{% elif request.query_params.get("paused") == "no" %}
+<div class="notice success" role="status">Resumed. The next episode comes out at the next release time.</div>
+{% elif request.query_params.get("all_out") %}
+{% set out = request.query_params.get("all_out") | int(0) %}
+<div class="notice success" role="status">{% if out %}The last {{ out }} episode{{ "" if out == 1 else "s" }} came out.{% else %}Everything was out already.{% endif %} It's an ordinary feed now: all at once.</div>
 {% elif published_now == "no" %}
 <div class="notice success" role="status">Back to a draft. Its address no longer works; podcast
   apps that follow it stop getting new episodes.</div>
@@ -56,6 +63,14 @@
         <a href="/feeds/{{ feed.id }}/edit">Edit details…</a>
         <a href="/feeds/{{ feed.id }}/picture">Change picture…</a>
         <a href="/feeds/{{ feed.id }}/new-link">New private link…</a>
+        {% if rolling and rolling.started %}
+        {% if not rolling.paused %}
+        <form method="post" action="/feeds/{{ feed.id }}/pause">
+          <button type="submit" name="paused" value="1">Pause releases</button>
+        </form>
+        {% endif %}
+        <a href="/feeds/{{ feed.id }}/all-at-once">Let everything out (All at once)…</a>
+        {% endif %}
         {% if feed.published %}
         <form method="post" action="/feeds/{{ feed.id }}/publish">
           <button type="submit" name="published" value="0">Unpublish (back to a draft)</button>
@@ -77,12 +92,21 @@
   {% elif not rolling.waiting %}
   <p><strong>All {{ rolling.total }} episode{{ "" if rolling.total == 1 else "s" }} are out.</strong>
     {% if feed.series %}Episodes added to {{ feed.series }} later come out on the schedule.{% endif %}</p>
+  {% elif rolling.paused %}
+  <p><strong>Paused: {{ rolling.out }} of {{ rolling.total }} out.</strong> Nothing more comes out on
+    schedule until you resume{% if not feed.published %} (and publish it again){% endif %}.</p>
   {% else %}
   <p><strong>{{ rolling.out }} of {{ rolling.total }} out.</strong>
     {% if not feed.published %}It's a draft, so nothing more comes out until it's published again.
     {% elif rolling.next_when %}Next: <em>{{ rolling.next_episode.title or "Untitled" }}</em>, {{ rolling.next_when }}.{% endif %}</p>
   {% endif %}
   <p class="muted small">{{ rolling.schedule }}.</p>
+  {% if not mobile and rolling.paused %}
+  <form class="release-more" method="post" action="/feeds/{{ feed.id }}/pause">
+    <button class="button primary" type="submit" name="paused" value="0">Resume</button>
+    <span class="muted small">The next episode comes out at the next release time.</span>
+  </form>
+  {% endif %}
   {% if not mobile and feed.published and rolling.waiting %}
   <form class="release-more" method="post" action="/feeds/{{ feed.id }}/release">
     <button class="button primary" type="submit">Release more now</button>

@@ -1014,7 +1014,13 @@ Steps:
   (Monday to Friday), once a week on a chosen day, every few days (2 to
   365, counted from the day it was first published: `feeds.roll_since`,
   database version 27). The schedule can be changed after publishing.
-- Step 3: Pause / Resume, and switching to All at once.
+- Step 3 ✅ *done* (2026-11-22): **Pause releases** (☰ Actions; what was
+  due comes out first) and **Resume** (a button in the status while
+  paused; carries on from then). Release more now still works while
+  paused. **Let everything out (All at once)…** (☰ Actions, after a
+  confirmation page): the waiting episodes come out now and it becomes
+  an ordinary feed; episodes already out keep their dates (their
+  `feed_releases` rows stay), later ones appear straight away.
 
 #### Later — "On this day" (owner's idea, 2026-11-22)
 A feed that's always there at the **top of the Feeds list**, made by the

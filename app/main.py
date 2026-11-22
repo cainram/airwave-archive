@@ -274,7 +274,7 @@ MANAGING_PAGES = {
     "library_convert.html", "rename.html", "series_picture.html", "series_genres.html",
     "series_about.html",
     "parts.html", "feed_form.html", "feed_picture.html", "feed_new_link.html",
-    "feed_delete.html", "feed_add.html",
+    "feed_delete.html", "feed_add.html", "feed_all_at_once.html",
 }
 
 
@@ -2318,6 +2318,47 @@ def feed_page(request: Request, feed_id: int, made: bool = False, published: str
         "hidden_out": hidden_out, "hidden_coming": hidden_coming,
         "max_at_once": rolling.MAX_AT_ONCE,
     })
+
+
+@app.post("/feeds/{feed_id}/pause")
+async def pause_feed(request: Request, feed_id: int):
+    """A rolling feed: stop, or carry on, letting episodes out on schedule."""
+    paused = str((await read_request_form(request)).get("paused", "")) == "1"
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        if not feed.rolling:
+            raise HTTPException(status_code=400, detail="Not a rolling feed")
+        if paused and not feed.roll_paused:
+            rolling.pause(session, feed)
+        elif not paused and feed.roll_paused:
+            rolling.resume(feed)
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?paused={'yes' if paused else 'no'}")
+
+
+@app.get("/feeds/{feed_id}/all-at-once", response_class=HTMLResponse)
+def all_at_once_page(request: Request, feed_id: int):
+    """A rolling feed: what letting everything out would do, and the button."""
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        if not feed.rolling:
+            return go_to(request, f"/feeds/{feed_id}")
+        rolling.bring_up_to_date(session, feed)
+        waiting = len(rolling.waiting(session, feed, feeds.feed_episodes(session, feed)))
+        session.expunge_all()
+    return render(request, "feed_all_at_once.html", {"feed": feed, "waiting": waiting})
+
+
+@app.post("/feeds/{feed_id}/all-at-once")
+async def all_at_once(request: Request, feed_id: int):
+    """Let every waiting episode out now; the feed is All at once from then on."""
+    if str((await read_request_form(request)).get("confirm", "")) != "yes":
+        raise HTTPException(status_code=400, detail="Not confirmed")
+    with Session(get_engine()) as session:
+        feed = get_feed(session, feed_id)
+        out = rolling.all_at_once(session, feed) if feed.rolling else 0
+        session.commit()
+    return go_to(request, f"/feeds/{feed_id}?all_out={out}")
 
 
 @app.post("/feeds/{feed_id}/release")

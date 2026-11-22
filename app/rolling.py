@@ -301,6 +301,38 @@ def bring_up_to_date(session: Session, feed: Feed) -> None:
         session.rollback()
 
 
+def pause(session: Session, feed: Feed, now: datetime | None = None) -> None:
+    """Stop letting episodes out on schedule (what was due comes out first)."""
+    catch_up(session, feed, now)
+    feed.roll_paused = True
+    feed.updated_at = utcnow()
+
+
+def resume(feed: Feed, now: datetime | None = None) -> None:
+    """Carry on from now: the next episode at the next release time (the
+    ones missed while paused don't all come out at once)."""
+    feed.roll_paused = False
+    if feed.roll_checked_at is not None:
+        feed.roll_checked_at = now or utcnow()
+    feed.updated_at = utcnow()
+
+
+def all_at_once(session: Session, feed: Feed, now: datetime | None = None) -> int:
+    """Let every waiting episode out now and make it an ordinary feed. What
+    came out keeps its date (podcast apps keep their order); episodes
+    added later appear straight away, as in any feed. Returns how many
+    came out now."""
+    from app.feeds import feed_episodes     # (here, to avoid a circular import)
+    now = now or utcnow()
+    catch_up(session, feed, now)
+    episodes = feed_episodes(session, feed)
+    count = _release(session, feed, episodes, [now] * len(waiting(session, feed, episodes)))
+    feed.rolling = False
+    feed.roll_paused = False
+    feed.updated_at = utcnow()
+    return count
+
+
 def forget(session: Session, feed: Feed, episode_ids: set[int]) -> None:
     """Episodes taken out of a hand-picked feed: forget they were out."""
     for row in session.scalars(select(FeedRelease).where(
@@ -317,6 +349,7 @@ def status(session: Session, feed: Feed, episodes: list[Episode],
     out = len(released(session, feed))
     nxt = next_release(feed, now) if feed.roll_checked_at is not None else None
     return {"out": out, "total": out + len(queue), "waiting": len(queue),
+            "paused": feed.roll_paused,
             "next_episode": queue[0] if queue else None,
             "next_when": when_words(feed, nxt, now) if nxt and queue else None,
             "schedule": schedule_words(feed),

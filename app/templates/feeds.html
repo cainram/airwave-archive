@@ -31,7 +31,7 @@
       {% if mobile %}{% elif feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
       <div class="muted small">
         {% if feed.series %}Series: {{ feed.series }}{% else %}Hand-picked{% endif %}{% if not row.rolling %} · {{ row.episodes }} episode{{ "" if row.episodes == 1 else "s" }}{% endif %}
-        {% if row.rolling %}· rolling: {{ row.rolling.out }} of {{ row.rolling.total }} out{% elif row.recordings != row.episodes %}({{ row.recordings }} recordings){% endif %}
+        {% if row.rolling %}· rolling: {{ row.rolling.out }} of {{ row.rolling.total }} out{% if row.rolling.paused %} (paused){% endif %}{% elif row.recordings != row.episodes %}({{ row.recordings }} recordings){% endif %}
       </div>
     </div>
   </li>
