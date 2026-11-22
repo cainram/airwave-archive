@@ -243,3 +243,43 @@ def test_taking_episodes_out_of_a_hand_picked_rolling_feed(client):
     with Session(client.engine) as session:
         assert session.scalar(select(FeedRelease).where(FeedRelease.episode_id == ids[0])) is None
     assert titles(client, feed_id) == ["Sorry, Wrong Number"]
+
+
+def pub_dates(client, feed_id) -> dict[str, str]:
+    return {i.findtext("title"): i.findtext("pubDate") for i in read(client, feed_id).findall("item")}
+
+
+def test_pause_and_resume(client):
+    feed_id = make_rolling(client, start="1")
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    page = client.post(f"/feeds/{feed_id}/pause", data={"paused": "1"}).text
+    assert "Paused. Nothing more comes out" in page and "Paused: 1 of 4 out." in page
+    assert ">Resume<" in page and "Pause releases" not in page
+    assert "(paused)" in client.get("/feeds").text
+    # Three days paused: nothing comes out, and resuming doesn't let the missed ones out.
+    go_back_in_time(client, feed_id, 3)
+    assert titles(client, feed_id) == ["The Hitchhiker"]
+    page = client.post(f"/feeds/{feed_id}/pause", data={"paused": "0"}).text
+    assert "Resumed." in page and "1 of 4 out." in page and "Next: " in page
+    assert titles(client, feed_id) == ["The Hitchhiker"]
+    # Release more now still works while paused.
+    client.post(f"/feeds/{feed_id}/pause", data={"paused": "1"})
+    client.post(f"/feeds/{feed_id}/release", data={"count": "1"})
+    assert titles(client, feed_id) == ["The Hitchhiker", "Sorry, Wrong Number"]
+
+
+def test_letting_everything_out(client):
+    feed_id = make_rolling(client, start="2")
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    before = pub_dates(client, feed_id)
+    page = client.get(f"/feeds/{feed_id}/all-at-once").text
+    assert "The 2 episodes that are still waiting come out now" in page
+    assert client.post(f"/feeds/{feed_id}/all-at-once", data={}).status_code == 400   # not confirmed
+    page = client.post(f"/feeds/{feed_id}/all-at-once", data={"confirm": "yes"}).text
+    assert "The last 2 episodes came out." in page and "rolling-status" not in page
+    after = pub_dates(client, feed_id)
+    assert len(after) == 4
+    assert all(after[title] == when for title, when in before.items())   # dates kept
+    with Session(client.engine) as session:
+        assert not session.get(Feed, feed_id).rolling
+    assert "Let everything out" not in client.get(f"/feeds/{feed_id}").text

@@ -119,7 +119,7 @@ def remove_episodes(feed: Feed, episode_ids: set[int]) -> int:
     from sqlalchemy.orm import object_session
     from app.rolling import forget
     gone = [pick for pick in feed.picks if pick.episode_id in episode_ids]
-    if gone and feed.rolling:
+    if gone:
         forget(object_session(feed), feed, {pick.episode_id for pick in gone})
     for pick in gone:
         feed.picks.remove(pick)
@@ -163,6 +163,11 @@ def feed_items(session: Session, feed: Feed) -> list[Item]:
     if feed.series is None:
         added = {pick.episode_id: pick.added_at for pick in session.scalars(
             select(FeedItem).where(FeedItem.feed_id == feed.id))}
+    # A feed that was rolling: what came out keeps the date it came out.
+    from app.rolling import released
+    out = released(session, feed)
+    if out:
+        added = {**(added or {}), **out}
     return in_order(items(feed, feed_episodes(session, feed), added), feed.newest_first)
 
 
@@ -214,7 +219,7 @@ def items(feed: Feed, episodes: list[Episode],
         if not parts:
             continue
         title = episode_title(episode, parts[0])
-        if added_at is not None:
+        if added_at is not None and episode.id in added_at:
             start = added_at[episode.id]
         elif min(f.first_seen for f in parts) <= feed.created_at:
             start = feed.created_at + timedelta(seconds=already)
