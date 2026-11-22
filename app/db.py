@@ -61,7 +61,7 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 28
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -351,6 +351,9 @@ class Feed(Base):
     roll_checked_at: Mapped[datetime | None]
     # UTC: when it was first published ("every N days" counts from that day).
     roll_since: Mapped[datetime | None]
+    # A feed the app makes itself: "on_this_day" (app/onthisday.py: the
+    # anniversaries of the ticked series, FeedSeries). None: an ordinary one.
+    kind: Mapped[str | None]
 
     picks: Mapped[list[FeedItem]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True)
@@ -381,6 +384,18 @@ class FeedRelease(Base):
     episode_id: Mapped[int] = mapped_column(
         ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True, index=True)
     released_at: Mapped[datetime]   # UTC: its date in podcast apps
+
+
+class FeedSeries(Base):
+    """A series ticked for the "On this day" feed, and since when (its
+    anniversaries come out from that day on). Unticking removes it."""
+
+    __tablename__ = "feed_series"
+
+    feed_id: Mapped[int] = mapped_column(
+        ForeignKey("feeds.id", ondelete="CASCADE"), primary_key=True)
+    series: Mapped[str] = mapped_column(primary_key=True)
+    added_at: Mapped[datetime]   # UTC
 
 
 # Load a file's episode and all that episode's parts along with it.
@@ -548,6 +563,9 @@ def _migrate(conn) -> None:
         conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN roll_since DATETIME")
         conn.exec_driver_sql("UPDATE feeds SET roll_since = published_at"
                              " WHERE rolling AND roll_checked_at IS NOT NULL")
+    # Version 28: feeds the app makes itself ("On this day").
+    if "kind" not in feed_columns:
+        conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN kind VARCHAR")
     # Version 19: what converting an inbox file will do.
     if "convert_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")

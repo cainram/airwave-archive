@@ -1,0 +1,63 @@
+{% extends layout %}
+{% block title %}On this day · Edit · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/feeds/{{ feed.id }}">← Back without saving</a></nav>
+<h1>On this day</h1>
+<p class="muted">Each day, the ticked series' broadcasts that first aired on that day, in any year.
+  Tick a series to bring in its anniversaries from today; untick it to take them out of the feed.</p>
+
+<form id="on-this-day" class="edit-form" method="post" action="/feeds/{{ feed.id }}/edit">
+  <fieldset class="feed-order">
+    <legend>When the day turns over</legend>
+    <div class="rolling-row">
+      <label for="roll_time">Each day's broadcasts come out at</label>
+      <input id="roll_time" name="roll_time" type="time" value="{{ values.roll_time }}"
+             {% if errors.roll_time %}aria-invalid="true" aria-describedby="roll_time-error"{% endif %}>
+      <select id="roll_zone" name="roll_zone" aria-label="Time zone"
+              {% if errors.roll_zone %}aria-invalid="true" aria-describedby="roll_zone-error"{% endif %}>
+        {% for zone, name in time_zones.items() %}
+        <option value="{{ zone }}" {% if zone == values.roll_zone %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if errors.roll_time %}<p id="roll_time-error" class="field-error">{{ errors.roll_time }}</p>{% endif %}
+    {% if errors.roll_zone %}<p id="roll_zone-error" class="field-error">{{ errors.roll_zone }}</p>{% endif %}
+    <p class="muted small">The feed holds the last 7 days, so a phone that missed a day still catches up.</p>
+  </fieldset>
+
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save</button>
+    <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
+  </div>
+
+  <h2>Series</h2>
+  {% if not series %}
+  <div class="notice">No series yet.</div>
+  {% else %}
+  <p class="muted small">Only episodes with a full air date (day, month and year) can come out.</p>
+  <table class="files">
+    <thead>
+      <tr>
+        <th class="pick"><input type="checkbox" form="on-this-day" data-select-all="series" aria-label="Tick all series"></th>
+        <th>Series</th>
+        <th class="num">With a full air date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in series %}
+      <tr>
+        <td class="pick"><input type="checkbox" form="on-this-day" name="series" value="{{ s.name }}" id="series-{{ loop.index }}"
+                                {% if s.name in values.series %}checked{% endif %}></td>
+        <td class="name"><label for="series-{{ loop.index }}">{{ s.name }}</label></td>
+        <td class="num">{{ s.dated }} of {{ s.episodes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save</button>
+    <a class="button" href="/feeds/{{ feed.id }}">Cancel</a>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

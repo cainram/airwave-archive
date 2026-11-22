@@ -1039,12 +1039,29 @@ There's no setting for the owner's own time zone: each rolling feed has
 its own. Maybe later: one time zone for the app (on the Advanced page, or
 a future **Settings** page) used as the starting choice.
 
-#### Later — "On this day" (owner's idea, 2026-11-22)
+#### "On this day" ✅ *done* (owner's idea and decisions, 2026-11-22)
 A feed that's always there at the **top of the Feeds list**, made by the
-app itself (not by hand): each day it holds the episodes first broadcast
-on that day of the year, in earlier years. Subscribe to it or not; it
-can't be deleted, only left alone. Only episodes with a complete air date
-(day, month and year) are used.
+app itself (`app/onthisday.py`; `feeds.kind = "on_this_day"`): each day
+it brings the episodes of the chosen series first broadcast on that day,
+in any year. Subscribe to it or not; it can't be deleted. It starts as a
+draft like any feed (Publish to switch its address on).
+- **Its own edit page** (☰ Actions → Choose series…): tick boxes for
+  every series (with how many have a full air date), and when the day
+  turns over. It starts with **no series ticked**. Ticks can change any
+  time: a series ticked today brings its anniversaries from today (not
+  earlier days); unticking takes its episodes out of the feed (a podcast
+  app keeps what it downloaded). Kept in `feed_series` (series name and
+  when it was ticked); renaming a series moves its tick.
+- The day turns over at the **release time in its time zone** (3:00 AM US
+  Central to start, like rolling feeds).
+- It holds the **last 7 days**, so a phone that missed a day catches up.
+- Items are titled with the **year first**: "1944 · Suspense: Donovan's
+  Brain" (the series left out when the title starts with it). Dated when
+  their day came out, newest first; the real air date is in the
+  description.
+- Only episodes with a **full air date** (day, month and year).
+- **February 29th** broadcasts come out on February 28th in other years.
+- Worked out whenever it's read; nothing runs in the background.
 
 ### Suggested groups (v1.1 and v1.2)
 Owner's request, 2026-11-08: find files that are probably parts of one

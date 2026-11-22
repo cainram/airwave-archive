@@ -185,7 +185,7 @@ def test_editing_renaming_and_deleting(client):
     assert "Your recordings aren't touched" in client.get(f"/feeds/{feed_id}/delete").text
     assert client.post(f"/feeds/{feed_id}/delete").status_code == 400      # not confirmed
     page = client.post(f"/feeds/{feed_id}/delete", data={"confirm": "yes"}, follow_redirects=True).text
-    assert "The feed was deleted." in page and "No feeds yet." in page
+    assert "The feed was deleted." in page and "To make a feed of your own" in page
     assert client.get(f"/feeds/{secret}/feed.xml").status_code == 404
     assert (client.lib / "Suspense" / "a.mp3").is_file()
     with Session(client.engine) as session:

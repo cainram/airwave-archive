@@ -10,6 +10,7 @@
   <div class="summary-text">
     <p class="muted">
       {% if feed.art_hash %}This is a picture you uploaded for this feed.
+      {% elif feed.kind %}This is the feed's own picture, a tuning dial.
       {% elif art %}This is the series' picture.
       {% else %}This feed has no picture yet.{% endif %}
     </p>
@@ -28,8 +29,8 @@
 </form>
 {% if feed.art_hash %}
 <form method="post" action="/feeds/{{ feed.id }}/picture/remove"
-      hx-confirm="Stop using this picture for the feed? It goes back to the series' picture (if there is one).">
-  <button class="button" type="submit">Use the series' picture instead</button>
+      hx-confirm="Stop using this picture for the feed? It goes back to {{ "the tuning dial" if feed.kind else "the series' picture (if there is one)" }}.">
+  <button class="button" type="submit">{{ "Use the tuning dial instead" if feed.kind else "Use the series' picture instead" }}</button>
 </form>
 {% endif %}
 <p class="muted small">Podcast apps may take a while (or a fresh follow) to show a new picture.</p>
