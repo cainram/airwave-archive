@@ -1010,7 +1010,10 @@ Steps:
   Database version 26 (`feeds.rolling` and `roll_*`, `feed_releases`).
   Going back to a draft and publishing again carries on from then (the
   missed releases don't all come out). `app/rolling.py`.
-- Step 2: the other schedules (weekdays, weekly, every N days).
+- Step 2 ✅ *done* (2026-11-22): the other schedules: every weekday
+  (Monday to Friday), once a week on a chosen day, every few days (2 to
+  365, counted from the day it was first published: `feeds.roll_since`,
+  database version 27). The schedule can be changed after publishing.
 - Step 3: Pause / Resume, and switching to All at once.
 
 #### Later — "On this day" (owner's idea, 2026-11-22)

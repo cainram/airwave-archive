@@ -44,6 +44,37 @@ def test_other_time_zones():
     assert rolling.release_times(london, datetime(2026, 12, 1, 19, 15), datetime(2026, 12, 2, 19, 14)) == []
 
 
+def test_weekdays_skip_the_weekend():
+    feed = daily()
+    feed.roll_every = "weekdays"
+    # Friday, November 20th to Tuesday, November 24th, 2026.
+    found = rolling.release_times(feed, datetime(2026, 11, 20, 0), datetime(2026, 11, 24, 23))
+    assert [d.day for d in found] == [20, 23, 24]
+    now = datetime(2026, 11, 20, 12)             # Friday, after 6 AM
+    assert rolling.when_words(feed, rolling.next_release(feed, now), now) == \
+        "Monday, November 23rd at 6:00 AM"
+
+
+def test_once_a_week():
+    feed = daily()
+    feed.roll_every, feed.roll_weekday = "week", 5     # Saturdays
+    found = rolling.release_times(feed, datetime(2026, 11, 1, 0), datetime(2026, 11, 30, 0))
+    assert [d.day for d in found] == [7, 14, 21, 28]
+    assert rolling.schedule_words(feed) == "One episode every Saturday at 6:00 AM (US Eastern)"
+
+
+def test_every_few_days_counts_from_the_first_publish():
+    feed = daily("20:00")
+    feed.roll_every, feed.roll_days = "days", 3
+    feed.roll_since = datetime(2026, 11, 2, 1)   # Sunday, November 1st, 8 PM in New York
+    found = rolling.release_times(feed, datetime(2026, 11, 1, 0), datetime(2026, 11, 12, 0))
+    assert [rolling._local_day(feed, d).day for d in found] == [1, 4, 7, 10]
+    assert rolling.schedule_words(feed) == "One episode every 3 days at 8:00 PM (US Eastern)"
+    now = datetime(2026, 11, 5, 12)
+    assert rolling.when_words(feed, rolling.next_release(feed, now), now) == \
+        "Saturday, November 7th at 8:00 PM"
+
+
 def test_how_the_next_release_is_described():
     feed = daily("18:00")
     now = datetime(2026, 11, 22, 15)             # Sunday, 10 AM in New York
@@ -79,7 +110,7 @@ def go_back_in_time(client, feed_id, days):
 
 def test_a_rolling_feed(client):
     page = client.get("/feeds/new?series=Suspense").text
-    assert 'value="rolling"' in page and "One episode every day at" in page
+    assert 'value="rolling"' in page and "every weekday (Monday to Friday)" in page
     feed_id = make_rolling(client)
     page = client.get(f"/feeds/{feed_id}").text
     assert "When it's published, the first 2" in page and "Release more now" not in page
@@ -165,12 +196,35 @@ def test_the_choice_is_fixed_once_published(client):
     assert len(titles(client, other)) == 4
 
 
+def test_choosing_how_often(client):
+    sent = client.post("/feeds", data={"series": "Suspense", "title": "S", "release": "rolling",
+                                       "roll_every": "week", "roll_weekday": "6", "roll_days": "",
+                                       "roll_time": "09:00", "roll_zone": "America/Chicago",
+                                       "roll_start": "1"}, follow_redirects=False)
+    feed_id = int(re.search(r"/feeds/(\d+)", sent.headers["location"])[1])
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    page = client.get(f"/feeds/{feed_id}").text
+    assert "One episode every Sunday at 9:00 AM (US Central)" in page
+    page = client.get(f"/feeds/{feed_id}/edit").text
+    assert '<option value="week" selected>' in page and '<option value="6" selected>Sunday' in page
+    # Changed after publishing: every 4 days, counted from when it was published.
+    client.post(f"/feeds/{feed_id}/edit", data={"title": "S", "release": "rolling", "roll_every": "days",
+                                               "roll_days": "4", "roll_time": "09:00",
+                                               "roll_zone": "America/Chicago"})
+    with Session(client.engine) as session:
+        feed = session.get(Feed, feed_id)
+        assert (feed.roll_every, feed.roll_days, feed.roll_weekday) == ("days", 4, None)
+        assert feed.roll_since is not None
+    assert "One episode every 4 days at 9:00 AM" in client.get(f"/feeds/{feed_id}").text
+
+
 def test_the_form_checks_the_schedule(client):
     sent = client.post("/feeds", data={"series": "Suspense", "title": "S", "release": "rolling",
-                                       "roll_time": "25:00", "roll_zone": "Mars", "roll_start": "x"})
+                                       "roll_time": "25:00", "roll_zone": "Mars", "roll_start": "x",
+                                       "roll_every": "days", "roll_days": "1"})
     assert sent.status_code == 400
     assert "Give a time of day" in sent.text and "Pick a time zone" in sent.text
-    assert "A number from 0 to 999" in sent.text
+    assert "A number from 0 to 999" in sent.text and "A number of days from 2 to 365" in sent.text
     # The time zone used last is suggested next time.
     make_rolling(client, zone="Europe/London")
     assert '<option value="Europe/London" selected>' in client.get("/feeds/new?series=Suspense").text

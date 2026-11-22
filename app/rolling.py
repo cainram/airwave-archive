@@ -2,7 +2,9 @@
 station rerunning a series), instead of all at once.
 
 - The schedule: one episode at a set time of day, in a chosen time zone,
-  every day. The time stays the same local time when the clocks change.
+  every day, every weekday (Monday to Friday), once a week on a chosen
+  day, or every few days (counted from the day it was first published).
+  The time stays the same local time when the clocks change.
 - When the feed is published, the first few (how many is chosen) come
   out straight away; the clock starts then.
 - Nothing runs in the background. Whenever the feed (or its page) is
@@ -20,8 +22,7 @@ station rerunning a series), instead of all at once.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -36,14 +37,11 @@ DEFAULT_ZONE = "America/New_York"
 DEFAULT_START = 1
 MAX_START = 999
 MAX_AT_ONCE = 999        # "Release more now"
-
-
-@dataclass
-class Schedule:
-    every: str = "day"
-    time: str = DEFAULT_TIME
-    zone: str = DEFAULT_ZONE
-    start: int = DEFAULT_START
+EVERY = ("day", "weekdays", "week", "days")
+WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+DEFAULT_WEEKDAY = 5      # Saturday
+DEFAULT_DAYS = 2
+MAX_DAYS = 365
 
 
 def read_form(form) -> tuple[dict, dict]:
@@ -52,9 +50,19 @@ def read_form(form) -> tuple[dict, dict]:
     values = {"release": "rolling" if form.get("release") == "rolling" else "all",
               "roll_time": str(form.get("roll_time", "")).strip() or DEFAULT_TIME,
               "roll_zone": str(form.get("roll_zone", "")) or DEFAULT_ZONE,
-              "roll_start": str(form.get("roll_start", "")).strip()}
+              "roll_start": str(form.get("roll_start", "")).strip(),
+              "roll_every": str(form.get("roll_every", "")) or "day",
+              "roll_weekday": str(form.get("roll_weekday", "")) or str(DEFAULT_WEEKDAY),
+              "roll_days": str(form.get("roll_days", "")).strip() or str(DEFAULT_DAYS)}
     errors = {}
     if values["release"] == "rolling":
+        if values["roll_every"] not in EVERY:
+            errors["roll_every"] = "Pick how often from the list."
+        if values["roll_every"] == "week" and values["roll_weekday"] not in "0123456":
+            errors["roll_every"] = "Pick a day of the week."
+        if values["roll_every"] == "days" and not (
+                values["roll_days"].isdigit() and 2 <= int(values["roll_days"]) <= MAX_DAYS):
+            errors["roll_days"] = f"A number of days from 2 to {MAX_DAYS}."
         if not TIME_PATTERN.match(values["roll_time"]):
             errors["roll_time"] = "Give a time of day, like 6:00 AM."
         if values["roll_zone"] not in TIME_ZONES:
@@ -70,10 +78,14 @@ def form_values(feed: Feed | None, zone: str = DEFAULT_ZONE) -> dict:
     feed (with the time zone used last)."""
     if feed is None or not feed.rolling:
         return {"release": "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
-                "roll_start": str(DEFAULT_START)}
+                "roll_start": str(DEFAULT_START), "roll_every": "day",
+                "roll_weekday": str(DEFAULT_WEEKDAY), "roll_days": str(DEFAULT_DAYS)}
     return {"release": "rolling", "roll_time": feed.roll_time or DEFAULT_TIME,
             "roll_zone": feed.roll_zone or zone,
-            "roll_start": str(feed.roll_start if feed.roll_start is not None else DEFAULT_START)}
+            "roll_start": str(feed.roll_start if feed.roll_start is not None else DEFAULT_START),
+            "roll_every": feed.roll_every or "day",
+            "roll_weekday": str(feed.roll_weekday if feed.roll_weekday is not None else DEFAULT_WEEKDAY),
+            "roll_days": str(feed.roll_days or DEFAULT_DAYS)}
 
 
 def last_zone(session: Session) -> str:
@@ -94,7 +106,9 @@ def apply_form(feed: Feed, values: dict) -> None:
         feed.rolling = values["release"] == "rolling"
     if not feed.rolling:
         return
-    feed.roll_every = feed.roll_every or "day"
+    feed.roll_every = values["roll_every"]
+    feed.roll_weekday = int(values["roll_weekday"]) if feed.roll_every == "week" else None
+    feed.roll_days = int(values["roll_days"]) if feed.roll_every == "days" else None
     feed.roll_time = values["roll_time"]
     feed.roll_zone = values["roll_zone"]
     if feed.roll_checked_at is None and values["roll_start"]:
@@ -119,17 +133,35 @@ def _to_utc(moment: datetime) -> datetime:
     return moment.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _local_day(feed: Feed, moment: datetime) -> date:
+    return moment.replace(tzinfo=timezone.utc).astimezone(_zone(feed)).date()
+
+
+def _is_release_day(feed: Feed, day: date) -> bool:
+    every = feed.roll_every or "day"
+    if every == "weekdays":
+        return day.weekday() < 5
+    if every == "week":
+        return day.weekday() == (feed.roll_weekday if feed.roll_weekday is not None
+                                 else DEFAULT_WEEKDAY)
+    if every == "days":
+        first = _local_day(feed, feed.roll_since) if feed.roll_since else day
+        return (day - first).days % (feed.roll_days or DEFAULT_DAYS) == 0
+    return True
+
+
 def release_times(feed: Feed, after: datetime, until: datetime) -> list[datetime]:
     """The release times (UTC) after `after`, up to and including `until`."""
     zone = _zone(feed)
     at = _time_of_day(feed)
-    day = after.replace(tzinfo=timezone.utc).astimezone(zone).date()
-    last = until.replace(tzinfo=timezone.utc).astimezone(zone).date()
+    day = _local_day(feed, after)
+    last = _local_day(feed, until)
     found = []
     while day <= last:
-        moment = _to_utc(datetime.combine(day, at, tzinfo=zone))
-        if after < moment <= until:
-            found.append(moment)
+        if _is_release_day(feed, day):
+            moment = _to_utc(datetime.combine(day, at, tzinfo=zone))
+            if after < moment <= until:
+                found.append(moment)
         day += timedelta(days=1)
     return found
 
@@ -138,7 +170,8 @@ def next_release(feed: Feed, now: datetime) -> datetime | None:
     """When the next episode comes out (UTC), if the clock is running."""
     if not feed.rolling or feed.roll_paused:
         return None
-    found = release_times(feed, now, now + timedelta(days=2))
+    ahead = (feed.roll_days or 0) + 8      # far enough for any schedule
+    found = release_times(feed, now, now + timedelta(days=ahead))
     return found[0] if found else None
 
 
@@ -172,9 +205,19 @@ def day_words(feed: Feed, moment: datetime, now: datetime) -> str:
 
 
 def schedule_words(feed: Feed) -> str:
-    """'One episode every day at 6:00 AM (US Eastern)'."""
+    """'One episode every day at 6:00 AM (US Eastern)', or every weekday
+    (Monday to Friday), every Saturday, every 3 days."""
     at = _time_of_day(feed).strftime("%I:%M %p").lstrip("0")
-    return f"One episode every day at {at} ({TIME_ZONES.get(feed.roll_zone or '', 'US Eastern')})"
+    every = feed.roll_every or "day"
+    if every == "weekdays":
+        often = "every weekday (Monday to Friday)"
+    elif every == "week":
+        often = f"every {WEEKDAYS[feed.roll_weekday if feed.roll_weekday is not None else DEFAULT_WEEKDAY]}"
+    elif every == "days":
+        often = f"every {feed.roll_days or DEFAULT_DAYS} days"
+    else:
+        often = "every day"
+    return f"One episode {often} at {at} ({TIME_ZONES.get(feed.roll_zone or '', 'US Eastern')})"
 
 
 # ------------------------------------------------------------ releasing
@@ -230,6 +273,7 @@ def start(session: Session, feed: Feed, now: datetime | None = None) -> None:
     now = now or utcnow()
     if feed.roll_checked_at is None:
         release_now(session, feed, feed.roll_start or 0, now)
+        feed.roll_since = now
     feed.roll_checked_at = now
 
 
