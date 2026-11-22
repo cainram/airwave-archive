@@ -817,3 +817,11 @@ h2.tag-file { font-size: 1.05rem; margin: 0 0 2px; }
 .fold[open] > summary::before { transform: rotate(90deg); }
 .fold > summary h2 { margin: 0; }
 .fold > summary:hover h2 { color: var(--accent); }
+
+/* Join multi-part episodes: the preview. */
+.join-plans { list-style: none; padding: 0; margin: 12px 0; }
+.join-plan { padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin-bottom: 10px; }
+.join-plan p { margin: 6px 0 0; }
+.join-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.join-parts { margin: 6px 0 0; padding-left: 22px; }
+.join-parts li { margin: 2px 0; }

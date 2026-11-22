@@ -35,7 +35,7 @@ from app.episodes import (
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
 from app import (airdates, convert, converting, csvimport, deleting, export, feeds, genres, grouping,
-                 rolling,
+                 joining, rolling,
                  inbox, listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
@@ -267,7 +267,7 @@ VIEW_COOKIE = "airwave-view"
 # ("use a computer"). Nothing on a phone leads to them; this covers old
 # bookmarks and the like.
 MANAGING_PAGES = {
-    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "import.html", "import_preview.html",
+    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "import.html", "import_preview.html",
     "review.html", "groups_suggested.html", "edit.html", "bulk_edit.html", "export.html",
     "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
     "organize.html", "organized.html", "organize_history.html", "renaming.html",
@@ -1556,6 +1556,33 @@ def advanced_export_page(request: Request):
     with Session(get_engine()) as session:
         found = [s for s in all_series(session) if s["name"] is not None]
     return render(request, "advanced_export.html", {"series": found})
+
+
+@app.get("/advanced/join", response_class=HTMLResponse)
+def advanced_join_page(request: Request):
+    """Join multi-part episodes: the series with episodes in several parts,
+    with tick boxes."""
+    with Session(get_engine()) as session:
+        found = joining.series_with_parts(session)
+    return render(request, "advanced_join.html", {"series": found})
+
+
+JOIN_SHOWN = 300     # episodes listed on the preview (the totals count them all)
+
+
+@app.get("/advanced/join/preview", response_class=HTMLResponse)
+def advanced_join_preview(request: Request, series: list[str] = Query(default=[])):
+    """What joining the ticked series' multi-part episodes would do. Nothing
+    is changed here."""
+    series = sorted(set(filter(None, series)), key=sort_key)
+    with Session(get_engine()) as session:
+        plans = joining.plans_for(session, series, LIBRARY_DIR) if series else []
+        session.expunge_all()
+    ready = [p for p in plans if not p.problem]
+    return render(request, "advanced_join_preview.html", {
+        "series": series, "ready": ready[:JOIN_SHOWN], "ready_count": len(ready),
+        "quick": sum(1 for p in ready if p.quick), "blocked": [p for p in plans if p.problem],
+        "files": sum(len(p.parts) for p in ready)})
 
 
 @app.get("/advanced/tags", response_class=HTMLResponse)
