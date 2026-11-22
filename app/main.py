@@ -35,7 +35,7 @@ from app.episodes import (
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
 from app import (airdates, convert, converting, csvimport, deleting, export, feeds, genres, grouping,
-                 joining, onthisday, rolling,
+                 joining, onthisday, rolling, settings,
                  inbox, listening, renaming, tagwriting, zipimport)
 from app.search import search, words_of
 from app.bulk import BULK_FIELDS, apply_bulk, read_bulk_form, rename_series
@@ -273,7 +273,7 @@ VIEW_COOKIE = "airwave-view"
 # ("use a computer"). Nothing on a phone leads to them; this covers old
 # bookmarks and the like.
 MANAGING_PAGES = {
-    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "joining.html", "feed_on_this_day_form.html", "import.html", "import_preview.html",
+    "inbox.html", "library.html", "advanced.html", "settings.html", "advanced_export.html", "advanced_join.html", "advanced_join_preview.html", "joining.html", "feed_on_this_day_form.html", "import.html", "import_preview.html",
     "review.html", "groups_suggested.html", "edit.html", "bulk_edit.html", "export.html",
     "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
     "organize.html", "organized.html", "organize_history.html", "renaming.html",
@@ -1559,6 +1559,28 @@ def advanced_page(request: Request):
                                              **convert_info})
 
 
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, saved: bool = False):
+    """Settings (the cog in the top bar): your time zone, and the way to
+    the Advanced tools."""
+    with Session(get_engine()) as session:
+        values = {"time_zone": settings.time_zone(session)}
+    return render(request, "settings.html", {"values": values, "errors": {}, "saved": saved,
+                                             "time_zones": TIME_ZONES})
+
+
+@app.post("/settings", response_class=HTMLResponse)
+async def save_settings(request: Request):
+    values, errors = settings.read_form(await read_request_form(request))
+    if errors:
+        return render(request, "settings.html", {"values": values, "errors": errors, "saved": False,
+                                                 "time_zones": TIME_ZONES}, status_code=400)
+    with Session(get_engine()) as session:
+        settings.save(session, values)
+        session.commit()
+    return go_to(request, "/settings?saved=1")
+
+
 @app.get("/advanced/export", response_class=HTMLResponse)
 def advanced_export_page(request: Request):
     """Every series with a tick box, to export the ticked ones together."""
@@ -2280,7 +2302,7 @@ def new_feed(request: Request, series: str = "", ids: list[int] = Query(default=
     # A series' "About" text is the description to start with.
     with Session(get_engine()) as session:
         description = about_of(session, title) or ""
-        release = rolling.form_values(None, rolling.last_zone(session))
+        release = rolling.form_values(None, settings.time_zone(session))
     return render_new_feed(request, series, totals, picked, back,
                            {"title": title or "", "description": description, "author": "",
                             "order": "oldest", **release}, {})

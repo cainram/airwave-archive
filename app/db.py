@@ -61,7 +61,7 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 28
+SCHEMA_VERSION = 29
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -396,6 +396,15 @@ class FeedSeries(Base):
         ForeignKey("feeds.id", ondelete="CASCADE"), primary_key=True)
     series: Mapped[str] = mapped_column(primary_key=True)
     added_at: Mapped[datetime]   # UTC
+
+
+class Setting(Base):
+    """One of the owner's settings (the Settings page), by name: "time_zone"."""
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[str | None]
 
 
 # Load a file's episode and all that episode's parts along with it.

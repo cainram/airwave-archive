@@ -1,9 +1,10 @@
 {% extends layout %}
 {% block title %}Advanced · Airwave Archive{% endblock %}
 {% block content %}
-{# Reached only by typing the address (owner's request): nothing links here. #}
+{# Reached from Settings (the red "Advanced Tools" link), or by typing the address. #}
+<nav class="back"><a class="button" href="/settings">← Settings</a></nav>
 <div class="danger-bar" role="alert">
-  <strong>These tools change your library files, all of them at once.</strong>
+  <strong>These tools change your library files, use with extreme caution.</strong>
   You're on your own here: keep backups, and take a snapshot first.
 </div>
 <h1>Advanced</h1>

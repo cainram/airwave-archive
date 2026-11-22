@@ -251,11 +251,21 @@
   document.body.addEventListener("htmx:afterSettle", markButtons);
   document.body.addEventListener("htmx:historyRestore", markButtons);
 
+  // The settings cog sits outside the menu, so it isn't sent with each
+  // page: light it up on Settings and the Advanced pages here.
+  document.body.addEventListener("htmx:afterSettle", function (event) {
+    const cog = document.querySelector(".settings-cog");
+    if (!cog || !event.detail.boosted || !event.detail.xhr) return;   // a whole new page only
+    const path = new URL(event.detail.xhr.responseURL || window.location.href).pathname;
+    if (path.startsWith("/settings") || path.startsWith("/advanced")) cog.setAttribute("aria-current", "page");
+    else cog.removeAttribute("aria-current");
+  });
+
   // Going Back restores a page from the browser's memory, without a fresh
   // menu, so highlight the right section of the menu here.
   document.body.addEventListener("htmx:historyRestore", function () {
     const path = window.location.pathname;
-    document.querySelectorAll("#menu a").forEach(function (link) {
+    document.querySelectorAll("#menu a, .settings-cog").forEach(function (link) {
       const here = link.dataset.paths.split(" ").some(function (start) {
         return path === start || (start !== "/" && path.startsWith(start));
       });

@@ -1,0 +1,24 @@
+{% extends layout %}
+{% block title %}Settings · Airwave Archive{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+{% if saved %}<div class="notice success" role="status">Saved.</div>{% endif %}
+
+<form class="edit-form" method="post" action="/settings">
+  <label for="time_zone">Your time zone</label>
+  <select id="time_zone" name="time_zone"
+          {% if errors.time_zone %}aria-invalid="true" aria-describedby="time_zone-error"{% endif %}>
+    {% for zone, name in time_zones.items() %}
+    <option value="{{ zone }}" {% if zone == values.time_zone %}selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+  {% if errors.time_zone %}<p id="time_zone-error" class="field-error">{{ errors.time_zone }}</p>{% endif %}
+  <p class="muted small">New podcast feeds start in this time zone. Feeds you've made keep their own:
+    change one on its own page.</p>
+  <div class="form-buttons">
+    <button class="button primary" type="submit">Save</button>
+  </div>
+</form>
+
+<p class="advanced-link"><a class="button danger" href="/advanced">Advanced Tools</a></p>
+{% endblock %}
