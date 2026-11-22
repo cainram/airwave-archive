@@ -189,6 +189,28 @@ def test_exporting_ticked_episodes_with_parts(client):
     assert entry["files"][1]["path"] == "Coast to Coast AM/Art Bell 1996-05-02 Hour 2.wav"
 
 
+def test_exporting_chosen_series_from_the_advanced_page(client):
+    assert "/advanced/export" in client.get("/advanced").text
+    page = client.get("/advanced/export").text
+    assert 'name="series" value="Suspense"' in page and 'value="Coast to Coast AM"' in page
+    assert 'action="/export"' in page
+    page = client.get("/export", params={"series": ["Suspense", "Coast to Coast AM"],
+                                         "back": "/advanced/export"}).text
+    assert "Export 2 series" in page and "3 episodes" in page and "4 recordings" in page
+    assert "Coast to Coast AM, Suspense" in page and 'href="/advanced/export"' in page
+    sent = client.get("/export/download", params={"series": ["Suspense", "Coast to Coast AM"]})
+    assert "Airwave%20-%202%20series%20-%20" in sent.headers["content-disposition"]
+    names = unzip(sent).namelist()
+    assert "Suspense/Suspense 1942-10-08.mp3" in names
+    assert "Coast to Coast AM/Art Bell 1996-05-02 Hour 2.wav" in names
+    # Just one ticked: named after it, like exporting that series.
+    page = client.get("/export", params={"series": ["Suspense"]}).text
+    assert "Export “Suspense”" in page and "Airwave - Suspense - " in page
+    # Only ticked series go in.
+    names = unzip(client.get("/export/download", params={"series": ["Suspense"]})).namelist()
+    assert not any(n.startswith("Coast") for n in names)
+
+
 def test_nothing_to_export(client):
     assert "no episodes were ticked" in client.get("/export").text
     assert client.get("/export/download").status_code == 404
