@@ -1,0 +1,42 @@
+{% extends layout %}
+{% block title %}Export chosen series · Airwave Archive{% endblock %}
+{% block content %}
+<nav class="back"><a class="button" href="/advanced">← Advanced</a></nav>
+<h1>Export chosen series</h1>
+<p class="muted">Tick the series to export together. The next page shows how big the zip will be,
+  with the button to download it. Your library's files aren't changed.</p>
+
+{% if not series %}
+<div class="notice">There are no series to export yet.</div>
+{% else %}
+{# A plain GET form: the export page's address lists the ticked series. #}
+<form id="chosen" method="get" action="/export">
+  <input type="hidden" name="back" value="/advanced/export">
+  <div class="pick-toolbar">
+    <button class="button primary" type="submit">Export ticked…</button>
+  </div>
+  <table class="files">
+    <thead>
+      <tr>
+        <th class="pick"><input type="checkbox" form="chosen" data-select-all="series" aria-label="Tick all series"></th>
+        <th>Series</th>
+        <th>Years</th>
+        <th class="num">Episodes</th>
+        <th class="num size">Size</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in series %}
+      <tr>
+        <td class="pick"><input type="checkbox" form="chosen" name="series" value="{{ s.name }}" id="series-{{ loop.index }}"></td>
+        <td class="name"><label for="series-{{ loop.index }}">{{ s.name }}</label></td>
+        <td class="muted">{{ s.years }}</td>
+        <td class="num">{{ s.episodes }}</td>
+        <td class="num size">{{ s.bytes | size }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% endif %}
+{% endblock %}

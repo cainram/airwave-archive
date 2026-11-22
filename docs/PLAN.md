@@ -1226,6 +1226,13 @@ How it works:
   other tools' previews say so and their buttons wait. Note: a folder
   whose recordings go to several series folders keeps its picture (it's
   unclear whose it is), so it isn't removed.
+- **Export chosen series ✅ *done* (owner's request, 2026-11-22).**
+  `/advanced/export` lists every series (years, episodes, size) with tick
+  boxes and "tick all"; **Export ticked…** opens the usual export summary
+  (Phase 11a) for those series, and the zip holds a folder for each.
+  Named after the series if one is ticked, else "<n> series". Episodes
+  without a series aren't listed. It doesn't change library files: it's
+  here because it's a behind-the-scenes job, not everyday use.
 - Note: an unlinked address is a **"keep out of the way" measure, not a
   lock**. Anyone on the network who knows the address can open it. That's
   fine for a single household, but it isn't security.

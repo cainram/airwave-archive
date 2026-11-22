@@ -43,7 +43,7 @@ from app.series import (
     LIBRARY_SORTS, MAX_ABOUT, SERIES_SORTS, about_of, about_row, all_series, episode_art,
     follow_rename, in_genre, library_order, most_played, one_series, read_source,
     recently_added, recently_added_by_genre, series_files, set_about, set_uploaded_picture,
-    source_name, wikipedia_search,
+    sort_key, source_name, wikipedia_search,
 )
 from app.scanner import format_bitrate, format_duration, format_size, forget_files, sync_library
 
@@ -266,7 +266,7 @@ VIEW_COOKIE = "airwave-view"
 # ("use a computer"). Nothing on a phone leads to them; this covers old
 # bookmarks and the like.
 MANAGING_PAGES = {
-    "inbox.html", "library.html", "advanced.html", "import.html", "import_preview.html",
+    "inbox.html", "library.html", "advanced.html", "advanced_export.html", "import.html", "import_preview.html",
     "review.html", "groups_suggested.html", "edit.html", "bulk_edit.html", "export.html",
     "delete.html", "deleted.html", "write_tags.html", "tags_writing.html", "tags_written.html",
     "organize.html", "organized.html", "organize_history.html", "renaming.html",
@@ -1371,8 +1371,16 @@ def picture_file(art_hash: str) -> Path | None:
                  if p.is_file()), None)
 
 
-def export_plan(session: Session, ids: list[int], whole_series: str):
-    episodes = chosen_episodes(session, ids, whole_series)
+def export_plan(session: Session, ids: list[int], whole_series: str, series: list[str] = ()):
+    """What an export holds: ticked episodes, a whole series, or (from the
+    Advanced page) several whole series."""
+    if series:
+        episodes = list(session.scalars(
+            select(Episode).where(Episode.series.in_(series))
+            .order_by(Episode.series, Episode.air_year, Episode.air_month, Episode.air_day,
+                      Episode.title)))
+    else:
+        episodes = chosen_episodes(session, ids, whole_series)
     export.give_ids(episodes)
     session.commit()
     return export.make_plan(session, episodes, LIBRARY_DIR, picture_file)
@@ -1380,30 +1388,37 @@ def export_plan(session: Session, ids: list[int], whole_series: str):
 
 @app.get("/export", response_class=HTMLResponse)
 def export_page(request: Request, ids: list[int] = Query(default=[]),
-                whole_series: str = "", back: str = "/"):
+                whole_series: str = "", series: list[str] = Query(default=[]), back: str = "/"):
     """What an export will hold, with the button to download it."""
+    series = sorted(set(filter(None, series)), key=sort_key)
     with Session(get_engine(), expire_on_commit=False) as session:
-        plan = export_plan(session, ids, whole_series)
-    query = urlencode([("whole_series", whole_series)] if whole_series
-                      else [("ids", e.id) for e in plan.episodes])
+        plan = export_plan(session, ids, whole_series, series)
+    if series:
+        query = urlencode([("series", name) for name in series])
+    elif whole_series:
+        query = urlencode([("whole_series", whole_series)])
+    else:
+        query = urlencode([("ids", e.id) for e in plan.episodes])
     return render(request, "export.html", {
-        "plan": plan, "series": whole_series, "back": safe_back(back),
+        "plan": plan, "series": whole_series, "several": series, "back": safe_back(back),
         "download": f"/export/download?{query}",
-        "file_name": export.zip_name(whole_series or None, len(plan.episodes)),
+        "file_name": export.zip_name(whole_series or None, len(plan.episodes), series),
     })
 
 
 @app.get("/export/download")
-def export_download(ids: list[int] = Query(default=[]), whole_series: str = ""):
+def export_download(ids: list[int] = Query(default=[]), whole_series: str = "",
+                    series: list[str] = Query(default=[])):
     """The zip itself, made while it downloads."""
+    series = sorted(set(filter(None, series)), key=sort_key)
     with Session(get_engine(), expire_on_commit=False) as session:
-        plan = export_plan(session, ids, whole_series)
+        plan = export_plan(session, ids, whole_series, series)
         for episode in plan.episodes:       # everything the zip needs, loaded now
             episode.parts
         session.expunge_all()
     if not plan.items:
         raise HTTPException(status_code=404, detail="Nothing to export")
-    name = export.zip_name(whole_series or None, len(plan.episodes))
+    name = export.zip_name(whole_series or None, len(plan.episodes), series)
     work_dir = Path(get_engine().url.database).parent / "export-temp"
     return StreamingResponse(export.stream_zip(plan, work_dir), media_type="application/zip",
                              headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
@@ -1532,6 +1547,14 @@ def advanced_page(request: Request):
     return render(request, "advanced.html", {"files": files, "episodes": episodes,
                                              "busy": tagwriting.busy(), "renaming": renaming.busy(),
                                              **convert_info})
+
+
+@app.get("/advanced/export", response_class=HTMLResponse)
+def advanced_export_page(request: Request):
+    """Every series with a tick box, to export the ticked ones together."""
+    with Session(get_engine()) as session:
+        found = [s for s in all_series(session) if s["name"] is not None]
+    return render(request, "advanced_export.html", {"series": found})
 
 
 @app.get("/advanced/tags", response_class=HTMLResponse)

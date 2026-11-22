@@ -2,10 +2,11 @@
 {% block title %}Export · Airwave Archive{% endblock %}
 {% block content %}
 <nav class="back"><a class="button" href="{{ back }}">← Back</a></nav>
-<h1>Export{% if series %} “{{ series }}”{% endif %}</h1>
+<h1>Export{% if series %} “{{ series }}”{% elif several | length == 1 %} “{{ several[0] }}”{% elif several %} {{ several | length }} series{% endif %}</h1>
+{% if several | length > 1 %}<p class="muted">{{ several | join(", ") }}</p>{% endif %}
 
 {% if not plan.items %}
-<div class="notice">There's nothing to export: {% if plan.episodes %}their recordings are missing from the library{% else %}no episodes were ticked{% endif %}.</div>
+<div class="notice">There's nothing to export: {% if plan.episodes %}their recordings are missing from the library{% elif several %}those series have no episodes{% else %}no episodes were ticked{% endif %}.</div>
 {% else %}
 <p>{{ plan.episodes | length }} episode{{ "" if plan.episodes | length == 1 else "s" }},
   {{ plan.items | length }} recording{{ "" if plan.items | length == 1 else "s" }},

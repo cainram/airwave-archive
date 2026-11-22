@@ -219,7 +219,15 @@ def stream_zip(plan: Plan, work_dir: Path) -> Iterator[bytes]:
             leftover.unlink(missing_ok=True)
 
 
-def zip_name(series: str | None, count: int) -> str:
+def zip_name(series: str | None, count: int, several: list[str] = ()) -> str:
+    """The zip's name: the series' name, "3 series", or "12 episodes"."""
     today = datetime.now().strftime("%Y-%m-%d")
-    what = folder_name(series) if series else f"{count} episode{'' if count == 1 else 's'}"
+    if len(several) == 1:
+        series = several[0]
+    if series:
+        what = folder_name(series)
+    elif several:
+        what = f"{len(several)} series"
+    else:
+        what = f"{count} episode{'' if count == 1 else 's'}"
     return f"Airwave - {what} - {today}.zip"
