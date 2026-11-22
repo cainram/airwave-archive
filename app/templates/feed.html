@@ -21,6 +21,11 @@
 {% set removed = request.query_params.get("removed") | int(0) %}
 <div class="notice success" role="status">Took {{ removed }} episode{{ "" if removed == 1 else "s" }} out of the feed.
   {{ "It's" if removed == 1 else "They're" }} still in your library.</div>
+{% elif request.query_params.get("released") %}
+{% set out = request.query_params.get("released") | int(0) %}
+<div class="notice success" role="status">{% if out %}{{ out }} more episode{{ "" if out == 1 else "s" }} came out.
+  Podcast apps get {{ "it" if out == 1 else "them" }} the next time they check.{% else %}Nothing
+  more to let out: every episode is out.{% endif %}</div>
 {% elif published_now == "no" %}
 <div class="notice success" role="status">Back to a draft. Its address no longer works; podcast
   apps that follow it stop getting new episodes.</div>
@@ -33,7 +38,7 @@
     <p class="muted">
       {% if mobile %}{% elif feed.published %}<span class="badge played">Published</span>{% else %}<span class="badge">Draft</span>{% endif %}
       {% if feed.series %}Every episode of <a href="{{ feed.series | series_url }}">{{ feed.series }}</a> ·{% else %}Hand-picked ·{% endif %}
-      {{ episodes }} episode{{ "" if episodes == 1 else "s" }}{% if recordings != episodes %} ({{ recordings }} recordings){% endif %}
+      {% if rolling %}Rolling{% else %}{{ episodes }} episode{{ "" if episodes == 1 else "s" }}{% if recordings != episodes %} ({{ recordings }} recordings){% endif %}{% endif %}
     </p>
     {% if feed.author %}<p class="muted small">By {{ feed.author }}</p>{% endif %}
     {% if feed.description %}<p class="feed-description">{{ feed.description }}</p>{% endif %}
@@ -62,6 +67,32 @@
   </div>
   {% endif %}
 </section>
+
+{% if rolling %}
+<section class="rolling-status" aria-label="Rolling">
+  {% if not rolling.started %}
+  <p><strong>Rolling.</strong> When it's published, the first {{ feed.roll_start or 0 }}
+    episode{{ "" if feed.roll_start == 1 else "s" }} come{{ "s" if feed.roll_start == 1 else "" }} out
+    straight away, then the rest one at a time.</p>
+  {% elif not rolling.waiting %}
+  <p><strong>All {{ rolling.total }} episode{{ "" if rolling.total == 1 else "s" }} are out.</strong>
+    {% if feed.series %}Episodes added to {{ feed.series }} later come out on the schedule.{% endif %}</p>
+  {% else %}
+  <p><strong>{{ rolling.out }} of {{ rolling.total }} out.</strong>
+    {% if not feed.published %}It's a draft, so nothing more comes out until it's published again.
+    {% elif rolling.next_when %}Next: <em>{{ rolling.next_episode.title or "Untitled" }}</em>, {{ rolling.next_when }}.{% endif %}</p>
+  {% endif %}
+  <p class="muted small">{{ rolling.schedule }}.</p>
+  {% if not mobile and feed.published and rolling.waiting %}
+  <form class="release-more" method="post" action="/feeds/{{ feed.id }}/release">
+    <button class="button primary" type="submit">Release more now</button>
+    <input name="count" type="number" min="1" max="{{ [rolling.waiting, max_at_once] | min }}" value="1"
+           inputmode="numeric" aria-label="How many">
+    <span class="muted small">of the {{ rolling.waiting }} waiting</span>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
 
 {% if not feed.published and mobile %}
 <div class="notice">This feed isn't published yet, so podcast apps can't open it.</div>
@@ -125,15 +156,20 @@
 
 <section aria-labelledby="in-feed-heading">
   <h2 id="in-feed-heading">In the feed</h2>
-  {% if not first and feed.series %}
+  {% if rolling and not first and not coming %}
+  <p class="muted">No episodes yet.{% if feed.series %} Episodes added to {{ feed.series }} later appear here.{% endif %}</p>
+  {% elif not first and not coming and feed.series %}
   <p class="muted">No episodes yet. Episodes added to {{ feed.series }} later appear here.</p>
-  {% elif not first and mobile %}
+  {% elif not first and not coming and mobile %}
   <p class="muted">No episodes in it yet.</p>
-  {% elif not first %}
+  {% elif not first and not coming %}
   <p class="muted">No episodes in it. To add some, tick them in the <a href="/library">Library</a> or on a
     series' page and choose <strong>☰ With ticked → Add to a feed…</strong></p>
   {% else %}
-  {% if not mobile %}
+  {% if rolling and not mobile %}
+  <p class="muted small">What's out, in the order it came out, then what's coming. The apps show the
+    date each one came out; the real air date is in each episode's description.</p>
+  {% elif not mobile %}
   <p class="muted small">{% if feed.newest_first %}Newest first{% else %}Oldest first, in air-date order{% endif %},
     as podcast apps list them (change it in <a href="/feeds/{{ feed.id }}/edit">Edit details</a>). The apps show
     the date each one was added to the feed; the real air date is in each episode's description.</p>
@@ -150,20 +186,33 @@
     <table class="files">
       <thead><tr>
         {% if picked %}<th class="pick"><input type="checkbox" form="feed-remove" data-select-all aria-label="Tick all"></th>{% endif %}
-        <th>Title</th><th class="date">Aired</th><th class="num">Length</th></tr></thead>
+        <th>Title</th><th class="date">Aired</th>{% if rolling %}<th class="date">Came out</th>{% endif %}<th class="num">Length</th></tr></thead>
       <tbody>
         {% for item in first %}
         <tr>
           {% if picked %}<td class="pick">{% if (item.part or 1) == 1 %}<input type="checkbox" form="feed-remove" name="ids" value="{{ item.episode.id }}" aria-label="Tick {{ item.title }}">{% endif %}</td>{% endif %}
           <td><a class="title" href="/files/{{ item.file.id }}">{{ item.title }}</a></td>
           <td class="date">{{ item.episode | air_date(short=true) or "unknown" }}</td>
+          {% if rolling %}<td class="date">{{ came_out.get(item.episode.id, "") }}</td>{% endif %}
+          <td class="num">{{ item.file.duration_seconds | duration }}</td>
+        </tr>
+        {% endfor %}
+        {% for item in coming %}
+        <tr class="coming">
+          {% if picked %}<td class="pick">{% if (item.part or 1) == 1 %}<input type="checkbox" form="feed-remove" name="ids" value="{{ item.episode.id }}" aria-label="Tick {{ item.title }}">{% endif %}</td>{% endif %}
+          <td><a class="title" href="/files/{{ item.file.id }}">{{ item.title }}</a></td>
+          <td class="date">{{ item.episode | air_date(short=true) or "unknown" }}</td>
+          <td class="date">{% if item.episode.id == coming[0].episode.id %}next{% else %}waiting{% endif %}</td>
           <td class="num">{{ item.file.duration_seconds | duration }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  {% if recordings > first | length %}
+  {% if rolling and (hidden_out or hidden_coming) %}
+  <p class="muted small">Not shown: {% if hidden_out %}{{ hidden_out }} earlier recording{{ "" if hidden_out == 1 else "s" }}{% endif %}{% if hidden_out and hidden_coming %},
+    {% endif %}{% if hidden_coming %}{{ hidden_coming }} more to come{% endif %}.</p>
+  {% elif not rolling and recordings > first | length %}
   <p class="muted small">…and {{ recordings - first | length }} more.</p>
   {% endif %}
   {% endif %}

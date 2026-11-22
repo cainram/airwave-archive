@@ -201,6 +201,10 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/feeds.py`: podcast feeds (RSS) for podcast apps: which recordings
   a feed holds, their dates (when added to the feed, never invented),
   the RSS itself, and QR codes
+- `app/rolling.py`: rolling feeds (episodes come out on a schedule): the
+  schedule's release times (in a time zone, through clock changes),
+  letting episodes out (each written down in `feed_releases`), catching
+  up whenever the feed is read (no background job), and "Release more now"
 - `app/convert.py`: converting formats that don't play well (video
   files, RealAudio, WMA, Ogg, Opus, and lossless FLAC, WAV and AIFF)
   with ffmpeg: looking inside a file

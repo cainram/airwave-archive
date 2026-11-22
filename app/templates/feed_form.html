@@ -58,6 +58,50 @@
       <span>Newest first <span class="muted small">— like most podcasts</span></span></label>
     <p class="muted small">Either way, an episode's parts stay in order: part 1, part 2…</p>
   </fieldset>
+  {% set is_rolling = values.release == "rolling" %}
+  {% if can_switch or is_rolling %}
+  <fieldset class="feed-order feed-release">
+    <legend>How episodes come out</legend>
+    {% if can_switch %}
+    <label class="choice"><input type="radio" name="release" value="all" {% if not is_rolling %}checked{% endif %}>
+      <span>All at once <span class="muted small">— every episode is there when it's published</span></span></label>
+    <label class="choice"><input type="radio" name="release" value="rolling" {% if is_rolling %}checked{% endif %}>
+      <span>Rolling <span class="muted small">— one a day, like a station rerunning the series</span></span></label>
+    {% else %}
+    <input type="hidden" name="release" value="rolling">
+    {% endif %}
+    <div class="rolling-options">
+      <div class="rolling-row">
+        <label for="roll_time">One episode every day at</label>
+        <input id="roll_time" name="roll_time" type="time" value="{{ values.roll_time }}"
+               {% if errors.roll_time %}aria-invalid="true" aria-describedby="roll_time-error"{% endif %}>
+        <select id="roll_zone" name="roll_zone" aria-label="Time zone"
+                {% if errors.roll_zone %}aria-invalid="true" aria-describedby="roll_zone-error"{% endif %}>
+          {% for zone, name in time_zones.items() %}
+          <option value="{{ zone }}" {% if zone == values.roll_zone %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if errors.roll_time %}<p id="roll_time-error" class="field-error">{{ errors.roll_time }}</p>{% endif %}
+      {% if errors.roll_zone %}<p id="roll_zone-error" class="field-error">{{ errors.roll_zone }}</p>{% endif %}
+      {% if not feed or feed.roll_checked_at is none %}
+      <div class="rolling-row">
+        <label for="roll_start">Start with</label>
+        <input id="roll_start" name="roll_start" type="number" min="0" max="999" inputmode="numeric"
+               value="{{ values.roll_start }}"
+               {% if errors.roll_start %}aria-invalid="true" aria-describedby="roll_start-error"{% endif %}>
+        <span>episode{{ "" if values.roll_start == "1" else "s" }}, out as soon as it's published</span>
+      </div>
+      {% if errors.roll_start %}<p id="roll_start-error" class="field-error">{{ errors.roll_start }}</p>{% endif %}
+      {% endif %}
+      <p class="muted small">Episodes come out oldest first, an episode's parts together. You can let
+        more out early from the feed's page.</p>
+    </div>
+    {% if can_switch and feed %}
+    <p class="muted small">This can't be changed once the feed is published.</p>
+    {% endif %}
+  </fieldset>
+  {% endif %}
   <div class="form-buttons">
     <button class="button primary" type="submit">{{ "Save" if feed else "Make the feed" }}</button>
     <a class="button" href="{{ back }}">Cancel</a>
