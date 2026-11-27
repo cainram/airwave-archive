@@ -6,10 +6,12 @@ Airwave Archive is a **self-hosted, homelab-first web app** for managing a
 personal collection of recorded **radio broadcasts**: old-time radio, talk
 radio, and anything else that went out over the air.
 
-It isn't for archiving podcasts (owner's choice, 2026-11-19; a separate
-version for podcasts may come later, as a fork). That's different from the
-app's own **podcast feeds** (Phase 12), which let podcast apps play your
-radio recordings: those are a key feature.
+Today it handles radio only. **Audiobooks and podcasts are planned to join
+it, in this same project, not as forks** (owner's decision, 2026-11-27,
+replacing the 2026-11-19 idea of a separate fork for podcasts): see
+"Next — Three kinds of media in one project" in section 9. That's
+different from the app's own **podcast feeds** (Phase 12), which let
+podcast apps play your recordings: those are a key feature.
 
 Think of it as a music library (like Plex or iTunes), but built around the
 information that matters for radio:
@@ -1498,6 +1500,11 @@ tags and spreadsheet imports. `format_air_date(..., with_time=True)`
 still gives the time, if it's ever wanted again.
 
 ### Mobile version (owner's request, 2026-11-15)
+**Equally important as the podcast feeds** (owner, 2026-11-27): keep it
+robust and up to date, and make every new feature, for every kind of
+media, work well on a phone. The two don't share your place (the browser
+and Podcasts each remember their own), and that's accepted.
+
 On a phone the app is for **listening, not curating**: "sitting in an
 airport, noodling around and listening to a few episodes". Less clutter;
 every tool that changes the library is left out. (Not a security
@@ -1594,6 +1601,74 @@ differently. The app already cleans up a lot (Phase 4b's clean titles,
 4c's file names, and the inbox's warning when series names differ). The
 owner is collecting examples of messy tags; the next round of
 improvements starts from those.
+
+### Next — Three kinds of media in one project (owner's decisions, 2026-11-27)
+After 36 series imported without trouble (tags plus file names, no
+file opened by hand), the owner wants the
+same model for **audiobooks** and for **archiving and playing
+podcasts**. Only discussed so far: nothing is built, and the steps below
+need planning before any code. A SWOT analysis (strengths, weaknesses,
+opportunities, threats) of the idea was written the same day.
+
+The decisions:
+- **One project, not forks.** Radio, audiobooks and podcasts live in
+  this one app, for development's sake: the shared parts (scanner,
+  inbox, player, feeds, the safety tools) exist once, so a fix to them
+  fixes all three. Getting there means carefully reorganising today's
+  code into a shared core first, planned before it's done.
+- **A distinct experience for each kind. No blended library** (for
+  now; the owner may revisit this). Each kind browses and listens in its
+  own way and its own words (radio: series and air dates; audiobooks:
+  authors, narrators, "Book 3"; podcasts: shows and release dates). So
+  "Continue listening" and search stay within one kind.
+- **Elegant and clean.** The owner disliked AudioBookshelf's "libraries"
+  drop-down, which makes each library a separate world. Tabs across the
+  top were also turned down as too obtrusive. **How you move between the
+  kinds is still open**, to explore later. Someone with only radio
+  should see the app as it is today.
+- **Apple Podcasts is the player for all three kinds,** on the iPhone and
+  the Mac: "manage in the
+  browser, listen in Podcasts". Feeds keep their secret addresses (no
+  logins, a ground rule the owner wants to keep). Building feeds becomes
+  the heart of the shared core. Podcasts gives speed, sleep timer,
+  CarPlay, downloads and Mac↔iPhone place-keeping (through iCloud) for
+  free.
+- **The mobile web version is just as important** as the feeds (see
+  "Mobile version").
+- **An iPhone / App Store app is shelved.** It would need logins and a
+  way for an app to ask the server for things (an API), and the owner
+  doesn't want logins. If it ever comes back: a TestFlight app for the
+  household first, the public App Store only after.
+- **Ground rules carry over** to the new kinds: no file touched without
+  a preview, no invented dates, the project hosts no content. Archived
+  podcasts are only ever served back to the owner through private
+  feeds, never re-published.
+- **One kind at a time.** Radio stays the flagship, and its open items
+  (messy tags above) shouldn't stall.
+
+Ideas raised, to weigh when planning:
+- Audiobooks in Podcasts: a book as one long episode with chapters
+  inside (the M4B files audiobooks usually come in, or one made by
+  "Join multi-part episodes"), or a feed per book series with each book
+  a "season". A rolling feed could give a chapter a night.
+- Podcasts: the archiver keeps its own copy of each show, so it stays
+  playable if the show vanishes. It's the first part that has to work
+  on a schedule by itself (checking feeds, downloading), not only when
+  the owner presses something or a feed is read (as rolling feeds do),
+  and the first to reach the internet. It needs disk-space limits and
+  warnings.
+
+Not yet known, to test before designing audiobooks (suggested first
+step: one audiobook in a test feed, checked on the iPhone and the Mac):
+does Podcasts play M4B (probably, if sent as M4A), show chapters inside
+the file, group seasons as hoped, keep the place in a 20-hour book, and
+cope with very long feeds? Do new items arrive by themselves from a
+Tailscale address, or only when the app is opened?
+
+Still to decide:
+- Keep the name "Airwave Archive", or rename it?
+- Which kind comes second: podcasts or audiobooks?
+- How to move between the kinds (see above).
 
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
