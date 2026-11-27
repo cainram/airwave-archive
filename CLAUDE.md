@@ -215,7 +215,8 @@ These come from the plan and should not be changed without the owner's OK:
 - `app/rolling.py`: rolling feeds (episodes come out on a schedule): the
   schedule's release times (in a time zone, through clock changes),
   letting episodes out (each written down in `feed_releases`), catching
-  up whenever the feed is read (no background job), and "Release more now"
+  up whenever the feed is read (no background job), "Release more now",
+  and skipping the first few episodes (`feed_skips`; never out in the feed)
 - `app/settings.py`: the owner's settings (the Settings page, behind the
   cog in the top bar): for now, your time zone, the starting choice for
   new feeds

@@ -99,9 +99,11 @@ def test_how_the_next_release_is_described():
 
 # ------------------------------------------------------------ in the app
 
-def make_rolling(client, series="Suspense", start="2", time="06:00", zone="America/New_York") -> int:
+def make_rolling(client, series="Suspense", start="2", time="06:00", zone="America/New_York",
+                 skip="0") -> int:
     sent = client.post("/feeds", data={"series": series, "title": series, "release": "rolling",
-                                       "roll_time": time, "roll_zone": zone, "roll_start": start},
+                                       "roll_time": time, "roll_zone": zone, "roll_start": start,
+                                       "roll_skip": skip},
                        follow_redirects=False)
     assert sent.status_code == 303
     return int(re.search(r"/feeds/(\d+)", sent.headers["location"])[1])
@@ -307,3 +309,95 @@ def test_letting_everything_out(client):
     with Session(client.engine) as session:
         assert not session.get(Feed, feed_id).rolling
     assert "Let everything out" not in client.get(f"/feeds/{feed_id}").text
+
+
+# ------------------------------------------------------------ skipping the first few
+
+def edit_skip(client, feed_id, skip):
+    return client.post(f"/feeds/{feed_id}/edit", data={
+        "title": "Suspense", "release": "rolling", "roll_time": "06:00",
+        "roll_zone": "America/New_York", "roll_skip": skip})
+
+
+def test_skipping_the_first_episodes(client):
+    # Suspense, in air-date order: The Hitchhiker, Sorry, Wrong Number,
+    # Untitled Episode, Donovan's Brain.
+    feed_id = make_rolling(client, start="1", skip="2")
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    assert titles(client, feed_id) == ["Untitled Episode"]
+    page = client.get(f"/feeds/{feed_id}").text
+    assert "1 of 2 out." in page and "2 skipped episodes won't come out in this feed." in page
+    # A skipped recording can't be fetched.
+    a = client.ids["a.mp3"]
+    assert client.get(f"/feeds/{token(client, feed_id)}/audio/{a}.mp3").status_code == 404
+    client.post(f"/feeds/{feed_id}/release", data={"count": "5"})
+    assert titles(client, feed_id) == ["Untitled Episode", "Donovan's Brain"]
+
+
+def test_the_line_under_the_number_says_where_it_starts(client):
+    page = client.get("/feeds/new?series=Suspense").text
+    assert 'name="roll_skip"' in page and "Starts with: the 1st of 4" in page
+    assert "The Hitchhiker" in page
+
+    def preview(skip):
+        return client.post("/feeds/skip-preview", data={"series": "Suspense", "roll_skip": skip}).text
+    assert "Starts with: the 3rd of 4" in preview("2") and "Untitled Episode" in preview("2")
+    assert "skips every episode" in preview("4")
+    assert "the 1st of 4" in preview("") and "the 1st of 4" in preview("abc")
+    # Ticked episodes: counted among those.
+    ids = episode_ids(client, "b.mp3", "d.flac")
+    page = client.post("/feeds/skip-preview", data={"ids": ids, "roll_skip": "1"}).text
+    assert "the 2nd of 2" in page and "Donovan&#39;s Brain" in page
+
+
+def test_the_hint_when_episodes_were_played_here(client):
+    assert "You've played up to" not in client.get("/feeds/new?series=Suspense").text
+    a, b = episode_ids(client, "a.mp3", "b.mp3")
+    client.post("/episodes/played", data={"ids": [a, b], "played": "1", "back": "/library"})
+    page = client.get("/feeds/new?series=Suspense").text
+    assert "You've played up to the 2nd here" in page and 'data-value="2"' in page
+    # Once the number matches, the hint has nothing to add.
+    page = client.post("/feeds/skip-preview", data={"series": "Suspense", "roll_skip": "2"}).text
+    assert "You've played up to" not in page
+
+
+def test_changing_how_many_on_a_rolling_feed(client):
+    feed_id = make_rolling(client, start="1")
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    assert titles(client, feed_id) == ["The Hitchhiker"]
+    page = client.get(f"/feeds/{feed_id}/edit").text
+    assert 'name="roll_skip"' in page and "Next out: the 2nd of 4" in page
+    # Jump ahead: the 2nd and 3rd are skipped; what's out stays out.
+    edit_skip(client, feed_id, "3")
+    assert "Next out: the 4th of 4" in client.get(f"/feeds/{feed_id}/edit").text
+    client.post(f"/feeds/{feed_id}/release", data={"count": "1"})
+    assert titles(client, feed_id) == ["The Hitchhiker", "Donovan's Brain"]
+    # Fewer: the ones skipped but not out yet come back, next in line.
+    edit_skip(client, feed_id, "1")
+    client.post(f"/feeds/{feed_id}/release", data={"count": "1"})
+    assert titles(client, feed_id) == ["The Hitchhiker", "Donovan's Brain", "Sorry, Wrong Number"]
+
+
+def test_skipped_episodes_stay_out_when_everything_is_let_out(client):
+    feed_id = make_rolling(client, start="1", skip="2")
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    page = client.get(f"/feeds/{feed_id}/all-at-once").text
+    assert "The 1 episode that&#39;s still waiting comes out now" in page
+    client.post(f"/feeds/{feed_id}/all-at-once", data={"confirm": "yes"})
+    assert titles(client, feed_id) == ["Untitled Episode", "Donovan's Brain"]
+    a = client.ids["a.mp3"]
+    assert client.get(f"/feeds/{token(client, feed_id)}/audio/{a}.mp3").status_code == 404
+
+
+def test_a_draft_made_all_at_once_skips_nothing(client):
+    feed_id = make_rolling(client, start="1", skip="2")
+    client.post(f"/feeds/{feed_id}/edit", data={"title": "Suspense", "release": "all"})
+    client.post(f"/feeds/{feed_id}/publish", data={"published": "1"})
+    assert len(titles(client, feed_id)) == 4
+
+
+def test_the_form_checks_the_number_to_skip(client):
+    sent = client.post("/feeds", data={"series": "Suspense", "title": "Suspense",
+                                       "release": "rolling", "roll_time": "06:00",
+                                       "roll_zone": "UTC", "roll_start": "1", "roll_skip": "-3"})
+    assert sent.status_code == 400 and "A number from 0 to 99999." in sent.text

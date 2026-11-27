@@ -30,7 +30,7 @@ from app.db import (
 from app.episodes import (
     LONG_FIELDS, _clean, MONTHS, TEXT_FIELDS, TIME_PATTERN, TIME_ZONES, apply_confirmed, apply_edits,
     day_heading, format_air_date, format_air_span, format_air_time, format_time, has_standin_title,
-    read_date_text, read_form, standin_title,
+    ordinal, read_date_text, read_form, standin_title,
 )
 from app.filenames import date_text, parse_filename
 from app.parts import nearby_files, renumber, set_parts
@@ -187,6 +187,7 @@ templates.env.filters["time_left"] = listening.time_left
 templates.env.filters["air_time"] = format_air_time
 templates.env.filters["air_span"] = format_air_span
 templates.env.filters["clock"] = format_time
+templates.env.filters["ordinal"] = ordinal
 templates.env.globals["day_heading"] = day_heading
 
 
@@ -2270,13 +2271,51 @@ def picked_episodes(session: Session, ids: list[int]) -> list[Episode]:
     return sorted(found, key=feeds.air_key)
 
 
+def skip_number(text) -> int:
+    """The "Skip the first … episodes" box, as a number (0 if it isn't one)."""
+    text = str(text or "").strip()
+    return min(int(text), rolling.MAX_SKIP) if text.isdigit() else 0
+
+
+def skip_preview(session: Session, feed: Feed | None, series: str, ids: list[int],
+                 how_many) -> dict:
+    """Which episode a rolling feed starts with when its first few are skipped."""
+    if feed is not None:
+        episodes = feeds.feed_episodes(session, feed)
+    elif series:
+        episodes = feeds.series_episodes(session, series)
+    else:
+        episodes = picked_episodes(session, ids)
+    return rolling.skip_preview(session, feed, episodes, skip_number(how_many))
+
+
 def render_new_feed(request: Request, series: str, totals, picked, back: str,
                     values: dict, errors: dict):
+    with Session(get_engine()) as session:
+        preview = skip_preview(session, None, series, [e.id for e in picked],
+                               values.get("roll_skip"))
+        session.expunge_all()
     return render(request, "feed_form.html", {
         "feed": None, "series": series, "totals": totals, "picked": picked,
         "back": safe_back(back) if back else (series_url(series) if series else "/feeds"),
-        "values": values, "errors": errors, "can_switch": True, "time_zones": TIME_ZONES},
+        "values": values, "errors": errors, "can_switch": True, "time_zones": TIME_ZONES,
+        "skip": preview},
         status_code=400 if errors else 200)
+
+
+@app.post("/feeds/skip-preview", response_class=HTMLResponse)
+async def feed_skip_preview(request: Request):
+    """The feed form's line under "Skip the first … episodes", sent again
+    as the number is typed: which episode the feed starts with."""
+    form = await read_request_form(request)
+    feed_id = str(form.get("feed", ""))
+    with Session(get_engine()) as session:
+        feed = get_feed(session, int(feed_id)) if feed_id.isdigit() else None
+        preview = skip_preview(session, feed, str(form.get("series", "")),
+                               [int(i) for i in form.getlist("ids") if str(i).isdigit()],
+                               form.get("roll_skip"))
+        session.expunge_all()
+    return HTMLResponse(templates.get_template("_skip_preview.html").render(skip=preview))
 
 
 def read_whole_feed_form(form) -> tuple[dict, dict]:
@@ -2334,6 +2373,9 @@ async def create_feed(request: Request):
         feed.author = values["author"] or None
         feed.newest_first = values["order"] == "newest"
         rolling.apply_form(feed, values)
+        if feed.rolling and skip_number(values["roll_skip"]):
+            rolling.skip(session, feed, skip_number(values["roll_skip"]),
+                         feeds.feed_episodes(session, feed))
         session.commit()
         feed_id = feed.id
     return go_to(request, f"/feeds/{feed_id}?made=1")
@@ -2516,6 +2558,8 @@ def edit_feed_form(request: Request, feed_id: int):
                 "series": set(onthisday.chosen(session, feed)),
                 "roll_time": feed.roll_time or rolling.DEFAULT_TIME,
                 "roll_zone": feed.roll_zone or rolling.DEFAULT_ZONE}, {})
+        rolling.bring_up_to_date(session, feed)
+        preview = skip_preview(session, feed, "", [], feed.roll_skip)
         session.expunge_all()
     return render(request, "feed_form.html", {
         "feed": feed, "series": feed.series, "totals": None,
@@ -2523,7 +2567,7 @@ def edit_feed_form(request: Request, feed_id: int):
                    "author": feed.author or "",
                    "order": "newest" if feed.newest_first else "oldest",
                    **rolling.form_values(feed)}, "errors": {},
-        "can_switch": rolling.can_switch(feed), "time_zones": TIME_ZONES})
+        "can_switch": rolling.can_switch(feed), "time_zones": TIME_ZONES, "skip": preview})
 
 
 @app.post("/feeds/{feed_id}/edit", response_class=HTMLResponse)
@@ -2540,17 +2584,25 @@ async def edit_feed(request: Request, feed_id: int):
         if errors and values["release"] == "all":
             errors = {k: v for k, v in errors.items() if not k.startswith("roll_")}
         if errors:
+            preview = skip_preview(session, feed, "", [], values.get("roll_skip"))
             session.expunge_all()
             return render(request, "feed_form.html", {
                 "feed": feed, "series": feed.series, "totals": None,
                 "values": values, "errors": errors,
-                "can_switch": rolling.can_switch(feed), "time_zones": TIME_ZONES},
+                "can_switch": rolling.can_switch(feed), "time_zones": TIME_ZONES,
+                "skip": preview},
                 status_code=400)
         rolling.catch_up(session, feed)    # (releases due by the old time come out first)
         feed.title, feed.description = values["title"], values["description"] or None
         feed.author = values["author"] or None
         feed.newest_first = values["order"] == "newest"
         rolling.apply_form(feed, values)
+        if feed.rolling and skip_number(values["roll_skip"]) != (feed.roll_skip or 0):
+            rolling.skip(session, feed, skip_number(values["roll_skip"]),
+                         feeds.feed_episodes(session, feed))
+        elif not feed.rolling and feed.roll_skip and rolling.can_switch(feed):
+            # A draft switched to "All at once": skipping is for rolling feeds only.
+            rolling.skip(session, feed, 0, feeds.feed_episodes(session, feed))
         feed.updated_at = utcnow()
         session.commit()
     return go_to(request, f"/feeds/{feed_id}")

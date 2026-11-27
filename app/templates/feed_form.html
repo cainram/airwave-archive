@@ -117,6 +117,20 @@
       </div>
       {% if errors.roll_start %}<p id="roll_start-error" class="field-error">{{ errors.roll_start }}</p>{% endif %}
       {% endif %}
+      {# Skipping the first few, already heard somewhere else. The line
+         under it says which episode that starts with, as it's typed. #}
+      <div class="rolling-row">
+        <label for="roll_skip">Skip the first</label>
+        <input id="roll_skip" name="roll_skip" type="number" min="0" max="99999" inputmode="numeric"
+               value="{{ values.roll_skip or 0 }}"
+               hx-post="/feeds/skip-preview" hx-trigger="input changed delay:250ms"
+               hx-include="closest form" hx-target="#skip-preview" hx-swap="outerHTML"
+               {% if feed %}hx-vals='{"feed": "{{ feed.id }}"}'{% endif %}
+               {% if errors.roll_skip %}aria-invalid="true" aria-describedby="roll_skip-error"{% endif %}>
+        <span>episodes <span class="muted small">— ones you've already heard, here or elsewhere</span></span>
+      </div>
+      {% if errors.roll_skip %}<p id="roll_skip-error" class="field-error">{{ errors.roll_skip }}</p>{% endif %}
+      {% include "_skip_preview.html" %}
       <p class="muted small">Episodes come out oldest first, an episode's parts together. You can let
         more out early from the feed's page.</p>
     </div>

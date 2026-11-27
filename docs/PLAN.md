@@ -1046,6 +1046,27 @@ Steps:
   confirmation page): the waiting episodes come out now and it becomes
   an ordinary feed; episodes already out keep their dates (their
   `feed_releases` rows stay), later ones appear straight away.
+- Step 4 ✅ *done* (owner's request, 2026-11-27): **Skip the first N
+  episodes**, for a series already partly heard, here or on another
+  platform (that's why it's always there, not only when episodes are
+  marked played here). Rolling feeds only (owner's choice), on the form
+  when making or editing one, any time.
+  - The owner types a number; the line under it says, as it's typed,
+    which episode the feed starts with ("Starts with: the 21st of 51,
+    *Title* · 1952"), or once it's rolling, which comes out next. Only
+    episodes with a recording are counted; an episode in parts counts
+    once. Skipping every episode says so.
+  - A hint when episodes of it were marked played here: "You've played
+    up to the 5th here (*Title*)" with a **Skip 5** button that fills in
+    the number. Not shown when the number already matches.
+  - Skipped episodes are written down (`feed_skips`, database version
+    30; `feeds.roll_skip` keeps the number as typed), so a recording
+    added to the series later doesn't shift which ones are skipped. They
+    never come out in this feed, even after **Let everything out**.
+  - Changing the number only moves episodes not out yet: what's out
+    stays out; a lower number puts skipped ones back in the queue, next
+    in line. A draft switched to All at once skips nothing.
+  - The feed's page says how many are skipped.
 
 #### Your time zone ✅ *done* (owner's idea, 2026-11-22)
 On the **Settings** page (below). It's the starting choice for new

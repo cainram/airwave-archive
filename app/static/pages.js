@@ -42,6 +42,18 @@
     if (set) set.checked = true;
   });
 
+  // A button with data-set-value puts its data-value into that box (and
+  // tells the box it changed, so anything watching it updates).
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest && event.target.closest("[data-set-value]");
+    if (!button) return;
+    const box = document.querySelector(button.getAttribute("data-set-value"));
+    if (!box) return;
+    box.value = button.getAttribute("data-value");
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    box.focus();
+  });
+
   // Pressing Enter in a box with data-enter-clicks presses that button
   // (instead of the form's first button).
   document.addEventListener("keydown", function (event) {

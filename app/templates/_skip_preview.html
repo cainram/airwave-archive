@@ -1,0 +1,20 @@
+{#- The feed form's line under "Skip the first … episodes": which episode
+    the feed starts with (or, once it's rolling, comes out next), and a
+    hint when episodes have been marked played here. Sent again as the
+    number is typed. -#}
+<div id="skip-preview" class="skip-preview" aria-live="polite">
+  {%- if skip.total == 0 %}
+  <p class="muted small">There are no episodes to skip yet.</p>
+  {%- elif skip.episode is none %}
+  <p class="muted small">⚠ That skips every episode: nothing is left to come out.</p>
+  {%- else %}
+  <p class="small">{{ "Next out" if skip.started else "Starts with" }}: the {{ skip.number | ordinal }} of {{ skip.total }},
+    <strong>{{ skip.episode.title or "Untitled" }}</strong>{% set aired = skip.episode | air_date(short=true) %}{% if aired %}
+    <span class="muted">· {{ aired }}</span>{% endif %}</p>
+  {%- endif %}
+  {%- if skip.played and skip.played != skip.skip %}
+  <p class="muted small">You've played up to the {{ skip.played | ordinal }} here
+    (<em>{{ skip.played_episode.title or "Untitled" }}</em>).
+    <button class="button small-button" type="button" data-set-value="#roll_skip" data-value="{{ skip.played }}">Skip {{ skip.played }}</button></p>
+  {%- endif %}
+</div>

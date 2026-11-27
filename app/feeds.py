@@ -50,7 +50,7 @@ import segno
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import AudioFile, Episode, Feed, FeedItem, FeedRelease, utcnow
+from app.db import AudioFile, Episode, Feed, FeedItem, FeedRelease, FeedSkip, utcnow
 from app.episodes import format_air_date
 from app.series import AIR_ORDER, one_series, uploaded_pictures
 
@@ -138,14 +138,19 @@ def air_key(e: Episode):
             not number, int(number) if number.isdigit() else 0, number, e.title or "", e.id)
 
 
+def series_episodes(session: Session, series: str) -> list[Episode]:
+    """A series' episodes, in air-date order, with their files."""
+    return list(session.scalars(
+        select(Episode).where(Episode.series == series)
+        .options(selectinload(Episode.files))
+        .order_by(*AIR_ORDER, Episode.id)))
+
+
 def feed_episodes(session: Session, feed: Feed) -> list[Episode]:
     """The feed's episodes, in air-date order (a hand-picked feed's: in the
     order they were added, each batch in air-date order), with their files."""
     if feed.series is not None:
-        return list(session.scalars(
-            select(Episode).where(Episode.series == feed.series)
-            .options(selectinload(Episode.files))
-            .order_by(*AIR_ORDER, Episode.id)))
+        return series_episodes(session, feed.series)
     return list(session.scalars(
         select(Episode).join(FeedItem, FeedItem.episode_id == Episode.id)
         .where(FeedItem.feed_id == feed.id)
@@ -168,12 +173,15 @@ def feed_items(session: Session, feed: Feed) -> list[Item]:
     if feed.series is None:
         added = {pick.episode_id: pick.added_at for pick in session.scalars(
             select(FeedItem).where(FeedItem.feed_id == feed.id))}
-    # A feed that was rolling: what came out keeps the date it came out.
-    from app.rolling import released
+    # A feed that was rolling: what came out keeps the date it came out,
+    # and episodes it skipped stay out.
+    from app.rolling import released, skipped
     out = released(session, feed)
     if out:
         added = {**(added or {}), **out}
-    return in_order(items(feed, feed_episodes(session, feed), added), feed.newest_first)
+    skip = skipped(session, feed)
+    episodes = [e for e in feed_episodes(session, feed) if e.id not in skip]
+    return in_order(items(feed, episodes, added), feed.newest_first)
 
 
 def feed_picture(session: Session, feed: Feed, found: list[Item]) -> str | None:
@@ -365,6 +373,8 @@ def in_feed(session: Session, feed: Feed, f: AudioFile) -> bool:
         return onthisday.in_feed(session, feed, f)
     if feed.rolling:
         return session.get(FeedRelease, (feed.id, f.episode_id)) is not None
+    if session.get(FeedSkip, (feed.id, f.episode_id)) is not None:
+        return False        # skipped while it was rolling
     if feed.series is None:
         return session.get(FeedItem, (feed.id, f.episode_id)) is not None
     episode = session.get(Episode, f.episode_id)

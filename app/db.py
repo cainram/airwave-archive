@@ -61,7 +61,8 @@ DB_FILENAME = "airwave.db"
 #  21: Phase 13d, converting library files (audio_files.convert_json, library_conversions table)
 #  22: Phase 10b, renaming and organizing files (rename_batches, renamed tables)
 #  23: genres for each series (series_genres table)
-SCHEMA_VERSION = 29
+#  30: skipping a rolling feed's first episodes (feeds.roll_skip, feed_skips table)
+SCHEMA_VERSION = 30
 
 # Where a value came from. Manual edits always win over automatic ones.
 MANUAL = "manual"
@@ -344,6 +345,8 @@ class Feed(Base):
     roll_time: Mapped[str | None]        # "06:00", in roll_zone
     roll_zone: Mapped[str | None]        # like "America/New_York"
     roll_start: Mapped[int | None]       # how many come out when it's published
+    # How many of the first episodes it skips (as typed; FeedSkip says which).
+    roll_skip: Mapped[int | None]
     roll_days: Mapped[int | None]        # "every N days"
     roll_weekday: Mapped[int | None]     # "weekly": 0 Monday ... 6 Sunday
     roll_paused: Mapped[bool] = mapped_column(default=False)
@@ -384,6 +387,19 @@ class FeedRelease(Base):
     episode_id: Mapped[int] = mapped_column(
         ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True, index=True)
     released_at: Mapped[datetime]   # UTC: its date in podcast apps
+
+
+class FeedSkip(Base):
+    """An episode a rolling feed skips: one of the first few, already heard
+    somewhere else. It never comes out in this feed. Removed along with its
+    feed or its episode."""
+
+    __tablename__ = "feed_skips"
+
+    feed_id: Mapped[int] = mapped_column(
+        ForeignKey("feeds.id", ondelete="CASCADE"), primary_key=True)
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episodes.id", ondelete="CASCADE"), primary_key=True, index=True)
 
 
 class FeedSeries(Base):
@@ -575,6 +591,10 @@ def _migrate(conn) -> None:
     # Version 28: feeds the app makes itself ("On this day").
     if "kind" not in feed_columns:
         conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN kind VARCHAR")
+    # Version 30: skipping a rolling feed's first episodes (and the
+    # feed_skips table, made by create_all).
+    if "roll_skip" not in feed_columns:
+        conn.exec_driver_sql("ALTER TABLE feeds ADD COLUMN roll_skip INTEGER")
     # Version 19: what converting an inbox file will do.
     if "convert_json" not in _columns(conn, "inbox_items"):
         conn.exec_driver_sql("ALTER TABLE inbox_items ADD COLUMN convert_json VARCHAR")

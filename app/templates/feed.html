@@ -119,7 +119,8 @@
     {% if not feed.published %}It's a draft, so nothing more comes out until it's published again.
     {% elif rolling.next_when %}Next: <em>{{ rolling.next_episode.title or "Untitled" }}</em>, {{ rolling.next_when }}.{% endif %}</p>
   {% endif %}
-  <p class="muted small">{{ rolling.schedule }}.</p>
+  <p class="muted small">{{ rolling.schedule }}.{% if rolling.skipped %}
+    {{ rolling.skipped }} skipped episode{{ "" if rolling.skipped == 1 else "s" }} won't come out in this feed.{% endif %}</p>
   {% if not mobile and rolling.paused %}
   <form class="release-more" method="post" action="/feeds/{{ feed.id }}/pause">
     <button class="button primary" type="submit" name="paused" value="0">Resume</button>
