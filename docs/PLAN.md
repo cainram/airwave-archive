@@ -28,8 +28,11 @@ browser on any device in your house.
 
 ### Who it's for
 
-- **One household.** It's not a service for the public, and it doesn't need
-  sign-ups or multi-user accounts.
+- **One person per server** (owner's choice, 2026-11-27): like an iPhone
+  or iPad, each copy of the app belongs to one person. It's not a service
+  for the public, and it doesn't need sign-ups or accounts. Play history,
+  "Continue listening" and played marks are simply that person's; don't
+  plan for sharing them.
 - **People who already have their recordings.** The project hosts and
   distributes **no content**. You bring your own files.
 
@@ -1635,18 +1638,13 @@ The decisions:
   - At most three fixed choices, named for what they are.
   - **No setting for a "main kind"** (owner's choice: switching now and
     then beats changing a setting). The app opens on the kind **last used
-    in that browser**, remembered like the dark-mode choice, so people
-    sharing the server each land where they left off. A new browser
+    in that browser**, remembered like the dark-mode choice. A new browser
     opens on Radio, and so does one whose last kind is now empty.
   - On the phone: the same drop-down in the same place is the first
     idea to try (the phone's top bar has room, with no Settings cog),
     using the browser's own drop-down so an iPhone shows its usual
     picker. To be settled when it's built. Not in the footer (owner,
     2026-11-27).
-- **"Continue listening" and played marks belong to the server, not to
-  a person** (there are no accounts), so everyone sharing it sees the
-  same ones. Fine while people listen to different kinds; revisit if it
-  gets in the way.
 - **Apple Podcasts is the player for all three kinds,** on the iPhone and
   the Mac: "manage in the
   browser, listen in Podcasts". Feeds keep their secret addresses (no

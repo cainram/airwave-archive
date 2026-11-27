@@ -132,7 +132,9 @@ These come from the plan and should not be changed without the owner's OK:
   joined file has been checked (`app/joining.py`).
 - **Never invent air dates or times.** If only the year is known, store only
   the year. If the time is unknown, show "time unknown".
-- **Single household, self-hosted.** No user accounts for strangers, no cloud
+- **One person per server, self-hosted** (like an iPhone or iPad: each copy
+  of the app is one person's; don't plan for accounts or shared play
+  history). No user accounts, no cloud
   services, no tracking.
 - **The project hosts no content.** Don't add sample recordings or links to
   download them.
