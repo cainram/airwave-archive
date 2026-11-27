@@ -1665,8 +1665,10 @@ the file, group seasons as hoped, keep the place in a 20-hour book, and
 cope with very long feeds? Do new items arrive by themselves from a
 Tailscale address, or only when the app is opened?
 
+The name stays **Airwave Archive** for now, for all three kinds
+(owner's choice, 2026-11-27).
+
 Still to decide:
-- Keep the name "Airwave Archive", or rename it?
 - Which kind comes second: podcasts or audiobooks?
 - How to move between the kinds (see above).
 
