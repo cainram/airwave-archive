@@ -1623,9 +1623,30 @@ The decisions:
   "Continue listening" and search stay within one kind.
 - **Elegant and clean.** The owner disliked AudioBookshelf's "libraries"
   drop-down, which makes each library a separate world. Tabs across the
-  top were also turned down as too obtrusive. **How you move between the
-  kinds is still open**, to explore later. Someone with only radio
+  top were also turned down as too obtrusive. Someone with only radio
   should see the app as it is today.
+- **Moving between the kinds: a drop-down** (owner's choice,
+  2026-11-27). In the top bar, just left of the dark-mode switch, it
+  shows the kind you're in ("Radio ▾") and lists Radio, Audiobooks,
+  Podcasts. Unlike AudioBookshelf's:
+  - It **only appears when the library holds more than one kind**, and
+    lists only the kinds that have something in them. With radio only,
+    the top bar is exactly as today.
+  - At most three fixed choices, named for what they are.
+  - **No setting for a "main kind"** (owner's choice: switching now and
+    then beats changing a setting). The app opens on the kind **last used
+    in that browser**, remembered like the dark-mode choice, so people
+    sharing the server each land where they left off. A new browser
+    opens on Radio, and so does one whose last kind is now empty.
+  - On the phone: the same drop-down in the same place is the first
+    idea to try (the phone's top bar has room, with no Settings cog),
+    using the browser's own drop-down so an iPhone shows its usual
+    picker. To be settled when it's built. Not in the footer (owner,
+    2026-11-27).
+- **"Continue listening" and played marks belong to the server, not to
+  a person** (there are no accounts), so everyone sharing it sees the
+  same ones. Fine while people listen to different kinds; revisit if it
+  gets in the way.
 - **Apple Podcasts is the player for all three kinds,** on the iPhone and
   the Mac: "manage in the
   browser, listen in Podcasts". Feeds keep their secret addresses (no
@@ -1670,7 +1691,7 @@ The name stays **Airwave Archive** for now, for all three kinds
 
 Still to decide:
 - Which kind comes second: podcasts or audiobooks?
-- How to move between the kinds (see above).
+- How the kind drop-down works on the phone (see above).
 
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
