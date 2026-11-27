@@ -134,7 +134,8 @@ These come from the plan and should not be changed without the owner's OK:
   the year. If the time is unknown, show "time unknown".
 - **One person per server, self-hosted** (like an iPhone or iPad: each copy
   of the app is one person's; don't plan for accounts or shared play
-  history). No user accounts, no cloud
+  history, but keep a later "Who's listening?" picker possible: see
+  "Who it's for" in the plan). No logins, no user accounts, no cloud
   services, no tracking.
 - **The project hosts no content.** Don't add sample recordings or links to
   download them.

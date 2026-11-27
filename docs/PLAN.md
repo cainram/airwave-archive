@@ -32,7 +32,13 @@ browser on any device in your house.
   or iPad, each copy of the app belongs to one person. It's not a service
   for the public, and it doesn't need sign-ups or accounts. Play history,
   "Continue listening" and played marks are simply that person's; don't
-  plan for sharing them.
+  plan for sharing them. **No logins or passwords.**
+  - *Kept open for later* (owner, 2026-11-27): a "Who's listening?"
+    picker like Netflix profiles: tap your name, no password. Not
+    planned yet, but don't build anything that rules it out: keep
+    each listener's things (where they stopped, played marks, the last
+    kind of media used) in their own tables, as `listening` already is,
+    never mixed into the episodes or the library's details.
 - **People who already have their recordings.** The project hosts and
   distributes **no content**. You bring your own files.
 
