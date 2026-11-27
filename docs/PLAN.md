@@ -28,8 +28,17 @@ browser on any device in your house.
 
 ### Who it's for
 
-- **One household.** It's not a service for the public, and it doesn't need
-  sign-ups or multi-user accounts.
+- **One person per server** (owner's choice, 2026-11-27): like an iPhone
+  or iPad, each copy of the app belongs to one person. It's not a service
+  for the public, and it doesn't need sign-ups or accounts. Play history,
+  "Continue listening" and played marks are simply that person's; don't
+  plan for sharing them. **No logins or passwords.**
+  - *Kept open for later* (owner, 2026-11-27): a "Who's listening?"
+    picker like Netflix profiles: tap your name, no password. Not
+    planned yet, but don't build anything that rules it out: keep
+    each listener's things (where they stopped, played marks, the last
+    kind of media used) in their own tables, as `listening` already is,
+    never mixed into the episodes or the library's details.
 - **People who already have their recordings.** The project hosts and
   distributes **no content**. You bring your own files.
 
@@ -1623,9 +1632,25 @@ The decisions:
   "Continue listening" and search stay within one kind.
 - **Elegant and clean.** The owner disliked AudioBookshelf's "libraries"
   drop-down, which makes each library a separate world. Tabs across the
-  top were also turned down as too obtrusive. **How you move between the
-  kinds is still open**, to explore later. Someone with only radio
+  top were also turned down as too obtrusive. Someone with only radio
   should see the app as it is today.
+- **Moving between the kinds: a drop-down** (owner's choice,
+  2026-11-27). In the top bar, just left of the dark-mode switch, it
+  shows the kind you're in ("Radio ▾") and lists Radio, Audiobooks,
+  Podcasts. Unlike AudioBookshelf's:
+  - It **only appears when the library holds more than one kind**, and
+    lists only the kinds that have something in them. With radio only,
+    the top bar is exactly as today.
+  - At most three fixed choices, named for what they are.
+  - **No setting for a "main kind"** (owner's choice: switching now and
+    then beats changing a setting). The app opens on the kind **last used
+    in that browser**, remembered like the dark-mode choice. A new browser
+    opens on Radio, and so does one whose last kind is now empty.
+  - On the phone: the same drop-down in the same place is the first
+    idea to try (the phone's top bar has room, with no Settings cog),
+    using the browser's own drop-down so an iPhone shows its usual
+    picker. To be settled when it's built. Not in the footer (owner,
+    2026-11-27).
 - **Apple Podcasts is the player for all three kinds,** on the iPhone and
   the Mac: "manage in the
   browser, listen in Podcasts". Feeds keep their secret addresses (no
@@ -1670,7 +1695,7 @@ The name stays **Airwave Archive** for now, for all three kinds
 
 Still to decide:
 - Which kind comes second: podcasts or audiobooks?
-- How to move between the kinds (see above).
+- How the kind drop-down works on the phone (see above).
 
 ### Later ideas (not committed)
 - Multiple library folders, playlists / "collections", backups of the
