@@ -17,6 +17,9 @@ station rerunning a series), instead of all at once.
   Episodes come out in the feed's own order (oldest first, in air-date
   order); a new episode added to a series feed takes its air-date place
   among those still waiting. An episode in several parts comes out whole.
+- The first few episodes can be skipped (already heard somewhere else):
+  they never come out in this feed (FeedSkip), even if everything is let
+  out later. Changing how many only moves episodes not out yet.
 - Podcast apps see only what's out. Dates are release times, never air
   dates (a ground rule: air dates are never invented).
 """
@@ -30,7 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db import Episode, Feed, FeedRelease, utcnow
+from app.db import Episode, Feed, FeedRelease, FeedSkip, Listening, utcnow
 from app.episodes import TIME_PATTERN, TIME_ZONES, ordinal
 
 # 3 AM: podcast apps fetch new episodes overnight, so they're on the
@@ -41,6 +44,7 @@ DEFAULT_ZONE = "America/Chicago"      # US Central (owner's choice, 2026-11-22)
 DEFAULT_START = 1
 MAX_START = 999
 MAX_AT_ONCE = 999        # "Release more now"
+MAX_SKIP = 99999
 EVERY = ("day", "weekdays", "weekend", "week", "days")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 DEFAULT_WEEKDAY = 5      # Saturday
@@ -55,6 +59,7 @@ def read_form(form) -> tuple[dict, dict]:
               "roll_time": str(form.get("roll_time", "")).strip() or DEFAULT_TIME,
               "roll_zone": str(form.get("roll_zone", "")) or DEFAULT_ZONE,
               "roll_start": str(form.get("roll_start", "")).strip(),
+              "roll_skip": str(form.get("roll_skip", "")).strip() or "0",
               "roll_every": str(form.get("roll_every", "")) or "day",
               "roll_weekday": str(form.get("roll_weekday", "")) or str(DEFAULT_WEEKDAY),
               "roll_days": str(form.get("roll_days", "")).strip() or str(DEFAULT_DAYS)}
@@ -74,6 +79,8 @@ def read_form(form) -> tuple[dict, dict]:
         if values["roll_start"] and not (values["roll_start"].isdigit()
                                          and int(values["roll_start"]) <= MAX_START):
             errors["roll_start"] = f"A number from 0 to {MAX_START}."
+        if not (values["roll_skip"].isdigit() and int(values["roll_skip"]) <= MAX_SKIP):
+            errors["roll_skip"] = f"A number from 0 to {MAX_SKIP}."
     return values, errors
 
 
@@ -82,11 +89,12 @@ def form_values(feed: Feed | None, zone: str = DEFAULT_ZONE) -> dict:
     feed: rolling (owner's choice, 2026-11-22), in your time zone (Settings)."""
     if feed is None or not feed.rolling:
         return {"release": "rolling" if feed is None else "all", "roll_time": DEFAULT_TIME, "roll_zone": zone,
-                "roll_start": str(DEFAULT_START), "roll_every": "day",
+                "roll_start": str(DEFAULT_START), "roll_skip": "0", "roll_every": "day",
                 "roll_weekday": str(DEFAULT_WEEKDAY), "roll_days": str(DEFAULT_DAYS)}
     return {"release": "rolling", "roll_time": feed.roll_time or DEFAULT_TIME,
             "roll_zone": feed.roll_zone or zone,
             "roll_start": str(feed.roll_start if feed.roll_start is not None else DEFAULT_START),
+            "roll_skip": str(feed.roll_skip or 0),
             "roll_every": feed.roll_every or "day",
             "roll_weekday": str(feed.roll_weekday if feed.roll_weekday is not None else DEFAULT_WEEKDAY),
             "roll_days": str(feed.roll_days or DEFAULT_DAYS)}
@@ -230,11 +238,62 @@ def released(session: Session, feed: Feed) -> dict[int, datetime]:
                                 .where(FeedRelease.feed_id == feed.id)).all())
 
 
+def skipped(session: Session, feed: Feed) -> set[int]:
+    """The episodes this feed skips (they never come out in it)."""
+    if feed.id is None:
+        return set()
+    return set(session.scalars(select(FeedSkip.episode_id).where(FeedSkip.feed_id == feed.id)))
+
+
+def playable(episodes: list[Episode]) -> list[Episode]:
+    """The episodes with a recording in the library: the ones counted when
+    skipping, in the feed's order."""
+    return [e for e in episodes if any(not f.missing for f in e.files)]
+
+
 def waiting(session: Session, feed: Feed, episodes: list[Episode]) -> list[Episode]:
     """The feed's episodes still to come, in the order they'll come out
-    (only those with a recording in the library)."""
+    (only those with a recording in the library, and not skipped)."""
     out = released(session, feed)
-    return [e for e in episodes if e.id not in out and any(not f.missing for f in e.files)]
+    skip = skipped(session, feed)
+    return [e for e in playable(episodes) if e.id not in out and e.id not in skip]
+
+
+def skip(session: Session, feed: Feed, how_many: int, episodes: list[Episode]) -> None:
+    """Skip the feed's first `how_many` episodes (counting only those with
+    a recording). Ones already out stay out; ones skipped before but not
+    among the first `how_many` any more go back in the queue."""
+    first = {e.id for e in playable(episodes)[:how_many]}
+    out = released(session, feed)
+    before = skipped(session, feed)
+    for row in session.scalars(select(FeedSkip).where(FeedSkip.feed_id == feed.id)):
+        if row.episode_id not in first:
+            session.delete(row)
+    for episode_id in first - before - set(out):
+        session.add(FeedSkip(feed_id=feed.id, episode_id=episode_id))
+    feed.roll_skip = how_many
+    feed.updated_at = utcnow()
+
+
+def skip_preview(session: Session, feed: Feed | None, episodes: list[Episode],
+                 how_many: int) -> dict:
+    """For the form, as the number is typed: which episode the feed would
+    start with (or, once it's rolling, which comes out next), and how far
+    the owner has listened here (the last one marked played)."""
+    candidates = playable(episodes)
+    out = released(session, feed) if feed is not None and feed.id is not None else {}
+    first = {e.id for e in candidates[:how_many]}
+    start = next(((number, e) for number, e in enumerate(candidates, 1)
+                  if e.id not in out and e.id not in first), None)
+    ids = [e.id for e in candidates]
+    played = set(session.scalars(select(Listening.episode_id).where(
+        Listening.played, Listening.episode_id.in_(ids)))) if ids else set()
+    last_played = max((number for number, e in enumerate(candidates, 1) if e.id in played),
+                      default=0)
+    return {"total": len(candidates), "skip": how_many, "started": bool(out),
+            "number": start[0] if start else None, "episode": start[1] if start else None,
+            "played": last_played,
+            "played_episode": candidates[last_played - 1] if last_played else None}
 
 
 def _release(session: Session, feed: Feed, episodes: list[Episode],
@@ -336,10 +395,12 @@ def all_at_once(session: Session, feed: Feed, now: datetime | None = None) -> in
 
 
 def forget(session: Session, feed: Feed, episode_ids: set[int]) -> None:
-    """Episodes taken out of a hand-picked feed: forget they were out."""
-    for row in session.scalars(select(FeedRelease).where(
-            FeedRelease.feed_id == feed.id, FeedRelease.episode_id.in_(episode_ids))):
-        session.delete(row)
+    """Episodes taken out of a hand-picked feed: forget they were out (or
+    skipped)."""
+    for table in (FeedRelease, FeedSkip):
+        for row in session.scalars(select(table).where(
+                table.feed_id == feed.id, table.episode_id.in_(episode_ids))):
+            session.delete(row)
 
 
 def status(session: Session, feed: Feed, episodes: list[Episode],
@@ -351,7 +412,7 @@ def status(session: Session, feed: Feed, episodes: list[Episode],
     out = len(released(session, feed))
     nxt = next_release(feed, now) if feed.roll_checked_at is not None else None
     return {"out": out, "total": out + len(queue), "waiting": len(queue),
-            "paused": feed.roll_paused,
+            "paused": feed.roll_paused, "skipped": len(skipped(session, feed)),
             "next_episode": queue[0] if queue else None,
             "next_when": when_words(feed, nxt, now) if nxt and queue else None,
             "schedule": schedule_words(feed),
