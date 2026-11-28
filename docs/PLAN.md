@@ -373,9 +373,11 @@ Released versions (GitHub Releases): **v1.0** (2026-11-07: Phases 0–9,
 tags, renaming, the Advanced page), **v26.11.0** (2026-11-20: genres,
 the mobile version, sorting, About this series, and more),
 **v26.11.1** (2026-11-22: rolling podcast feeds, joining multi-part
-episodes, exporting chosen series) and **v26.11.2** (2026-11-27: the
+episodes, exporting chosen series), **v26.11.2** (2026-11-27: the
 "On this day" feed, the Settings page; its notes mention, vaguely, that
-a larger upgrade has started). Everything
+a larger upgrade has started) and **v26.11.3** (2026-11-28: skipping a
+rolling feed's first episodes; its notes say work has begun on
+audiobook support). Everything
 after that is on `main`, waiting for the next version (only when the
 owner asks for one).
 
@@ -1581,7 +1583,7 @@ on first run. Built automatically by GitHub for each release.
 ### Later — Going public
 - ✅ The GitHub repository is public (2026-11-10), with **Issues**,
   **Discussions** and the **Wiki** off, since there's no support channel.
-- ✅ Finished versions are published on GitHub **Releases** (v1.0, v2.0, v26.11.0, v26.11.1, v26.11.2).
+- ✅ Finished versions are published on GitHub **Releases** (v1.0, v2.0, v26.11.0, v26.11.1, v26.11.2, v26.11.3).
   Still to come there: the desktop installers and a ready-made Docker
   image.
 - **airwavearchive.org** (in progress: its own public repository,
@@ -1716,8 +1718,10 @@ Tailscale address, or only when the app is opened?
 The name stays **Airwave Archive** for now, for all three kinds
 (owner's choice, 2026-11-27).
 
+**Audiobooks come second** (owner, 2026-11-28; announced in the 26.11.3
+release notes). Podcasts after that.
+
 Still to decide:
-- Which kind comes second: podcasts or audiobooks?
 - How the kind drop-down works on the phone (see above).
 
 ### Later ideas (not committed)
